@@ -1,0 +1,142 @@
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+
+import { Breadcrumbs } from "@/components/breadcrumbs";
+import { ButtonLink } from "@/components/button-link";
+import { Container } from "@/components/container";
+import { JsonLd } from "@/components/json-ld";
+import { ProvisionalImage } from "@/components/provisional-image";
+import { localContentSource } from "@/features/content";
+import { createMetadata } from "@/lib/seo";
+
+type ProductPageProps = {
+  params: Promise<{ slug: string }>;
+};
+
+export const dynamicParams = false;
+
+export async function generateStaticParams() {
+  const catalog = await localContentSource.listProducts();
+
+  return catalog.products.map((product) => ({
+    slug: product.slug,
+  }));
+}
+
+export async function generateMetadata({
+  params,
+}: ProductPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const product = await localContentSource.getProductBySlug(slug);
+
+  if (!product) {
+    return {};
+  }
+
+  return createMetadata(product.metadata);
+}
+
+export default async function ProductDetailPage({ params }: ProductPageProps) {
+  const { slug } = await params;
+  const product = await localContentSource.getProductBySlug(slug);
+
+  if (!product) {
+    notFound();
+  }
+
+  return (
+    <>
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "Product",
+          name: product.name,
+          description: product.summary,
+          category: product.category,
+          brand: {
+            "@type": "Brand",
+            name: "Tauco Cap Badak",
+          },
+        }}
+      />
+      <section className="product-detail-hero">
+        <Container>
+          <Breadcrumbs
+            items={[
+              { label: "Beranda", href: "/" },
+              { label: "Produk", href: "/produk" },
+              { label: product.name, href: `/produk/${product.slug}` },
+            ]}
+          />
+          <div className="product-detail-grid">
+            <div className="product-detail-copy">
+              <p className="eyebrow">{product.category}</p>
+              <h1>{product.name}</h1>
+              <p className="product-summary">{product.summary}</p>
+              <dl className="product-facts">
+                {product.facts.map((fact) => (
+                  <div key={fact.label}>
+                    <dt>{fact.label}</dt>
+                    <dd>{fact.value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="purchase-note">{product.purchaseNote}</p>
+              <ButtonLink href={product.contactLink.href}>
+                Tanyakan produk
+              </ButtonLink>
+            </div>
+            <ProvisionalImage
+              src={product.image.src}
+              alt={product.image.alt}
+              sizes="(max-width: 1023px) 100vw, 52vw"
+              className="product-detail-image"
+              imageClassName="aspect-[4/3]"
+            />
+          </div>
+        </Container>
+      </section>
+
+      <Container className="product-body">
+        <section>
+          <h2>Informasi produk</h2>
+          {product.description.map((paragraph) => (
+            <p key={paragraph}>{paragraph}</p>
+          ))}
+        </section>
+
+        <section>
+          <h2>Saran penggunaan</h2>
+          <ul className="usage-list">
+            {product.usageSuggestions.map((suggestion) => (
+              <li key={suggestion}>{suggestion}</li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="research-note">
+          <h2>{product.researchEvidence.heading}</h2>
+          <p>{product.researchEvidence.summary}</p>
+          <dl>
+            {product.researchEvidence.facts.map((fact) => (
+              <div key={fact.label}>
+                <dt>{fact.label}</dt>
+                <dd>{fact.value}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="scope-note">{product.researchEvidence.scopeNote}</p>
+          <a
+            href={product.researchEvidence.source.url}
+            target="_blank"
+            rel="noreferrer"
+            className="research-source"
+          >
+            <span>{product.researchEvidence.source.label}</span>
+            <small>{product.researchEvidence.source.publisher}</small>
+          </a>
+        </section>
+      </Container>
+    </>
+  );
+}

@@ -1,0 +1,82 @@
+{
+  "metadata": {
+    "title": "Produk Tauco Cap Badak | Katalog Produk",
+    "description": "Jelajahi produk Tauco Cap Badak dari Cianjur dan temukan informasi dasar serta saran penggunaannya dalam beragam masakan.",
+    "canonicalPath": "/produk",
+    "openGraphImage": {
+      "src": "/images/tauco-fermentation-provisional.webp",
+      "alt": "Ilustrasi tauco semipadat dalam mangkuk dengan kedelai"
+    }
+  },
+  "heading": "Produk Tauco Cap Badak",
+  "description": "Katalog ini hanya memuat informasi produk yang telah dapat dipastikan. Hubungi kami untuk ukuran, komposisi, harga, dan ketersediaan terbaru.",
+  "contactLink": {
+    "label": "Tanyakan informasi produk",
+    "href": "/kontak?topik=produk"
+  },
+  "products": [
+    {
+      "slug": "tauco-cap-badak",
+      "name": "Tauco Cap Badak",
+      "category": "Bumbu fermentasi",
+      "summary": "Produk tauco dari Cianjur untuk digunakan sebagai bumbu dalam aneka masakan.",
+      "description": [
+        "Tauco Cap Badak dikenal sebagai produk tauco dari Cianjur, Jawa Barat.",
+        "Tauco dapat digunakan sebagai bumbu pada tumisan, sambal, dan masakan berkuah. Sesuaikan jumlahnya dengan cita rasa hidangan."
+      ],
+      "image": {
+        "src": "/images/tauco-fermentation-provisional.webp",
+        "alt": "Ilustrasi tauco semipadat dalam mangkuk dengan kedelai"
+      },
+      "facts": [
+        {
+          "label": "Asal",
+          "value": "Cianjur, Jawa Barat"
+        },
+        {
+          "label": "Kegunaan umum",
+          "value": "Bumbu masakan"
+        }
+      ],
+      "usageSuggestions": [
+        "Gunakan sedikit demi sedikit dan cicipi sebelum menambahkan garam.",
+        "Padukan dengan bahan lain sesuai resep dan selera."
+      ],
+      "priceEstimate": null,
+      "purchaseNote": "Hubungi kami untuk informasi ukuran, komposisi, harga, dan ketersediaan terbaru.",
+      "contactLink": {
+        "label": "Hubungi kami",
+        "href": "/kontak?topik=produk"
+      },
+      "researchEvidence": {
+        "heading": "Catatan dari penelitian 2022",
+        "summary": "Journal of Ethnic Foods meneliti satu sampel Tauco Cap Badak Cianjur dengan kode CBC sebagai bagian dari studi terhadap 24 produk tauco di Indonesia.",
+        "facts": [
+          {
+            "label": "Kategori sampel",
+            "value": "Semipadat"
+          },
+          {
+            "label": "Komposisi pada label sampel",
+            "value": "Kedelai, garam, gula, dan air"
+          }
+        ],
+        "scopeNote": "Data ini hanya menjelaskan kemasan sampel yang diteliti pada studi 2022. Data tersebut bukan konfirmasi formula, ukuran, legalitas, atau keseluruhan katalog Tauco Cap Badak yang tersedia saat ini.",
+        "source": {
+          "label": "Nutritional composition of tauco as Indonesian fermented soybean paste",
+          "publisher": "Journal of Ethnic Foods",
+          "url": "https://link.springer.com/article/10.1186/s42779-022-00159-y"
+        }
+      },
+      "metadata": {
+        "title": "Tauco Cap Badak | Produk Tauco dari Cianjur",
+        "description": "Kenali Tauco Cap Badak dari Cianjur, kegunaannya sebagai bumbu masakan, serta cara memperoleh informasi produk yang terbaru.",
+        "canonicalPath": "/produk/tauco-cap-badak",
+        "openGraphImage": {
+          "src": "/images/tauco-fermentation-provisional.webp",
+          "alt": "Ilustrasi tauco semipadat dalam mangkuk dengan kedelai"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "metadata": {
+    "title": "Tauco Cap Badak Cianjur | Produk & Cerita Kami",
+    "description": "Kenali Tauco Cap Badak dari Cianjur, lihat produk kami, pelajari tentang tauco, dan hubungi kami untuk memperoleh informasi terbaru.",
+    "canonicalPath": "/",
+    "openGraphImage": {
+      "src": "/images/tauco-hero-provisional.webp",
+      "alt": "Semangkuk tauco dengan kedelai dan tumisan sayuran"
+    }
+  },
+  "hero": {
+    "eyebrow": "Tauco dari Cianjur",
+    "title": "Tauco Cap Badak",
+    "description": "Mengenal produk tauco dari Cianjur dan kegunaannya sebagai bumbu dalam beragam masakan Indonesia.",
+    "image": {
+      "src": "/images/tauco-hero-provisional.webp",
+      "alt": "Semangkuk tauco dengan kedelai dan tumisan sayuran"
+    },
+    "actions": [
+      {
+        "label": "Lihat produk",
+        "href": "/produk"
+      }
+    ]
+  },
+  "introduction": {
+    "id": "mengenal-tauco",
+    "heading": "Kenali tauco lebih dekat",
+    "paragraphs": [
+      "Tauco merupakan bumbu berbahan kedelai yang diproses melalui fermentasi. Cita rasanya umumnya gurih dan asin sehingga digunakan sebagai penyedap dalam berbagai masakan.",
+      "Di Cianjur, tauco telah lama dikenal sebagai bagian dari kekayaan kuliner lokal."
+    ]
+  },
+  "featuredProductSlugs": [
+    "tauco-cap-badak"
+  ],
+  "guidePreview": {
+    "heading": "Apa itu tauco?",
+    "description": "Pelajari bahan, proses fermentasi secara umum, ragam rasa, dan cara menggunakan tauco dalam masakan.",
+    "link": {
+      "label": "Baca panduan tauco",
+      "href": "/tauco"
+    }
+  },
+  "aboutPreview": {
+    "heading": "Mengenal Tauco Cap Badak",
+    "description": "Temukan profil singkat Tauco Cap Badak dan konteks kuliner tauco di Cianjur.",
+    "link": {
+      "label": "Tentang kami",
+      "href": "/tentang-kami"
+    }
+  }
+}

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="id-ID">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Blueprint formulir kontak</title>
+  </head>
+  <body>
+    <form
+      name="kontak"
+      method="POST"
+      data-netlify="true"
+      netlify-honeypot="bot-field"
+    >
+      <input type="hidden" name="form-name" value="kontak" />
+      <p hidden>
+        <label>
+          Jangan isi bidang ini
+          <input name="bot-field" />
+        </label>
+      </p>
+      <label>
+        Nama
+        <input
+          name="name"
+          type="text"
+          minlength="2"
+          maxlength="100"
+          required
+        />
+      </label>
+      <label>
+        Email
+        <input name="email" type="email" maxlength="160" required />
+      </label>
+      <label>
+        Telepon
+        <input
+          name="phone"
+          type="tel"
+          minlength="7"
+          maxlength="30"
+          pattern="[+0-9() -]{7,30}"
+        />
+      </label>
+      <label>
+        Topik
+        <select name="subject" required>
+          <option>Informasi produk</option>
+          <option>Kerja sama dan distribusi</option>
+          <option>Pertanyaan umum</option>
+        </select>
+      </label>
+      <label>
+        Pesan
+        <textarea
+          name="message"
+          minlength="20"
+          maxlength="2000"
+          required
+        ></textarea>
+      </label>
+      <label>
+        <input
+          name="privacyConsent"
+          type="checkbox"
+          value="yes"
+          required
+        />
+        Persetujuan privasi
+      </label>
+      <button type="submit">Kirim pesan</button>
+    </form>
+  </body>
+</html>

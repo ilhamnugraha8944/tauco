@@ -1,0 +1,59 @@
+{
+  "metadata": {
+    "title": "Tentang Kami | Tauco Cap Badak Cianjur",
+    "description": "Kenali profil Tauco Cap Badak dan hubungannya dengan kekayaan kuliner tauco yang telah lama dikenal oleh masyarakat Cianjur.",
+    "canonicalPath": "/tentang-kami",
+    "openGraphImage": {
+      "src": "/images/tauco-dish-provisional.webp",
+      "alt": "Tumis tahu dan sayuran dengan bumbu tauco"
+    }
+  },
+  "hero": {
+    "eyebrow": "Tentang kami",
+    "title": "Tentang Tauco Cap Badak",
+    "description": "Tauco Cap Badak dikenal sebagai salah satu produk tauco dari Cianjur, Jawa Barat.",
+    "image": {
+      "src": "/images/tauco-dish-provisional.webp",
+      "alt": "Tumis tahu dan sayuran dengan bumbu tauco"
+    }
+  },
+  "sections": [
+    {
+      "id": "profil-singkat",
+      "heading": "Profil singkat",
+      "paragraphs": [
+        "Tauco Cap Badak merupakan produk tauco asal Cianjur, Jawa Barat. Website ini memperkenalkan produk tersebut sekaligus menyediakan pengetahuan dasar tentang tauco."
+      ]
+    },
+    {
+      "id": "cianjur-dan-tauco",
+      "heading": "Cianjur dan tauco",
+      "paragraphs": [
+        "Tauco telah menjadi bagian dari identitas kuliner Cianjur. Bumbu ini dibuat melalui fermentasi kedelai dan digunakan untuk memberi rasa gurih pada masakan.",
+        "Karakter, komposisi, dan proses rinci dapat berbeda pada setiap produsen. Karena itu, informasi produk perlu mengacu pada keterangan resmi dari produsennya."
+      ]
+    }
+  ],
+  "relatedLinks": [
+    {
+      "label": "Pelajari apa itu tauco",
+      "href": "/tauco"
+    },
+    {
+      "label": "Lihat produk",
+      "href": "/produk"
+    }
+  ],
+  "sources": [
+    {
+      "label": "Tauco - Explore Cianjur",
+      "publisher": "Dinas Kebudayaan dan Pariwisata Kabupaten Cianjur",
+      "url": "https://hayuka.cianjurkab.go.id/kuliner/tauco"
+    },
+    {
+      "label": "Tauco",
+      "publisher": "Program Studi Teknologi Pangan, Universitas Katolik Widya Mandala Surabaya",
+      "url": "https://www.foodtech.ukwms.ac.id/post/tauco"
+    }
+  ]
+}
