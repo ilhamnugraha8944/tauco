@@ -8,7 +8,7 @@ import {
   contentBundleSchema,
   imageAssetSchema,
   internalLinkSchema,
-  productCatalogContentSchema,
+  productCatalogDocumentSchema,
   seoMetadataSchema,
   slugSchema,
 } from "../../src/features/content";
@@ -59,22 +59,60 @@ describe("content schemas", () => {
   });
 
   it("requires descriptive alt text and an internal image path", () => {
-    expect(
-      imageAssetSchema.safeParse({
-        src: "/images/tauco-fermentation-provisional.png",
-        alt: "Ilustrasi tauco semipadat dalam mangkuk dengan kedelai",
-      }).success,
-    ).toBe(true);
+    const informativeImage = imageAssetSchema.safeParse({
+      src: "/images/tauco-fermentation-provisional.png",
+      alt: "Ilustrasi tauco semipadat dalam mangkuk dengan kedelai",
+      decorative: false,
+    });
+
+    expect(informativeImage.success).toBe(true);
+
+    if (informativeImage.success) {
+      expect(informativeImage.data.decorative).toBe(false);
+    }
+
     expect(
       imageAssetSchema.safeParse({
         src: "/images/tauco-fermentation-provisional.png",
         alt: "Foto produk",
+        decorative: false,
       }).success,
     ).toBe(false);
     expect(
       imageAssetSchema.safeParse({
         src: "https://example.com/product.webp",
         alt: "Produk Tauco Cap Badak dari Cianjur",
+        decorative: false,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("requires an empty alt only for explicitly decorative images", () => {
+    expect(
+      imageAssetSchema.safeParse({
+        src: "/images/tauco-fermentation-provisional.png",
+        alt: "Ilustrasi tauco semipadat dalam mangkuk dengan kedelai",
+      }).success,
+    ).toBe(false);
+    expect(
+      imageAssetSchema.safeParse({
+        src: "/images/tauco-fermentation-provisional.png",
+        alt: "",
+        decorative: true,
+      }).success,
+    ).toBe(true);
+    expect(
+      imageAssetSchema.safeParse({
+        src: "/images/tauco-fermentation-provisional.png",
+        alt: "Tauco dalam mangkuk",
+        decorative: true,
+      }).success,
+    ).toBe(false);
+    expect(
+      imageAssetSchema.safeParse({
+        src: "/images/tauco-fermentation-provisional.png",
+        alt: "",
+        decorative: false,
       }).success,
     ).toBe(false);
   });
@@ -88,20 +126,63 @@ describe("content schemas", () => {
         openGraphImage: {
           src: "/images/tauco-fermentation-provisional.png",
           alt: "Ilustrasi tauco semipadat dalam mangkuk dengan kedelai",
+          decorative: false,
         },
       }).success,
     ).toBe(false);
   });
 
-  it("rejects duplicate product slugs", () => {
+  it("requires an informative Open Graph image", () => {
+    expect(
+      seoMetadataSchema.safeParse({
+        ...homeJson.metadata,
+        openGraphImage: {
+          src: "/images/tauco-hero-provisional.webp",
+          alt: "",
+          decorative: true,
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("requires an explicit product publication status", () => {
+    const productWithoutStatus = structuredClone(productsJson.products[0]) as {
+      status?: string;
+    };
+    delete productWithoutStatus.status;
+
+    expect(
+      productCatalogDocumentSchema.safeParse({
+        ...productsJson,
+        products: [productWithoutStatus],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts an authored catalog without product records", () => {
+    expect(
+      productCatalogDocumentSchema.safeParse({
+        ...productsJson,
+        products: [],
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejects duplicate product slugs across publication statuses", () => {
     const firstProduct = productsJson.products[0];
     const catalogWithDuplicate = {
       ...productsJson,
-      products: [firstProduct, { ...firstProduct }],
+      products: [
+        firstProduct,
+        {
+          ...firstProduct,
+          status: "draft",
+        },
+      ],
     };
 
     expect(
-      productCatalogContentSchema.safeParse(catalogWithDuplicate).success,
+      productCatalogDocumentSchema.safeParse(catalogWithDuplicate).success,
     ).toBe(false);
   });
 
@@ -116,6 +197,23 @@ describe("content schemas", () => {
 
     expect(
       contentBundleSchema.safeParse(bundleWithUnknownFeaturedProduct).success,
+    ).toBe(false);
+  });
+
+  it("rejects a featured product that is still a draft", () => {
+    const bundleWithDraftFeaturedProduct = {
+      ...validBundle,
+      productCatalog: {
+        ...productsJson,
+        products: productsJson.products.map((product) => ({
+          ...product,
+          status: "draft",
+        })),
+      },
+    };
+
+    expect(
+      contentBundleSchema.safeParse(bundleWithDraftFeaturedProduct).success,
     ).toBe(false);
   });
 });

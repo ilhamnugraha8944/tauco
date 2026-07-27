@@ -1,25 +1,8 @@
 import type { NextConfig } from "next";
 
-import {
-  isNetlifyProductionEnvironment,
-  isSeoAuditEnvironment,
-  parseSiteOrigin,
-} from "./src/lib/site-origin";
+import { resolveSiteEnvironment } from "./src/lib/site-origin";
 
-const isNetlifyProduction =
-  isNetlifyProductionEnvironment(process.env);
-const isSeoAudit = isSeoAuditEnvironment(process.env);
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-
-if (isNetlifyProduction) {
-  try {
-    parseSiteOrigin(siteUrl ?? "", { requirePublicHttps: true });
-  } catch {
-    throw new Error(
-      "NEXT_PUBLIC_SITE_URL wajib berupa origin HTTPS publik untuk deploy production Netlify.",
-    );
-  }
-}
+const siteEnvironment = resolveSiteEnvironment(process.env);
 
 const securityHeaders = [
   {
@@ -41,7 +24,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  distDir: isSeoAudit ? ".next-lighthouse" : ".next",
+  distDir: siteEnvironment.isSeoAudit ? ".next-lighthouse" : ".next",
   poweredByHeader: false,
   reactStrictMode: true,
   images: {

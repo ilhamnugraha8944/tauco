@@ -1,8 +1,8 @@
 import type {
   AboutContent,
   HomeContent,
-  Product,
   ProductCatalogContent,
+  ProductDetail,
   TaucoGuideContent,
 } from "./types";
 
@@ -11,5 +11,5 @@ export interface ContentSource {
   getAbout(): Promise<AboutContent>;
   getTaucoGuide(): Promise<TaucoGuideContent>;
   listProducts(): Promise<ProductCatalogContent>;
-  getProductBySlug(slug: string): Promise<Product | null>;
+  getProductBySlug(slug: string): Promise<ProductDetail | null>;
 }

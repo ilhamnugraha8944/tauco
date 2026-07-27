@@ -1,28 +1,10 @@
 import {
-  isNetlifyProductionEnvironment,
-  isSeoAuditEnvironment,
-  parseSiteOrigin,
+  resolveSiteEnvironment,
 } from "./site-origin";
 
-const LOCAL_SITE_URL = "http://localhost:3000";
-
-const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-const isNetlifyProduction =
-  isNetlifyProductionEnvironment(process.env);
-const isSeoAudit = isSeoAuditEnvironment(process.env);
-
-if (isNetlifyProduction && !configuredSiteUrl) {
-  throw new Error(
-    "NEXT_PUBLIC_SITE_URL wajib diisi sebelum production deploy agar canonical tidak salah.",
-  );
-}
-
-export const siteUrl = parseSiteOrigin(
-  configuredSiteUrl || LOCAL_SITE_URL,
-  { requirePublicHttps: isNetlifyProduction },
-);
-export const isIndexableProduction =
-  isNetlifyProduction || isSeoAudit;
+export const siteEnvironment = resolveSiteEnvironment(process.env);
+export const siteUrl = siteEnvironment.siteUrl;
+export const isIndexableProduction = siteEnvironment.isIndexable;
 
 export const siteConfig = {
   name: "Tauco Cap Badak",

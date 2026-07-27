@@ -5,7 +5,8 @@
     "canonicalPath": "/tentang-kami",
     "openGraphImage": {
       "src": "/images/tauco-dish-provisional.webp",
-      "alt": "Tumis tahu dan sayuran dengan bumbu tauco"
+      "alt": "Tumis tahu dan sayuran dengan bumbu tauco",
+      "decorative": false
     }
   },
   "hero": {
@@ -14,7 +15,8 @@
     "description": "Tauco Cap Badak dikenal sebagai salah satu produk tauco dari Cianjur, Jawa Barat.",
     "image": {
       "src": "/images/tauco-dish-provisional.webp",
-      "alt": "Tumis tahu dan sayuran dengan bumbu tauco"
+      "alt": "Tumis tahu dan sayuran dengan bumbu tauco",
+      "decorative": false
     }
   },
   "sections": [

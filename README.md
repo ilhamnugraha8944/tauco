@@ -9,7 +9,7 @@ REST API Go, PostgreSQL, Redis, image worker, authentication, dan Admin CMS
 belum menjadi bagian runtime saat ini. Rencana lengkapnya ada di
 [PRD.md](./PRD.md).
 
-**Status handoff:** implementasi dan verifikasi Phase 1A selesai di local.
+**Status handoff:** Phase 1A berstatus PRD-complete dan tervalidasi di local.
 Belum ada deployment, site Netlify/Vercel, koneksi Supabase, atau perubahan
 layanan eksternal. Hasil dan screenshot tersedia di
 [WALKTHROUGH.md](./WALKTHROUGH.md).
@@ -98,16 +98,19 @@ Jangan commit `.env.local`.
 
 | Variable | Wajib | Contoh | Keterangan |
 | --- | --- | --- | --- |
-| `NEXT_PUBLIC_SITE_URL` | Ya di production | `https://nama-site.netlify.app` | Absolute canonical origin tanpa path dan query |
+| `NEXT_PUBLIC_SITE_URL` | Ya pada setiap build Netlify | `https://nama-site.netlify.app` | Absolute canonical origin tanpa path dan query |
 | `GOOGLE_SITE_VERIFICATION` | Tidak | Token Search Console | Isi setelah URL-prefix property dibuat |
 
 Aturan `NEXT_PUBLIC_SITE_URL`:
 
 - Lokal memakai `http://localhost:3000`.
-- Production wajib memakai URL production yang benar.
-- Gunakan `https`.
+- Setiap context Netlify wajib memakai origin production final yang benar.
+- Netlify production indexable, sedangkan Deploy Preview dan branch deploy
+  tetap `noindex`.
+- Gunakan `https` dengan hostname publik. Localhost, IP literal, single-label
+  hostname, dan reserved TLD ditolak pada build Netlify.
 - Jangan memakai slash penutup jika parser konfigurasi mengharuskan origin.
-- Jangan mengisi URL contoh atau Deploy Preview sebagai canonical production.
+- Jangan memakai URL Deploy Preview sebagai canonical.
 - Setelah mengganti domain, build dan deploy ulang agar canonical, sitemap,
   robots, JSON-LD, dan social URL ikut berubah.
 
@@ -160,9 +163,11 @@ npm.cmd run test:e2e
 ```
 
 `test:e2e` dan `lighthouse` membuat production build serta mengelola server
-local secara otomatis. Lighthouse memakai build `.next-lighthouse` agar mode
-audit yang indexable tidak mengubah perilaku local normal yang tetap `noindex`.
-Skor local bukan field data production.
+local secara otomatis. Lighthouse memakai build `.next-lighthouse`, mencari
+port kosong, dan mengaktifkan indexability hanya pada loopback audit. Manifest
+baru dipublikasikan setelah seluruh assertion lulus. Runner juga membersihkan
+staging, menghentikan server/Chrome, serta memulihkan `next-env.d.ts`. Skor
+local bukan field data production.
 
 ## Routes
 
@@ -190,7 +195,7 @@ Browser / crawler
 Next.js App Router
   |-- Server Components untuk halaman dan konten utama
   |-- Navigasi mobile native <details> dari Server Component
-  |-- Client Component hanya untuk contact form
+  |-- Client Components untuk contact form dan error boundary Next.js
   |-- Metadata, robots, sitemap, dan JSON-LD
        |
        v
@@ -247,11 +252,15 @@ Workflow:
    - `content/about.json`
    - `content/tauco-guide.json`
    - `content/products.json`
-3. Pertahankan ID dan slug produk published.
-4. Pastikan setiap informative image memiliki alt text yang faktual.
-5. Jangan menambahkan harga, sertifikasi, alamat, kontak, sejarah, testimoni,
+3. Setiap record produk wajib memiliki status eksplisit `draft` atau
+   `published`. Status tidak mempunyai default.
+4. Pertahankan ID dan slug produk published.
+5. Pastikan setiap informative image memakai `decorative: false` dan alt text
+   yang faktual. Gambar dekoratif wajib memakai `decorative: true` serta
+   `alt: ""`.
+6. Jangan menambahkan harga, sertifikasi, alamat, kontak, sejarah, testimoni,
    atau klaim kualitas tanpa source-of-truth.
-6. Jalankan:
+7. Jalankan:
 
    ```powershell
    npm.cmd run typecheck
@@ -259,8 +268,13 @@ Workflow:
    npm.cmd run build
    ```
 
-7. Preview seluruh route yang terdampak, termasuk mobile viewport.
-8. Setelah merge, periksa canonical dan sitemap pada deployment.
+8. Preview seluruh route yang terdampak, termasuk mobile viewport.
+9. Setelah merge, periksa canonical dan sitemap pada deployment.
+
+Produk draft tetap berada di repository dan bukan boundary untuk data rahasia.
+Jangan menyimpan rahasia, credential, atau data pribadi dalam file konten.
+Hanya produk published yang diproyeksikan ke katalog, detail route, homepage,
+sitemap, dan static params.
 
 Produk awal memakai slug `tauco-cap-badak` dan public URL
 `/produk/tauco-cap-badak`. CTA pertanyaan produk menggunakan
@@ -300,7 +314,8 @@ Referensi resmi:
    - Build command: `npm run build`
    - Publish directory: `.next`
    - Node: `22`
-5. Tambahkan production environment variable:
+5. Tambahkan environment variable pada production, Deploy Preview, dan branch
+   deploy. Nilainya tetap origin production final:
 
    ```text
    NEXT_PUBLIC_SITE_URL=https://nama-site-final.netlify.app

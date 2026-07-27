@@ -80,6 +80,7 @@ export function ContactForm({
   defaultSubject?: ContactMessage["subject"];
 }) {
   const formRef = useRef<HTMLFormElement>(null);
+  const submissionLockRef = useRef(false);
   const [state, setState] = useState<SubmissionState>(initialState);
   const isPending = state.status === "pending";
 
@@ -125,6 +126,10 @@ export function ContactForm({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (submissionLockRef.current) {
+      return;
+    }
+
     const form = event.currentTarget;
     const result = validateContactMessage(getPayload(form));
 
@@ -136,6 +141,7 @@ export function ContactForm({
       return;
     }
 
+    submissionLockRef.current = true;
     setState({ status: "pending", errors: {} });
 
     try {
@@ -149,6 +155,8 @@ export function ContactForm({
         message:
           "Pesan belum terkirim. Periksa koneksi Anda, lalu coba kembali.",
       });
+    } finally {
+      submissionLockRef.current = false;
     }
   }
 

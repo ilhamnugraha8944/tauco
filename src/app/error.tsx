@@ -18,7 +18,7 @@ export default function ErrorPage({
       <div className="mx-auto w-full max-w-[1280px] px-5 sm:px-8 lg:px-10">
         <p className="eyebrow">Terjadi kendala</p>
         <h1>Halaman belum dapat ditampilkan</h1>
-        <p>Coba muat kembali halaman ini. Konten Anda tidak berubah.</p>
+        <p>Coba muat kembali halaman ini.</p>
         <button type="button" className="button-link" onClick={reset}>
           Coba kembali
         </button>

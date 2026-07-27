@@ -47,14 +47,16 @@ export const internalLinkSchema = z
   })
   .strict();
 
-export const imageAssetSchema = z
+const imageSourceSchema = z
+  .string()
+  .regex(
+    internalImagePattern,
+    "Gambar harus menggunakan path /images dan format yang didukung.",
+  );
+
+export const informativeImageAssetSchema = z
   .object({
-    src: z
-      .string()
-      .regex(
-        internalImagePattern,
-        "Gambar harus menggunakan path /images dan format yang didukung.",
-      ),
+    src: imageSourceSchema,
     alt: z
       .string()
       .trim()
@@ -67,15 +69,29 @@ export const imageAssetSchema = z
           ),
         "Alt text harus menjelaskan isi gambar, bukan label generik.",
       ),
+    decorative: z.literal(false),
   })
   .strict();
+
+export const decorativeImageAssetSchema = z
+  .object({
+    src: imageSourceSchema,
+    alt: z.literal(""),
+    decorative: z.literal(true),
+  })
+  .strict();
+
+export const imageAssetSchema = z.union([
+  informativeImageAssetSchema,
+  decorativeImageAssetSchema,
+]);
 
 export const seoMetadataSchema = z
   .object({
     title: z.string().trim().min(8).max(80),
     description: z.string().trim().min(50).max(180),
     canonicalPath: internalPathSchema,
-    openGraphImage: imageAssetSchema,
+    openGraphImage: informativeImageAssetSchema,
   })
   .strict();
 
@@ -116,7 +132,7 @@ export const homeContentSchema = z
       actions: z.array(internalLinkSchema).min(1).max(2),
     }),
     introduction: textSectionSchema,
-    featuredProductSlugs: z.array(slugSchema).min(1).max(6),
+    featuredProductSlugs: z.array(slugSchema).max(6),
     guidePreview: z
       .object({
         heading: shortTextSchema,
@@ -190,15 +206,23 @@ export const productResearchEvidenceSchema = z
   })
   .strict();
 
-export const productSchema = z
+export const productStatusSchema = z.enum(["draft", "published"]);
+
+export const productSummarySchema = z
   .object({
     slug: slugSchema,
     name: z.string().trim().min(3).max(120),
     category: shortTextSchema,
     summary: z.string().trim().min(40).max(220),
-    description: z.array(paragraphSchema).min(1).max(6),
-    image: imageAssetSchema,
+    image: informativeImageAssetSchema,
     facts: z.array(productFactSchema).min(1).max(12),
+  })
+  .strict();
+
+export const productDetailSchema = productSummarySchema
+  .extend({
+    metadata: seoMetadataSchema,
+    description: z.array(paragraphSchema).min(1).max(6),
     usageSuggestions: z
       .array(z.string().trim().min(20).max(220))
       .min(1)
@@ -207,17 +231,35 @@ export const productSchema = z
     purchaseNote: z.string().trim().min(20).max(220),
     contactLink: internalLinkSchema,
     researchEvidence: productResearchEvidenceSchema,
-    metadata: seoMetadataSchema,
   })
   .strict();
 
-export const productCatalogContentSchema = z
+export const productRecordSchema = productDetailSchema
+  .extend({
+    status: productStatusSchema,
+  })
+  .strict();
+
+export const productSchema = productDetailSchema;
+
+const productCatalogBaseSchema = z
   .object({
     metadata: seoMetadataSchema,
     heading: z.string().trim().min(4).max(120),
     description: z.string().trim().min(40).max(240),
     contactLink: internalLinkSchema,
-    products: z.array(productSchema).min(1).max(1000),
+  })
+  .strict();
+
+export const productCatalogContentSchema = productCatalogBaseSchema
+  .extend({
+    products: z.array(productSummarySchema).max(1000),
+  })
+  .strict();
+
+export const productCatalogDocumentSchema = productCatalogBaseSchema
+  .extend({
+    products: z.array(productRecordSchema).max(1000),
   })
   .strict()
   .superRefine((catalog, context) => {
@@ -250,7 +292,7 @@ export const contentBundleSchema = z
     home: homeContentSchema,
     about: aboutContentSchema,
     taucoGuide: taucoGuideContentSchema,
-    productCatalog: productCatalogContentSchema,
+    productCatalog: productCatalogDocumentSchema,
   })
   .strict()
   .superRefine((bundle, context) => {
@@ -287,15 +329,17 @@ export const contentBundleSchema = z
       }
     });
 
-    const productSlugs = new Set(
-      bundle.productCatalog.products.map((product) => product.slug),
+    const publishedProductSlugs = new Set(
+      bundle.productCatalog.products
+        .filter((product) => product.status === "published")
+        .map((product) => product.slug),
     );
 
     bundle.home.featuredProductSlugs.forEach((slug, index) => {
-      if (!productSlugs.has(slug)) {
+      if (!publishedProductSlugs.has(slug)) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
-          message: `Produk unggulan tidak ditemukan: ${slug}`,
+          message: `Produk unggulan tidak ditemukan atau belum published: ${slug}`,
           path: ["home", "featuredProductSlugs", index],
         });
       }
@@ -308,9 +352,9 @@ export const contentBundleSchema = z
       "/produk",
       "/tauco",
       "/tentang-kami",
-      ...bundle.productCatalog.products.map(
-        (product) => `/produk/${product.slug}`,
-      ),
+      ...bundle.productCatalog.products
+        .filter((product) => product.status === "published")
+        .map((product) => `/produk/${product.slug}`),
     ]);
 
     const links = [

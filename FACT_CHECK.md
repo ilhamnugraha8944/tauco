@@ -334,9 +334,12 @@ sebagai deskripsi sensori, bukan fakta ilmiah. Hindari superlatif.
 - [ ] Nama pihak yang mengendalikan data contact form.
 - [ ] Email/kanal privacy request.
 - [ ] Siapa yang menerima Netlify submission.
+- [x] Public wording membatasi akses kepada pengelola inbox yang ditunjuk dan
+      menyebut Netlify sebagai pemroses teknis.
 - [x] Retention period untuk scope Phase 1A: maksimal 12 bulan.
 - [ ] Persetujuan pemilik bisnis dan SOP operasional untuk retensi 12 bulan.
-- [ ] Prosedur koreksi/penghapusan.
+- [x] Public flow untuk permintaan akses, koreksi, dan penghapusan melalui form.
+- [ ] SOP operasional untuk verifikasi, koreksi, dan penghapusan.
 - [ ] Response-time wording yang boleh dijanjikan.
 - [ ] Notification recipient dan backup recipient.
 

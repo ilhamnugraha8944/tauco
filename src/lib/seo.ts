@@ -69,6 +69,7 @@ export const staticPageMetadata = {
     openGraphImage: {
       src: "/images/tauco-hero-provisional.webp",
       alt: "Semangkuk tauco dengan kedelai dan tumisan sayuran",
+      decorative: false,
     },
   }),
   privacy: seoMetadataSchema.parse({
@@ -79,6 +80,7 @@ export const staticPageMetadata = {
     openGraphImage: {
       src: "/images/tauco-hero-provisional.webp",
       alt: "Semangkuk tauco dengan kedelai dan tumisan sayuran",
+      decorative: false,
     },
   }),
 } as const;

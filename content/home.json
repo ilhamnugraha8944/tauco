@@ -5,7 +5,8 @@
     "canonicalPath": "/",
     "openGraphImage": {
       "src": "/images/tauco-hero-provisional.webp",
-      "alt": "Semangkuk tauco dengan kedelai dan tumisan sayuran"
+      "alt": "Semangkuk tauco dengan kedelai dan tumisan sayuran",
+      "decorative": false
     }
   },
   "hero": {
@@ -14,7 +15,8 @@
     "description": "Mengenal produk tauco dari Cianjur dan kegunaannya sebagai bumbu dalam beragam masakan Indonesia.",
     "image": {
       "src": "/images/tauco-hero-provisional.webp",
-      "alt": "Semangkuk tauco dengan kedelai dan tumisan sayuran"
+      "alt": "Semangkuk tauco dengan kedelai dan tumisan sayuran",
+      "decorative": false
     },
     "actions": [
       {

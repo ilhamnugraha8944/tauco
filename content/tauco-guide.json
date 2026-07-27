@@ -5,7 +5,8 @@
     "canonicalPath": "/tauco",
     "openGraphImage": {
       "src": "/images/tauco-fermentation-provisional.webp",
-      "alt": "Tauco semipadat dalam mangkuk dengan kedelai"
+      "alt": "Tauco semipadat dalam mangkuk dengan kedelai",
+      "decorative": false
     }
   },
   "publishedAt": "2026-07-24",
@@ -16,7 +17,8 @@
     "description": "Tauco adalah bumbu hasil fermentasi kedelai yang dikenal karena rasa gurih, asin, dan aromanya yang khas.",
     "image": {
       "src": "/images/tauco-fermentation-provisional.webp",
-      "alt": "Tauco semipadat dalam mangkuk dengan kedelai"
+      "alt": "Tauco semipadat dalam mangkuk dengan kedelai",
+      "decorative": false
     }
   },
   "sections": [

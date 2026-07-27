@@ -1,6 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import { LocalContentSource } from "../../src/features/content";
+import aboutJson from "../../content/about.json";
+import homeJson from "../../content/home.json";
+import productsJson from "../../content/products.json";
+import taucoGuideJson from "../../content/tauco-guide.json";
+import {
+  contentBundleSchema,
+  LocalContentSource,
+} from "../../src/features/content";
+
+const baseBundleInput = {
+  home: homeJson,
+  about: aboutJson,
+  taucoGuide: taucoGuideJson,
+  productCatalog: productsJson,
+};
 
 describe("LocalContentSource", () => {
   const source = new LocalContentSource();
@@ -46,6 +60,7 @@ describe("LocalContentSource", () => {
       label: "Kategori sampel",
       value: "Semipadat",
     });
+    expect(product).not.toHaveProperty("status");
   });
 
   it("returns null for unknown or malformed slugs", async () => {
@@ -72,5 +87,82 @@ describe("LocalContentSource", () => {
     expect(
       home.featuredProductSlugs.every((slug) => availableSlugs.has(slug)),
     ).toBe(true);
+  });
+
+  it("returns summaries from listProducts without detail-only fields", async () => {
+    const catalog = await source.listProducts();
+    const product = catalog.products[0];
+
+    expect(product).toMatchObject({
+      slug: "tauco-cap-badak",
+      name: "Tauco Cap Badak",
+    });
+    expect(product).not.toHaveProperty("status");
+    expect(product).not.toHaveProperty("description");
+    expect(product).not.toHaveProperty("researchEvidence");
+    expect(product).not.toHaveProperty("purchaseNote");
+    expect(product).not.toHaveProperty("metadata");
+  });
+
+  it("filters draft products from summaries and detail lookup", async () => {
+    const currentProduct = productsJson.products[0];
+    const draftSlug = "tauco-uji-draft";
+    const bundle = contentBundleSchema.parse({
+      ...baseBundleInput,
+      productCatalog: {
+        ...productsJson,
+        products: [
+          currentProduct,
+          {
+            ...currentProduct,
+            slug: draftSlug,
+            status: "draft",
+            name: "Tauco Uji Draft",
+            metadata: {
+              ...currentProduct.metadata,
+              title: "Tauco Uji Draft | Produk Belum Terbit",
+              canonicalPath: `/produk/${draftSlug}`,
+            },
+          },
+        ],
+      },
+    });
+    const sourceWithDraft = new LocalContentSource(bundle);
+    const catalog = await sourceWithDraft.listProducts();
+
+    expect(catalog.products.map((product) => product.slug)).toEqual([
+      "tauco-cap-badak",
+    ]);
+    await expect(
+      sourceWithDraft.getProductBySlug(draftSlug),
+    ).resolves.toBeNull();
+  });
+
+  it("supports an empty published catalog", async () => {
+    const bundle = contentBundleSchema.parse({
+      ...baseBundleInput,
+      home: {
+        ...homeJson,
+        featuredProductSlugs: [],
+      },
+      taucoGuide: {
+        ...taucoGuideJson,
+        relatedLinks: taucoGuideJson.relatedLinks.filter(
+          (link) => !link.href.startsWith("/produk/"),
+        ),
+      },
+      productCatalog: {
+        ...productsJson,
+        products: [],
+      },
+    });
+    const emptySource = new LocalContentSource(bundle);
+
+    await expect(emptySource.listProducts()).resolves.toMatchObject({
+      products: [],
+    });
+    await expect(
+      emptySource.getProductBySlug("tauco-cap-badak"),
+    ).resolves.toBeNull();
   });
 });

@@ -19,8 +19,135 @@ eksternal. Konfigurasi Netlify hanya disiapkan sebagai future runbook.
 | 3 | Halaman publik dan design system | Selesai | Tujuh route, true 404, responsive light/dark |
 | 4 | SEO teknis dan structured data | Selesai | Metadata, canonical, sitemap, JSON-LD, initial HTML |
 | 5 | Form kontak dan privacy flow | Selesai secara lokal | Contract, native validation, UI states, blueprint |
-| 6 | Automated tests dan pre-flight desain | Selesai | 33 unit, 69 E2E, Lighthouse gate hijau |
+| 6 | Automated tests dan pre-flight desain | Selesai | 73 unit, 79 E2E, Lighthouse gate hijau |
 | 7 | Build dan walkthrough local | Selesai | Static/SSG build dan tujuh screenshot |
+
+## Remediasi Phase 1A PRD-complete
+
+Audit ulang menemukan bahwa baseline fungsional local sudah berjalan, tetapi
+beberapa kontrak dan bukti acceptance masih perlu ditutup. Seluruh remediasi
+berikut kini selesai tanpa deployment, commit, atau push.
+
+Baseline sebelum remediasi:
+
+- Git working tree bersih.
+- ESLint dan TypeScript lulus.
+- Unit test 33/33 lulus.
+- Playwright 69 lulus dengan 9 expected skip.
+- Dua belas audit Lighthouse lulus, dengan Performance minimum 91 serta
+  Accessibility, SEO, dan Best Practices 100.
+- Dependency audit melaporkan 0 vulnerability.
+
+| Checkpoint | Scope | Status | Bukti |
+| --- | --- | --- | --- |
+| 0 | Baseline dan progress tracker | Selesai | Audit dan gate awal dicatat |
+| 1 | Publication boundary dan DTO produk | Selesai | Content tests 21/21 dan TypeScript lulus |
+| 2 | Empty state dan media contract | Selesai | Empty fixture dan image semantics tervalidasi |
+| 3 | Kebijakan Privasi | Selesai | Privacy contract dan browser assertion lulus |
+| 4 | Form dan keyboard interaction | Selesai | Targeted Playwright desktop/mobile 20/20 lulus |
+| 5 | Acceptance test lengkap | Selesai | Quality browser suite 20/20 lulus |
+| 6 | SEO environment dan audit integrity | Selesai | Environment tests 32/32 dan 12 Lighthouse report lulus |
+| 7 | Final gate dan dokumentasi | Selesai | Seluruh local gate lulus |
+
+### Hasil checkpoint 1
+
+- Authored product wajib memiliki status eksplisit `draft` atau `published`.
+- Public adapter memfilter produk sebelum data mencapai homepage, katalog,
+  sitemap, static params, atau detail lookup.
+- Draft, unknown slug, dan malformed slug tidak dapat dibaca melalui public
+  content source.
+- DTO `ProductSummary` hanya membawa field katalog, sedangkan
+  `ProductDetail` membawa metadata dan field detail.
+- Unique slug divalidasi terhadap seluruh record, termasuk lintas status.
+- `LocalContentSource` menerima validated bundle melalui constructor agar
+  publication boundary dapat diuji tanpa mengubah konten production.
+
+### Hasil checkpoint 2
+
+- Authored catalog dan public catalog mendukung nol produk.
+- `featuredProductSlugs` dapat kosong dan hanya boleh menunjuk produk
+  published.
+- Empty fixture menghasilkan katalog kosong serta detail lookup `null`.
+- Informative image wajib memakai `decorative: false` dan alt deskriptif.
+- Decorative image wajib memakai `decorative: true` dan `alt=""`.
+- Open Graph hanya menerima informative image.
+- Decorative image tidak menghasilkan figcaption.
+- Seluruh content JSON telah dimigrasikan ke media contract baru.
+- Content tests 21/21, seluruh unit test 73/73, TypeScript, targeted
+  ESLint, dan diff check lulus.
+
+### Hasil checkpoint 3
+
+- Privacy notice menjelaskan pengelola inbox yang ditunjuk dan Netlify sebagai
+  pemroses teknis.
+- Permintaan data mencakup akses, koreksi, dan penghapusan.
+- Retensi ditetapkan paling lama 12 bulan tanpa pengecualian yang bertentangan
+  dengan PRD.
+- Browser test memverifikasi seluruh kontrak copy tersebut.
+
+### Hasil checkpoint 4
+
+- Contact form memakai lock sinkron untuk mencegah rapid double-submit.
+- Pending state mempertahankan disabled button, `aria-busy`, dan live status.
+- Network error mempertahankan seluruh nilai input serta mengaktifkan tombol
+  kembali.
+- Success state mereset seluruh field.
+- Mobile menu dapat dibuka dan ditutup dengan keyboard serta mempertahankan
+  focus pada summary.
+- Seluruh tujuh route, true 404, menu native, dan constraint form diuji dengan
+  JavaScript dinonaktifkan.
+- Targeted ESLint, TypeScript, unit contact 8/8, production build, dan targeted
+  Playwright desktop/mobile 20/20 lulus.
+
+### Hasil checkpoint 5
+
+- Overflow diuji pada 320, 390, 768, 1024, dan 1440 px untuk seluruh route.
+- Boundary 1023/1024 px membuktikan pergantian mobile menu ke desktop
+  navigation tanpa dua baris.
+- Homepage hero diuji untuk batas dua baris, copy maksimal 20 kata, CTA dalam
+  initial viewport, dan label CTA tanpa wrapping.
+- Product hierarchy tablet, focus outline, serta reduced-motion diuji.
+- Axe WCAG A/AA dijalankan pada seluruh route dalam light dan dark mode.
+- Validation error, pending, success, dan network error form juga diaudit
+  dengan Axe.
+- Visible text, alt, title, aria-label, figcaption, dan button text dipindai
+  terhadap em dash dan en dash.
+- Keyboard-only walkthrough menjangkau seluruh control terlihat pada setiap
+  route dengan Tab dan memverifikasi outline fokus.
+- Targeted quality browser suite lulus 20/20.
+
+### Hasil checkpoint 6
+
+- Satu pure environment resolver mengendalikan origin dan indexability.
+- Local dan provider tidak dikenal tetap noindex.
+- Hanya Netlify production yang indexable; deploy preview dan branch deploy
+  tetap noindex.
+- SEO audit flag hanya bekerja pada loopback non-Netlify.
+- Seluruh Netlify context membutuhkan origin HTTPS publik yang eksplisit.
+- URL guard menolak localhost, IP literal, single-label hostname, reserved TLD,
+  HTTP, path, query, hash, dan credentials.
+- Lighthouse memakai port dinamis, memverifikasi canonical/robots audit,
+  mempromosikan manifest hanya setelah gate lulus, membersihkan staging, dan
+  memulihkan `next-env.d.ts`.
+- Environment unit tests lulus 32/32.
+- Full Lighthouse menghasilkan 12 report dengan Performance minimum 90 serta
+  Accessibility, SEO, dan Best Practices minimum 100. Median LCP terburuk
+  adalah 2498,9 ms dan CLS maksimum 0.
+
+### Hasil checkpoint 7
+
+- ESLint lulus tanpa warning.
+- TypeScript typecheck lulus.
+- Unit test lulus 73/73.
+- Production build lulus dan menghasilkan route Static/SSG yang diharapkan.
+- Full Playwright lulus 79 test dengan 13 desktop-only expected skip.
+- Lighthouse lulus 12/12 report.
+- Production dan seluruh dependency audit melaporkan 0 vulnerability dari 683
+  dependency.
+- `next-env.d.ts` dipulihkan setelah audit dan tidak menjadi source change.
+- Dokumentasi content workflow, privacy fact-check, test evidence, serta
+  deferred launch gate telah diselaraskan.
+- Tidak ada commit, push, atau deployment.
 
 ## Poin 1. Fondasi proyek
 
@@ -57,7 +184,8 @@ Keputusan arsitektur:
 - Konten publik dirender sebagai Server Components.
 - Navigasi mobile memakai elemen native `<details>`, sehingga tidak membutuhkan
   JavaScript client.
-- Hanya form kontak yang menjadi Client Component.
+- Client Component dibatasi pada form kontak dan error boundary yang diwajibkan
+  Next.js untuk mekanisme retry.
 - Link publik utama tetap dapat digunakan ketika JavaScript dimatikan.
 
 ## Poin 2. Konten tervalidasi dan aset provisional
@@ -129,17 +257,17 @@ Design direction yang diterapkan:
 - Motion hanya hover, focus, active, dan feedback form berbasis CSS.
 - Komposisi asimetris dan editorial, tanpa generic three-card layout.
 - Satu CTA utama pada hero.
-- Responsive collapse telah diperiksa pada 320 px, 390 px, 768 px, dan desktop.
+- Responsive collapse telah diperiksa pada 320, 390, 768, 1024, dan 1440 px.
 
 Hasil pre-flight visual:
 
 - Satu `h1` per halaman.
-- H1 homepage tetap maksimal dua baris pada desktop.
+- H1 homepage tetap maksimal dua baris pada viewport target.
 - Nama produk dan CTA tampil sebelum ilustrasi pada tablet/mobile.
-- Focus state dan CTA memiliki kontras yang jelas.
+- Focus state, reduced-motion, dan CTA memiliki kontras yang jelas.
 - Tidak ada overflow horizontal.
-- Tidak ada em dash atau en dash pada visible copy.
-- Dark mode form dan article tetap terbaca.
+- Tidak ada em dash atau en dash pada visible maupun accessible copy.
+- Seluruh route dan dynamic form state lolos Axe dalam mode yang relevan.
 
 ## Poin 4. SEO teknis dan structured data
 
@@ -150,20 +278,24 @@ Yang diimplementasikan:
 - `html lang="id-ID"`.
 - Title, description, canonical, dan Open Graph unik.
 - `NEXT_PUBLIC_SITE_URL` sebagai satu-satunya sumber canonical origin.
-- Parser origin menolak credentials, path, query, dan hash.
-- Production build menolak canonical yang tidak valid.
+- Parser origin menolak credentials, path, query, hash, localhost, IP literal,
+  single-label hostname, serta reserved TLD pada build Netlify.
+- Seluruh context Netlify membutuhkan origin HTTPS publik. Hanya production
+  yang indexable; Deploy Preview dan branch deploy tetap noindex.
 - `robots.ts`, `sitemap.ts`, manifest, dan favicon.
 - Local normal memakai `noindex, nofollow`; tidak ada risiko local URL dianggap
   indexable.
-- Harness Lighthouse memakai audit build terpisah yang indexable hanya selama
-  pengukuran SEO.
+- Harness Lighthouse memakai audit build terpisah, port dinamis, promotion
+  manifest setelah gate lulus, cleanup staging/process, dan pemulihan
+  `next-env.d.ts`.
 - Homepage memakai JSON-LD `WebSite` dan `Organization`.
 - Interior route memakai `BreadcrumbList`.
 - `/tauco` memakai `Article` dengan tanggal, author, dan sumber yang juga
   terlihat di halaman.
 - Detail produk memakai `Product` tanpa `Offer`, image produk resmi, rating,
   atau review.
-- Sitemap berisi exact unique route set dan tanggal konten yang relevan.
+- Sitemap berisi exact unique route set serta tanggal publikasi Phase 1A yang
+  eksplisit.
 - Copy utama, heading, dan link tersedia di initial HTML.
 - `next/image` memakai dimensi tetap, kandidat responsif, preload hanya pada
   hero, dan format WebP/AVIF.
@@ -223,14 +355,14 @@ Hasil gate final:
 | --- | --- |
 | `npm.cmd run lint` | Lulus, 0 warning |
 | `npm.cmd run typecheck` | Lulus |
-| `npm.cmd run test` | 33/33 lulus |
-| `npm.cmd run test:e2e` | 69 lulus, 9 skip yang disengaja |
+| `npm.cmd run test` | 73/73 lulus |
+| `npm.cmd run test:e2e` | 79 lulus, 13 skip yang disengaja |
 | `npm.cmd run build` | Lulus, seluruh route Static/SSG |
 | `npm.cmd run lighthouse` | Lulus, 12/12 audit |
 | `npm.cmd audit --omit=dev` | 0 vulnerability |
 | `npm.cmd audit` | 0 vulnerability |
 
-Sembilan E2E skip berasal dari pemeriksaan global yang sengaja dijalankan sekali
+Tiga belas E2E skip berasal dari pemeriksaan global yang sengaja dijalankan sekali
 pada project desktop agar tidak diduplikasi pada project mobile. Test route,
 rendering, form, dan Axe tetap berjalan pada desktop dan mobile.
 
@@ -239,18 +371,20 @@ Coverage E2E meliputi:
 - seluruh route dan navigation target;
 - true 404;
 - satu `h1`;
-- initial HTML dengan JavaScript disabled;
-- mobile menu;
-- contact form state dan native constraint;
+- seluruh public route dan true 404 dengan JavaScript disabled;
+- mobile menu pointer dan keyboard, termasuk focus return;
+- contact form validation, pending, duplicate lock, success, network error,
+  input retention, dan native constraint;
 - exact sitemap dan robots;
 - canonical dan local noindex;
 - JSON-LD entity, article, breadcrumb, dan product;
 - larangan commerce field rekaan;
 - security headers;
 - tidak ada broken internal link;
-- Axe WCAG A/AA automated rules;
-- tidak ada overflow 320/768 px;
-- visible copy tidak memakai em dash atau en dash.
+- Axe WCAG A/AA automated rules pada light, dark, dan dynamic form state;
+- tidak ada overflow pada 320, 390, 768, 1024, dan 1440 px;
+- hero, CTA, navigation breakpoint, focus state, dan reduced-motion;
+- visible serta accessible copy tidak memakai em dash atau en dash.
 
 ### Hasil Lighthouse mobile
 
@@ -259,10 +393,10 @@ run, sedangkan LCP adalah median.
 
 | Route | Performance min. | Accessibility min. | SEO min. | Best Practices min. | Median LCP | Median CLS |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `/` | 93 | 100 | 100 | 100 | 2.401 ms | 0 |
-| `/tauco` | 94 | 100 | 100 | 100 | 2.363 ms | 0 |
-| `/produk/tauco-cap-badak` | 97 | 100 | 100 | 100 | 2.445 ms | 0 |
-| `/kontak` | 96 | 100 | 100 | 100 | 2.257 ms | 0 |
+| `/` | 90 | 100 | 100 | 100 | 2.438 ms | 0 |
+| `/tauco` | 91 | 100 | 100 | 100 | 2.402 ms | 0 |
+| `/produk/tauco-cap-badak` | 93 | 100 | 100 | 100 | 2.499 ms | 0 |
+| `/kontak` | 98 | 100 | 100 | 100 | 2.185 ms | 0 |
 
 Penulisan `2.401 ms` mengikuti pemisah ribuan Indonesia, yaitu 2.401
 milidetik. Semua median LCP berada di bawah gate 2.500 ms.
@@ -346,7 +480,7 @@ eksternal:
 6. Rich Results Test/Schema validator pada URL publik.
 7. Verifikasi Search Console dan submission sitemap.
 8. Mengumpulkan field data Core Web Vitals, termasuk INP p75.
-9. Cross-browser manual pada Safari dan Firefox.
+9. Cross-browser manual pada Edge, Firefox, dan Safari.
 
 ## Data resmi yang masih dibutuhkan
 
@@ -374,4 +508,5 @@ Tidak diimplementasikan:
 - production analytics, Search Console, atau layanan email;
 - deployment ke platform mana pun.
 
-Phase 1A selesai sebagai website publik yang berjalan dan tervalidasi di local.
+Phase 1A berstatus `PRD-complete` dan tervalidasi di local. Validasi launch yang
+membutuhkan URL atau akun eksternal tetap ditunda sampai deployment diizinkan.

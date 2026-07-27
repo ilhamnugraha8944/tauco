@@ -36,7 +36,7 @@ export function ProvisionalImage({
           sizes={sizes}
         />
       </div>
-      {caption ? <figcaption>{caption}</figcaption> : null}
+      {alt && caption ? <figcaption>{caption}</figcaption> : null}
     </figure>
   );
 }

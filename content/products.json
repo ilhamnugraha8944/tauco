@@ -5,7 +5,8 @@
     "canonicalPath": "/produk",
     "openGraphImage": {
       "src": "/images/tauco-fermentation-provisional.webp",
-      "alt": "Ilustrasi tauco semipadat dalam mangkuk dengan kedelai"
+      "alt": "Ilustrasi tauco semipadat dalam mangkuk dengan kedelai",
+      "decorative": false
     }
   },
   "heading": "Produk Tauco Cap Badak",
@@ -17,6 +18,7 @@
   "products": [
     {
       "slug": "tauco-cap-badak",
+      "status": "published",
       "name": "Tauco Cap Badak",
       "category": "Bumbu fermentasi",
       "summary": "Produk tauco dari Cianjur untuk digunakan sebagai bumbu dalam aneka masakan.",
@@ -26,7 +28,8 @@
       ],
       "image": {
         "src": "/images/tauco-fermentation-provisional.webp",
-        "alt": "Ilustrasi tauco semipadat dalam mangkuk dengan kedelai"
+        "alt": "Ilustrasi tauco semipadat dalam mangkuk dengan kedelai",
+        "decorative": false
       },
       "facts": [
         {
@@ -74,7 +77,8 @@
         "canonicalPath": "/produk/tauco-cap-badak",
         "openGraphImage": {
           "src": "/images/tauco-fermentation-provisional.webp",
-          "alt": "Ilustrasi tauco semipadat dalam mangkuk dengan kedelai"
+          "alt": "Ilustrasi tauco semipadat dalam mangkuk dengan kedelai",
+          "decorative": false
         }
       }
     }

@@ -19,16 +19,31 @@ async function getPublicRouteMetadata(): Promise<
       localContentSource.getTaucoGuide(),
       localContentSource.listProducts(),
     ]);
+  const productMetadata = await Promise.all(
+    productCatalog.products.map(async (product) => {
+      const detail = await localContentSource.getProductBySlug(
+        product.slug,
+      );
+
+      if (!detail) {
+        throw new Error(
+          `Detail produk published tidak ditemukan: ${product.slug}`,
+        );
+      }
+
+      return {
+        route: `/produk/${product.slug}`,
+        metadata: detail.metadata,
+      };
+    }),
+  );
 
   return [
     { route: "/", metadata: home.metadata },
     { route: "/tauco", metadata: taucoGuide.metadata },
     { route: "/tentang-kami", metadata: about.metadata },
     { route: "/produk", metadata: productCatalog.metadata },
-    ...productCatalog.products.map((product) => ({
-      route: `/produk/${product.slug}`,
-      metadata: product.metadata,
-    })),
+    ...productMetadata,
     { route: "/kontak", metadata: staticPageMetadata.contact },
     {
       route: "/kebijakan-privasi",
