@@ -4,9 +4,9 @@
 
 | Atribut | Nilai |
 | --- | --- |
-| Versi dokumen | 1.1 |
+| Versi dokumen | 1.2 |
 | Tanggal | 28 Juli 2026 |
-| Status produk | Phase 1A complete di production; Phase 1B–1D planned |
+| Status produk | Phase 1A complete di production; Phase 1B implementation; Phase 1C–1D planned |
 | Bahasa produk | Indonesia |
 | Target pasar awal | Indonesia |
 | Target deployment Phase 1A | Implemented di `https://tauco-cap-badak.netlify.app` |
@@ -27,8 +27,12 @@ Delivery dibagi agar website publik dapat diluncurkan lebih cepat:
   kontak berkontrak Netlify Forms, metadata SEO, sitemap, robots, structured
   data, dan privacy notice. Deployment, Forms, Search Console, serta production
   quality gate sudah diverifikasi.
-- **Phase 1B — future:** fondasi REST API Go, PostgreSQL, Redis, media storage,
-  job processing, observability, dan security middleware.
+- **Phase 1B — implementation:** B0 scope freeze, B1 backend skeleton, B2
+  executable API contract, B3 database dan seed, serta B4 public read API sudah
+  complete. Fondasi berikutnya mencakup contact transaction, durable worker,
+  media storage, Redis, observability, dan security middleware. Delivery
+  dilakukan local-first dalam shadow-mode sehingga production Phase 1A tetap
+  memakai konten lokal dan Netlify Forms.
 - **Phase 1C — future:** Admin CMS, authentication, publishing workflow,
   product/media management, dan inbox.
 - **Phase 1D — future:** hardening, migration konten lokal ke CMS, load/security
@@ -40,6 +44,8 @@ Label status dalam dokumen ini:
 
 - `IMPLEMENTED-1A`: termasuk implementasi repository, deployment production,
   dan acceptance Phase 1A yang tercatat pada `plan.md` serta `WALKTHROUGH.md`.
+- `IMPLEMENTING-1B`: termasuk implementation gate B0–B10 yang tercatat pada
+  `PHASE_1B_PLAN.md` serta `PHASE_1B_WALKTHROUGH.md`.
 - `PLANNED`: desain target yang belum diimplementasikan pada Phase 1A.
 - `OUT-OF-SCOPE`: bukan bagian delivery Phase 1.
 
@@ -153,9 +159,9 @@ inbox, dan audit trail.
 | Kebijakan privasi | `IMPLEMENTED-1A` | Mencakup data formulir |
 | Technical SEO | `IMPLEMENTED-1A` | Metadata, canonical, sitemap, robots, JSON-LD |
 | Responsive dan accessibility baseline | `IMPLEMENTED-1A` | Semantic HTML dan keyboard flow |
-| REST API Go | `PLANNED` | Phase 1B |
-| PostgreSQL/Supabase | `PLANNED` | Phase 1B |
-| Redis/Upstash | `PLANNED` | Phase 1B |
+| REST API Go | `IMPLEMENTING-1B` | B4 public read runtime complete; contact transaction mulai B5 |
+| PostgreSQL/Supabase | `IMPLEMENTING-1B` | Migration, seed, repository, dan integration B3 complete di PostgreSQL lokal |
+| Redis/Upstash | `IMPLEMENTING-1B` | Compose scaffold B1; runtime adapter B8 |
 | Object storage dan image worker | `PLANNED` | Phase 1B |
 | Admin authentication | `PLANNED` | Phase 1C |
 | CMS homepage/about | `PLANNED` | Phase 1C |
@@ -462,9 +468,29 @@ Jika berpindah ke custom domain:
 6. gunakan Change of Address bila sesuai;
 7. pertahankan redirect domain lama selama mungkin.
 
-## 11. Future Architecture — Phase 1B dan 1C
+## 11. Backend Architecture — Phase 1B dan 1C
 
-Seluruh bagian ini berstatus `PLANNED` dan bukan dependency runtime Phase 1A.
+Phase 1B berstatus `IMPLEMENTING-1B`. Requirement Admin CMS dan authentication
+di bagian ini tetap `PLANNED` untuk Phase 1C dan bukan dependency runtime Phase
+1A.
+
+### 11.0 Boundary delivery
+
+Phase 1B memakai local-first shadow-mode:
+
+- backend baru berada di `backend/` tanpa memindahkan Next.js dari root;
+- public API, database, Redis, storage, worker, dan middleware dibangun serta
+  diuji tanpa menjadi dependency production website;
+- JSON Phase 1A diimpor satu arah ke database untuk parity test;
+- production tetap memakai `LocalContentSource` dan Netlify Forms;
+- endpoint contact Go tidak melakukan dual-write ke Netlify;
+- admin authentication, RBAC, TOTP, CRUD, publishing, upload, dan inbox runtime
+  mulai Phase 1C;
+- production content/contact cutover, remote media, ISR/revalidation, backup
+  drill, dan production hardening mulai Phase 1D.
+
+Kontrak eksekusi rinci dan acceptance gate berada di
+[PHASE_1B_PLAN.md](./PHASE_1B_PLAN.md).
 
 ### 11.1 Topologi target
 
@@ -475,9 +501,12 @@ Seluruh bagian ini berstatus `PLANNED` dan bukan dependency runtime Phase 1A.
 - Redis digunakan sebagai cache dan distributed rate-limit store.
 - Object storage menyimpan original serta image variants.
 - API stateless dan worker dapat di-scale terpisah.
-- Target free-tier awal: Supabase PostgreSQL, Upstash Redis, Cloudflare R2,
-  Cloud Run scale-to-zero, dan provider email ber-free-tier. Seluruh quota,
-  billing requirement, dan terms wajib ditinjau ulang saat implementasi.
+- Target remote pilot awal: Supabase PostgreSQL dan Storage, Upstash Redis,
+  serta runtime adapter yang dapat berjalan sebagai Netlify Go Function atau
+  container Cloud Run. PostgreSQL tetap source of truth durable job.
+- Cloudflare R2 menjadi upgrade path setelah custom domain dan billing risk
+  disetujui. Seluruh quota, billing requirement, dan terms wajib ditinjau ulang
+  sebelum deployment.
 
 ### 11.2 Clean Architecture
 
@@ -493,9 +522,8 @@ Setiap bounded module memisahkan:
 Dependency injection menggunakan constructor. Handler tidak mengakses GORM
 secara langsung dan domain tidak bergantung pada Gin.
 
-Modul awal:
+Modul Phase 1B:
 
-- `auth`
 - `content`
 - `catalog`
 - `media`
@@ -503,7 +531,12 @@ Modul awal:
 - `jobs`
 - `audit`
 
+Modul `auth` mulai diimplementasikan pada Phase 1C.
+
 ### 11.3 Public REST API
+
+**Status:** kontrak B2, persistence/repository B3, dan lima public read handler
+B4 complete secara lokal. Contact transaction mulai B5.
 
 Base path: `/api/v1`
 
@@ -511,6 +544,7 @@ Base path: `/api/v1`
 | --- | --- | --- |
 | GET | `/home` | Published homepage |
 | GET | `/about` | Published about content |
+| GET | `/tauco-guide` | Published informational tauco guide |
 | GET | `/products` | Published product list |
 | GET | `/products/{slug}` | Published product detail |
 | POST | `/contact-messages` | Persist visitor message |
@@ -520,6 +554,8 @@ RFC 7807 `application/problem+json` dan memiliki `requestId`. Pagination list
 menggunakan opaque cursor.
 
 ### 11.4 Admin REST API
+
+**Status:** `PLANNED` untuk Phase 1C.
 
 - login, refresh, logout, current user;
 - setup/enable/disable TOTP;
@@ -532,6 +568,8 @@ menggunakan opaque cursor.
 OpenAPI menjadi contract dan divalidasi dalam CI.
 
 ### 11.5 Authentication dan authorization
+
+**Status:** `PLANNED` untuk Phase 1C.
 
 - Role aktif Phase 1: `super_admin`; schema tetap siap untuk RBAC.
 - Tidak ada public registration.
@@ -546,6 +584,8 @@ OpenAPI menjadi contract dan divalidasi dalam CI.
   menjadi third-party cookie lintas platform.
 
 ### 11.6 Content publishing
+
+**Status:** schema foundation pada Phase 1B; runtime publishing pada Phase 1C.
 
 - Homepage dan About merupakan singleton content.
 - Draft dan published revision dipisahkan.
@@ -744,8 +784,10 @@ Daftar status rinci berada di [FACT_CHECK.md](./FACT_CHECK.md).
 - Bahasa Phase 1 hanya Indonesia; kontrak konten dibuat agar locale dapat
   ditambahkan kemudian.
 - Phase 1A tidak memiliki database, API Go, Redis, login, atau CMS.
-- Netlify Forms adalah transport kontak sementara dan dapat diganti contact
-  endpoint Go mulai Phase 1B tanpa mengubah UI publik.
+- Netlify Forms tetap menjadi transport kontak production sepanjang Phase 1B.
+  Contact endpoint Go dibangun dalam shadow-mode dan baru dapat menggantikannya
+  pada Phase 1D setelah anti-spam, email, retensi, privacy, dan rollback gate
+  lulus.
 - Konten awal dapat diperbarui melalui repository oleh developer.
 - Harga dan order online tidak termasuk Phase 1A.
 - Availability 99,9% adalah aspirasi arsitektur, bukan SLA free-tier.
