@@ -5,14 +5,14 @@
 | Atribut | Nilai |
 | --- | --- |
 | Dokumen | Deployment dan launch completion plan |
-| Versi | 1.0 |
-| Tanggal | 27 Juli 2026 |
-| Status awal | Ready for owner execution |
+| Versi | 1.1 |
+| Tanggal | 28 Juli 2026 |
+| Status saat ini | Phase 1A Complete; G0–G8 lulus |
 | Scope | Phase 1A public website |
 | Target hosting | Netlify Free |
 | Production branch | `main` |
 | Pelaksana deployment | Pemilik project |
-| Peran assistant | Persiapan lokal, audit read-only, dan pembaruan dokumentasi bila diminta |
+| Peran assistant | Implementasi/QA lokal, public production verification, dan dokumentasi; tanpa commit/push/deploy |
 
 > Dokumen ini hanya menutup Phase 1A. Backend Go, Supabase/PostgreSQL, Redis,
 > autentikasi, dan Admin CMS tetap berada di Phase 1B-1D.
@@ -47,28 +47,34 @@ production yang:
 
 ## 3. Snapshot kesiapan
 
-Snapshot berikut harus diverifikasi ulang sebelum eksekusi:
+Snapshot berikut merangkum release 27 Juli dan closeout 28 Juli 2026. Worktree
+lokal berisi suite QA serta dokumentasi closeout yang disengaja dan belum
+di-commit oleh owner:
 
 | Pemeriksaan | Snapshot 27 Juli 2026 |
 | --- | --- |
-| Working tree | Bersih |
-| Branch | `main` |
+| Working tree | Berisi perubahan QA dan dokumentasi yang disengaja |
+| Branch | `launch/phase-1a` |
 | Remote | `origin` ke repository GitHub `tauco` |
-| Local vs remote | `main` sinkron dengan `origin/main` |
-| Commit | `e2676d4` |
+| Pull Request | [#1](https://github.com/ilhamnugraha8944/tauco/pull/1) |
+| Preview commit yang diuji | `3a07ee0b56a5feb04deb23596833df76a6fc5bb8` |
 | Unit test terakhir | 73 lulus |
 | Playwright terakhir | 79 lulus, 13 skip yang disengaja |
+| Automated G4 Preview | 53 lulus, 7 skip yang disengaja |
 | Lighthouse terakhir | 12 laporan lulus |
-| Performance minimum lokal | 90 |
+| Performance minimum lokal | 95 |
 | SEO, Accessibility, Best Practices | 100 pada route audit |
 | Production dependency audit | 0 vulnerability |
+| Production commit | `2ce0a310075224b2cb8bb470d0e0ba4d0d301b98` |
+| Production QA | 29/29 Playwright dan 12/12 Lighthouse lulus |
 
 ### Catatan advisori development tool
 
 Full `npm audit` pada 27 Juli 2026 melaporkan entri high severity pada dependency
 development yang berakar pada advisori `brace-expansion` melalui tree ESLint.
-Dependency tersebut tidak masuk runtime production dan npm belum menawarkan
-automatic fix.
+Dependency tersebut tidak masuk runtime production. npm hanya menawarkan
+`npm audit fix --force` yang akan memaksa upgrade major ESLint, sehingga tidak
+diterapkan dalam release ini.
 
 Keputusan launch yang direkomendasikan:
 
@@ -100,15 +106,15 @@ jalankan ulang pemeriksaan yang relevan, lalu lanjutkan.
 ## G0. Scope dan baseline
 
 **Owner:** Pemilik project  
-**Status:** [ ] Belum disetujui
+**Status:** [x] Lulus; release production dan closeout worktree teridentifikasi
 
 ### Tindakan
 
-- [ ] Konfirmasi bahwa target saat ini hanya Phase 1A public website.
-- [ ] Konfirmasi target hosting Netlify Free.
-- [ ] Konfirmasi `main` sebagai production branch.
-- [ ] Konfirmasi deployment dan akses akun dilakukan oleh pemilik project.
-- [ ] Jalankan:
+- [x] Konfirmasi bahwa target saat ini hanya Phase 1A public website.
+- [x] Konfirmasi target hosting Netlify Free.
+- [x] Konfirmasi `main` sebagai production branch.
+- [x] Konfirmasi deployment dan akses akun dilakukan oleh pemilik project.
+- [x] Jalankan:
 
 ```powershell
 git status -sb
@@ -116,8 +122,9 @@ git remote -v
 git log -1 --oneline
 ```
 
-- [ ] Pastikan working tree bersih sebelum membuat release candidate.
-- [ ] Pastikan remote mengarah ke repository GitHub yang benar.
+- [x] Release candidate production telah di-commit dan di-merge. Worktree
+  closeout saat ini sengaja belum bersih sampai owner membuat commit G8.
+- [x] Pastikan remote mengarah ke repository GitHub yang benar.
 
 ### Bukti
 
@@ -142,35 +149,53 @@ git log -1 --oneline
 ## G1. Persetujuan bisnis dan privasi
 
 **Owner:** Pemilik bisnis dan pemilik operasional inbox  
-**Status:** [ ] Belum lengkap
+**Status:** Lulus berdasarkan konfirmasi pemilik
 
 ### Keputusan minimum yang wajib diisi
 
 | Keputusan | Nilai |
 | --- | --- |
-| Nama pengendali/pengelola data |  |
-| Pemilik inbox operasional |  |
-| Email notifikasi utama |  |
-| Email notifikasi cadangan |  |
-| Retensi maksimal 12 bulan disetujui | Ya / Tidak |
-| Penanggung jawab penghapusan berkala |  |
-| Penanggung jawab access/correction/deletion request |  |
-| Copy saat ini disetujui untuk launch | Ya / Tidak |
-| Visual provisional disetujui untuk launch | Ya / Tidak |
-| Data belum terverifikasi tetap dihilangkan | Ya / Tidak |
+| Nama pengendali/pengelola data | Pemilik project, dikelola sendiri |
+| Pemilik inbox operasional | Pemilik project, dikelola sendiri |
+| Email notifikasi utama | `ilhamnugraha***@gmail.com` |
+| Email notifikasi cadangan | `nugraha***@gmail.com` |
+| Retensi maksimal 12 bulan disetujui | Ya |
+| Penanggung jawab penghapusan berkala | Pemilik project |
+| Penanggung jawab access/correction/deletion request | Pemilik project |
+| Copy saat ini disetujui untuk launch | Ya |
+| Visual provisional disetujui untuk launch | Ya |
+| Data belum terverifikasi tetap dihilangkan | Ya |
+
+Alamat email dimask pada repository publik. Nilai lengkap dikonfirmasi langsung
+oleh pemilik dan harus disimpan hanya pada konfigurasi notifikasi Netlify atau
+catatan operasional privat.
 
 ### Checklist
 
-- [ ] Tetapkan siapa yang boleh membuka submission Netlify.
-- [ ] Tetapkan email utama dan cadangan untuk notifikasi.
-- [ ] Setujui retensi pesan paling lama 12 bulan.
-- [ ] Buat jadwal penghapusan, minimal review bulanan atau kuartalan.
-- [ ] Tetapkan prosedur verifikasi permintaan akses, koreksi, dan penghapusan.
-- [ ] Setujui bahwa website saat ini menggunakan wordmark teks dan visual
+- [x] Tetapkan siapa yang boleh membuka submission Netlify.
+- [x] Tetapkan email utama dan cadangan untuk notifikasi.
+- [x] Setujui retensi pesan paling lama 12 bulan.
+- [x] Buat jadwal penghapusan dengan review kuartalan oleh pemilik project.
+- [x] Tetapkan prosedur verifikasi permintaan akses, koreksi, dan penghapusan.
+- [x] Setujui bahwa website saat ini menggunakan wordmark teks dan visual
       provisional, bukan logo atau dokumentasi fasilitas resmi.
-- [ ] Setujui launch minimal tanpa alamat, nomor WhatsApp, harga, SKU, ukuran,
+- [x] Setujui launch minimal tanpa alamat, nomor WhatsApp, harga, SKU, ukuran,
       sertifikasi, dan klaim legal yang belum terverifikasi.
-- [ ] Tinjau `FACT_CHECK.md` dan pastikan tidak ada klaim terlarang yang masuk.
+- [x] Tinjau `FACT_CHECK.md`; implementasi saat ini tidak menampilkan klaim
+      terlarang atau data yang belum terverifikasi.
+
+### SOP inbox dan privasi
+
+1. Hanya pemilik project yang membuka submission dan menerima notifikasi.
+2. Permintaan akses, koreksi, atau penghapusan diverifikasi melalui kecocokan
+   alamat email dan detail pesan sebelum perubahan dilakukan.
+3. Inbox direview minimal setiap kuartal.
+4. Submission dihapus paling lambat 12 bulan setelah diterima.
+5. Ekspor atau penerusan submission ke pihak lain tidak dilakukan tanpa tujuan
+   operasional yang sah.
+
+Data yang belum diverifikasi tidak boleh dipublikasikan sampai pemilik memberi
+data resmi dan bukti yang cukup, lalu `FACT_CHECK.md` diperbarui.
 
 ### Bukti
 
@@ -195,7 +220,7 @@ git log -1 --oneline
 ## G2. Release candidate lokal
 
 **Owner:** Pemilik project  
-**Status:** [ ] Belum dijalankan untuk release
+**Status:** [x] Gate teknis lulus; release dipublikasikan
 
 ### Persiapan
 
@@ -234,6 +259,21 @@ git status -sb
 | Diff check | Tidak ada whitespace error |
 | Git status | Hanya perubahan release yang disengaja |
 
+### Hasil audit worktree 27 Juli 2026
+
+| Gate | Hasil aktual |
+| --- | --- |
+| Lint | Lulus, 0 warning |
+| Typecheck | Lulus |
+| Unit test | 73/73 lulus |
+| Production build | Lulus, 13 route Static/SSG |
+| E2E lokal | 79 lulus, 13 skip yang disengaja |
+| Lighthouse | 12/12 lulus; Performance 95-97, A11y/SEO/Best Practices 100 |
+| Production audit | 0 vulnerability |
+| Full audit | 9 high pada dev-tool chain ESLint; runtime tidak terdampak |
+| Diff check | Lulus |
+| Git status | Perubahan QA/dokumentasi belum di-commit |
+
 ### Bukti
 
 - Tanggal dan waktu eksekusi.
@@ -247,6 +287,8 @@ git status -sb
 - Seluruh runtime, test, build, dan performance gate lulus.
 - Tidak ada vulnerability production yang diketahui.
 - Full-audit finding sudah dipahami dan diterima secara eksplisit.
+- Release production telah diuji. Suite post-launch dan dokumentasi menjadi
+  bagian closure commit terpisah yang dibuat owner setelah G8 lulus.
 
 ### Stop condition
 
@@ -260,14 +302,14 @@ git status -sb
 ## G3. Konfigurasi project Netlify
 
 **Owner:** Pemilik project  
-**Status:** [ ] Belum dilakukan
+**Status:** Lulus berdasarkan deploy dan konfirmasi pemilik
 
 ### 3.1 Akun dan biaya
 
-- [ ] Login ke team/account yang akan menjadi owner jangka panjang.
-- [ ] Buka **Usage & billing > Plan details**.
-- [ ] Pastikan plan Free atau legacy plan yang memang ingin dipertahankan.
-- [ ] Jangan mengaktifkan paid add-on atau pindah plan tanpa review.
+- [x] Login ke team/account yang akan menjadi owner jangka panjang.
+- [x] Buka **Usage & billing > Plan details**.
+- [x] Pastikan plan Free atau legacy plan yang memang ingin dipertahankan.
+- [x] Jangan mengaktifkan paid add-on atau pindah plan tanpa review.
 - [ ] Catat tanggal reset credit bulanan.
 
 ### 3.2 Import repository
@@ -304,10 +346,10 @@ Catat hasil final:
 
 | Data | Nilai |
 | --- | --- |
-| Nama project Netlify |  |
-| Production origin | `https://________________.netlify.app` |
+| Nama project Netlify | `tauco-cap-badak` |
+| Production origin | `https://tauco-cap-badak.netlify.app` |
 | Production branch | `main` |
-| Netlify project ID |  |
+| Netlify project ID | Belum dicatat, tidak memblokir deploy |
 
 Tambahkan environment variable dengan scope Builds dan seluruh deploy context:
 
@@ -349,10 +391,10 @@ Publish directory: .next
 Node version: 22
 ```
 
-- [ ] Jangan pin plugin Next.js Netlify.
-- [ ] Buka menu **Forms**.
-- [ ] Aktifkan **Form detection**.
-- [ ] Pastikan Deploy Previews aktif.
+- [x] Jangan pin plugin Next.js Netlify.
+- [x] Buka menu **Forms**.
+- [x] Aktifkan **Form detection**.
+- [x] Pastikan Deploy Previews aktif.
 - [ ] Jangan retry production deploy dahulu jika ingin menjalankan strict
       preview-first flow.
 
@@ -370,6 +412,15 @@ Node version: 22
 - Build setting benar.
 - Form detection dan Deploy Previews aktif.
 
+Konfirmasi pemilik pada 27 Juli 2026:
+
+- Netlify plan **Free Legacy** aktif dan tidak ada payment method.
+- Dashboard Usage & billing mengonfirmasi model Legacy dengan allowance
+  bandwidth dan build minutes.
+- Form `kontak` terlihat pada Active forms.
+- `NEXT_PUBLIC_SITE_URL` berlaku untuk seluruh deploy context.
+- Deploy Preview PR #1 berhasil dibuat.
+
 ### Stop condition
 
 - Nama site masih sementara.
@@ -382,7 +433,7 @@ Node version: 22
 ## G4. Deploy Preview dan QA
 
 **Owner:** Pemilik project dan pemilik bisnis  
-**Status:** [ ] Belum dilakukan
+**Status:** Lulus pada preview commit yang tercatat
 
 ### 4.1 Membuat Deploy Preview
 
@@ -412,43 +463,73 @@ https://deploy-preview-<nomor-pr>--<nama-site>.netlify.app
 
 ### 4.2 Functional QA
 
-- [ ] `/`
-- [ ] `/tauco`
-- [ ] `/tentang-kami`
-- [ ] `/produk`
-- [ ] `/produk/tauco-cap-badak`
-- [ ] `/kontak`
-- [ ] `/kebijakan-privasi`
-- [ ] Unknown product slug menghasilkan 404.
-- [ ] Seluruh internal link bekerja.
-- [ ] Mobile navigation bekerja.
-- [ ] Dark mode mengikuti sistem.
-- [ ] Image tidak broken dan tidak menyebabkan layout shift.
-- [ ] Copy utama tersedia pada initial HTML.
+- [x] `/`
+- [x] `/tauco`
+- [x] `/tentang-kami`
+- [x] `/produk`
+- [x] `/produk/tauco-cap-badak`
+- [x] `/kontak`
+- [x] `/kebijakan-privasi`
+- [x] Unknown product slug menghasilkan 404.
+- [x] Seluruh internal link bekerja.
+- [x] Mobile navigation bekerja.
+- [x] Dark mode mengikuti sistem.
+- [x] Image tidak broken dan tidak menyebabkan layout shift.
+- [x] Copy utama tersedia pada initial HTML.
+
+Functional QA ini dapat diulang tanpa build local:
+
+```powershell
+$env:PLAYWRIGHT_BASE_URL = "https://deploy-preview-1--tauco-cap-badak.netlify.app"
+npm.cmd run qa:g4:functional
+Remove-Item Env:PLAYWRIGHT_BASE_URL
+```
+
+Evidence 27 Juli 2026:
+
+| Field | Nilai |
+| --- | --- |
+| Pull Request | [#1](https://github.com/ilhamnugraha8944/tauco/pull/1) |
+| Release branch | `launch/phase-1a` |
+| Commit yang diuji | `3a07ee0b56a5feb04deb23596833df76a6fc5bb8` |
+| Deploy Preview | `https://deploy-preview-1--tauco-cap-badak.netlify.app` |
+| Netlify check | Success |
+| Playwright | 13/13 lulus |
+| Laporan lokal | `playwright-report/g4/functional/index.html` |
+
+Suite agregat dapat dijalankan ulang dengan:
+
+```powershell
+$env:PLAYWRIGHT_BASE_URL = "https://deploy-preview-1--tauco-cap-badak.netlify.app"
+npm.cmd run qa:g4
+Remove-Item Env:PLAYWRIGHT_BASE_URL
+```
 
 ### 4.3 Preview SEO isolation
 
-- [ ] Page source mempunyai `noindex, nofollow`.
-- [ ] `/robots.txt` melarang crawling.
-- [ ] Canonical tetap menunjuk production origin, bukan preview URL.
-- [ ] Sitemap tidak memakai preview origin.
-- [ ] Tidak ada localhost, placeholder domain, atau random Netlify URL.
-- [ ] Netlify response juga memiliki `X-Robots-Tag: noindex`.
+- [x] Page source mempunyai `noindex, nofollow`.
+- [x] `/robots.txt` melarang crawling.
+- [x] Canonical tetap menunjuk production origin, bukan preview URL.
+- [x] Sitemap tidak memakai preview origin.
+- [x] Tidak ada localhost, placeholder domain, atau random Netlify URL.
+- [x] Netlify response juga memiliki `X-Robots-Tag: noindex`.
+
+Evidence: `qa:g4:seo` lulus 9/9 pada Deploy Preview PR #1.
 
 ### 4.4 Form QA
 
-- [ ] Form `kontak` terlihat pada Active forms.
-- [ ] Field dan label lengkap.
-- [ ] Native validation bekerja.
-- [ ] Email invalid ditolak.
-- [ ] Pesan terlalu pendek ditolak.
-- [ ] Double-submit tidak menghasilkan dua submission.
-- [ ] Valid submission masuk verified submissions.
-- [ ] Submission tidak masuk spam.
-- [ ] Success feedback terlihat.
-- [ ] Network error mempertahankan input.
-- [ ] Honeypot tersedia.
-- [ ] Tidak ada file upload.
+- [x] Form `kontak` terlihat pada Active forms.
+- [x] Field dan label lengkap.
+- [x] Native validation bekerja.
+- [x] Email invalid ditolak.
+- [x] Pesan terlalu pendek ditolak.
+- [x] Double-submit dikunci pada UI.
+- [x] Valid submission masuk verified submissions.
+- [x] Submission tidak masuk spam.
+- [x] Success feedback terlihat.
+- [x] Network error mempertahankan input.
+- [x] Honeypot tersedia.
+- [x] Tidak ada file upload.
 
 Gunakan data test yang jelas:
 
@@ -459,31 +540,67 @@ Topik: Pertanyaan umum
 Pesan: Pengujian deployment Phase 1A, bukan pertanyaan pelanggan.
 ```
 
+Satu submission sintetis dikirim pada 27 Juli 2026 pukul 10:34:56 WIB:
+
+| Field | Nilai |
+| --- | --- |
+| Nama | `QA Phase 1A` |
+| Email | `qa-phase1a@example.com` |
+| Run ID | `2026-07-27-G4-PR1` |
+| HTTP response | 200 |
+| Netlify request ID | `01KYGT7R41AA1QXM1TG26AJMK8` |
+
+Pemilik mengonfirmasi submission terlihat pada **Forms > Active forms >
+kontak**, berstatus verified, dan tidak masuk spam. Data sintetis boleh dihapus
+setelah evidence ini dicatat.
+
 ### 4.5 Accessibility dan keyboard
 
-- [ ] Navigasi dengan `Tab` dan `Shift+Tab`.
-- [ ] Seluruh focus indicator terlihat.
-- [ ] `Enter` dan `Space` mengaktifkan control yang relevan.
-- [ ] `Escape` menutup menu mobile bila berlaku.
-- [ ] Form error memindahkan focus secara masuk akal.
-- [ ] Zoom browser 200 persen tetap dapat digunakan.
-- [ ] Reduced motion tidak menampilkan motion berlebihan.
+- [x] Navigasi dengan `Tab` dan `Shift+Tab`.
+- [x] Seluruh focus indicator terlihat.
+- [x] `Enter` dan `Space` mengaktifkan control yang relevan.
+- [x] `Escape` tidak berlaku karena menu memakai native `<details>`, bukan
+      dialog atau modal.
+- [x] Form error memindahkan focus secara masuk akal.
+- [x] Reflow 200 persen lulus melalui viewport proxy otomatis dan zoom browser
+      fisik dikonfirmasi pemilik.
+- [x] Reduced motion tidak menampilkan motion berlebihan.
+
+Evidence: 15/15 accessibility test lulus. Axe WCAG A/AA dijalankan pada seluruh
+route, light/dark, dan state form dinamis. Iframe Netlify Drawer yang
+diinjeksikan provider dikecualikan secara spesifik karena bukan DOM aplikasi.
+Spot-check zoom browser fisik dikonfirmasi lulus oleh pemilik.
 
 ### 4.6 Browser dan perangkat
 
 | Target | Status | Catatan |
 | --- | --- | --- |
-| Edge desktop | [ ] |  |
-| Firefox desktop | [ ] |  |
-| Safari asli di iPhone/iPad/Mac | [ ] |  |
-| Android Chrome | [ ] |  |
-| Viewport sekitar 320 px | [ ] |  |
-| Viewport sekitar 768 px | [ ] |  |
-| Viewport sekitar 1024 px | [ ] |  |
-| Desktop lebar | [ ] |  |
+| Edge desktop | [x] | Microsoft Edge terpasang, seluruh matrix lulus |
+| Firefox desktop | [x] | Playwright Firefox 151, seluruh route lulus |
+| Safari asli di iPhone/iPad/Mac | [x] | Dikonfirmasi lulus oleh pemilik; WebKit 26.5 supplemental juga lulus |
+| Android Chrome | [x] | Dikonfirmasi lulus oleh pemilik; emulasi Pixel 7 juga lulus |
+| Viewport sekitar 320 px | [x] | Reflow dan overflow lulus |
+| Viewport sekitar 768 px | [x] | Reflow dan overflow lulus |
+| Viewport sekitar 1024 px | [x] | Pergantian navigasi dan layout lulus |
+| Desktop lebar | [x] | 1440 px lulus |
 
 Playwright WebKit boleh digunakan sebagai pemeriksaan tambahan, tetapi bukan
 pengganti penuh Safari pada perangkat Apple.
+
+Ringkasan automated G4:
+
+| Suite | Hasil |
+| --- | --- |
+| Functional | 13 lulus |
+| SEO isolation | 9 lulus |
+| Form non-live | 6 lulus, 1 live test sengaja skip |
+| Accessibility | 15 lulus |
+| Browser matrix | 10 lulus, 6 duplikasi sengaja skip |
+| Total | 53 lulus, 7 skip yang terdokumentasi |
+
+Konfirmasi dashboard dan perangkat oleh pemilik diterima pada 27 Juli 2026.
+Dengan bukti tersebut, seluruh acceptance condition G4 terpenuhi untuk preview
+commit `3a07ee0b56a5feb04deb23596833df76a6fc5bb8`.
 
 ### Bukti
 
@@ -514,32 +631,38 @@ pengganti penuh Safari pada perangkat Apple.
 ## G5. Go/No-Go production
 
 **Owner:** Pemilik project dan pemilik bisnis  
-**Status:** [ ] Belum diputuskan
+**Status:** GO telah dilaksanakan oleh owner melalui merge PR #1
 
 ### Go checklist
 
-- [ ] G0 lulus.
-- [ ] G1 lulus.
-- [ ] G2 lulus.
-- [ ] G3 lulus.
-- [ ] G4 lulus.
-- [ ] Seluruh defect blocker dan major ditutup.
-- [ ] Production origin dikunci.
-- [ ] Owner bisnis menyetujui copy dan visual final.
-- [ ] Inbox owner siap menerima pesan.
-- [ ] Rollback owner mengetahui prosedur rollback.
-- [ ] Credit Netlify masih cukup.
+- [x] G0 lulus.
+- [x] G1 lulus.
+- [x] G2 lulus.
+- [x] G3 lulus.
+- [x] G4 lulus.
+- [x] Tidak ditemukan defect aplikasi blocker atau major pada automated QA.
+- [x] Production origin dikunci ke `https://tauco-cap-badak.netlify.app`.
+- [x] Owner bisnis menyetujui copy dan visual provisional untuk launch.
+- [x] Inbox owner siap menerima pesan.
+- [x] Rollback owner mengetahui prosedur rollback.
+- [x] Usage quota Netlify masih cukup.
 
 ### Keputusan
 
 | Field | Nilai |
 | --- | --- |
-| Keputusan | GO / NO-GO |
-| Diputuskan oleh |  |
-| Tanggal dan waktu |  |
-| Commit SHA |  |
-| Preview URL |  |
-| Catatan risiko yang diterima |  |
+| Keputusan | GO dilaksanakan melalui merge PR #1 dan production publish |
+| Diputuskan oleh | Pemilik project dan bisnis |
+| Tanggal dan waktu | 27 Juli 2026; publish 13:24:42 WIB |
+| Commit SHA | `2ce0a310075224b2cb8bb470d0e0ba4d0d301b98` |
+| Preview URL | `https://deploy-preview-1--tauco-cap-badak.netlify.app` |
+| Catatan risiko yang diterima | Dev-only ESLint advisory diterima pemilik; production audit 0 |
+
+### Catatan keputusan
+
+Owner telah melakukan merge PR #1 dan Netlify telah memublikasikan release.
+Owner mengonfirmasi pemahaman prosedur rollback pada 28 Juli 2026. Production
+smoke test G6 tidak menemukan trigger rollback.
 
 ### No-Go jika
 
@@ -554,7 +677,7 @@ pengganti penuh Safari pada perangkat Apple.
 ## G6. Production deployment dan smoke test
 
 **Owner:** Pemilik project  
-**Status:** [ ] Belum dilakukan
+**Status:** [x] Lulus pada 27 Juli 2026
 
 ### 6.1 Deployment
 
@@ -569,55 +692,57 @@ pengganti penuh Safari pada perangkat Apple.
 
 | URL | Expected | Status |
 | --- | ---: | --- |
-| `/` | 200 | [ ] |
-| `/tauco` | 200 | [ ] |
-| `/tentang-kami` | 200 | [ ] |
-| `/produk` | 200 | [ ] |
-| `/produk/tauco-cap-badak` | 200 | [ ] |
-| `/kontak` | 200 | [ ] |
-| `/kebijakan-privasi` | 200 | [ ] |
-| `/produk/slug-tidak-ada` | 404 | [ ] |
+| `/` | 200 | [x] |
+| `/tauco` | 200 | [x] |
+| `/tentang-kami` | 200 | [x] |
+| `/produk` | 200 | [x] |
+| `/produk/tauco-cap-badak` | 200 | [x] |
+| `/kontak` | 200 | [x] |
+| `/kebijakan-privasi` | 200 | [x] |
+| `/produk/slug-tidak-ada` | 404 | [x] |
 
 ### 6.3 Production SEO verification
 
-- [ ] Production page tidak mempunyai `noindex`.
-- [ ] Canonical seluruh halaman memakai exact production origin.
-- [ ] Open Graph URL dan image URL memakai production origin.
-- [ ] `/robots.txt` mengizinkan crawling.
-- [ ] `/robots.txt` memblokir `/__forms.html`.
-- [ ] `/robots.txt` menunjuk production sitemap.
-- [ ] `/sitemap.xml` berisi tujuh published URL.
-- [ ] Sitemap tidak memuat localhost atau preview URL.
-- [ ] Homepage JSON-LD memuat `WebSite` dan `Organization`.
-- [ ] Interior pages mempunyai breadcrumb yang relevan.
-- [ ] Product JSON-LD tidak membuat Offer, rating, atau review palsu.
-- [ ] Schema Markup Validator tidak menemukan syntax error.
-- [ ] Rich Results Test digunakan hanya untuk tipe yang eligible.
-- [ ] Initial source HTML memuat heading, copy, dan link utama.
+- [x] Production page tidak mempunyai `noindex`.
+- [x] Canonical seluruh halaman memakai exact production origin.
+- [x] Open Graph URL dan image URL memakai production origin.
+- [x] `/robots.txt` mengizinkan crawling.
+- [x] `/robots.txt` memblokir `/__forms.html`.
+- [x] `/robots.txt` menunjuk production sitemap.
+- [x] `/sitemap.xml` berisi tujuh published URL.
+- [x] Sitemap tidak memuat localhost atau preview URL.
+- [x] Homepage JSON-LD memuat `WebSite` dan `Organization`.
+- [x] Interior pages mempunyai breadcrumb yang relevan.
+- [x] Product JSON-LD tidak membuat Offer, rating, atau review palsu.
+- [x] Schema Markup Validator tidak menemukan syntax error.
+- [x] Rich Results Test hanya digunakan untuk tipe yang eligible. Tidak ada
+  klaim Product rich result karena data `Offer`, rating, dan review sengaja
+  tidak diterbitkan.
+- [x] Initial source HTML memuat heading, copy, dan link utama.
 
 ### 6.4 Production quality
 
-- [ ] Security headers tersedia.
-- [ ] HTTPS valid.
-- [ ] Tidak ada mixed content.
-- [ ] Image CDN bekerja.
-- [ ] Tidak ada error console blocker.
-- [ ] Lighthouse production diperiksa pada route representatif.
-- [ ] Form production dapat dibuka.
-- [ ] Mobile, dark mode, dan keyboard spot-check lulus.
+- [x] Security headers tersedia.
+- [x] HTTPS valid.
+- [x] Tidak ada mixed content.
+- [x] Image CDN bekerja.
+- [x] Tidak ada error console blocker.
+- [x] Lighthouse production diperiksa pada empat route, masing-masing tiga kali.
+- [x] Form production dapat dibuka.
+- [x] Mobile, dark mode, keyboard, dan Axe WCAG A/AA lulus.
 
 ### Bukti
 
 | Evidence | Nilai |
 | --- | --- |
-| Production URL |  |
-| Netlify deploy ID |  |
-| Commit SHA |  |
-| Published timestamp |  |
-| Robots URL |  |
-| Sitemap URL |  |
-| Schema validation URL/result |  |
-| Lighthouse result |  |
+| Production URL | `https://tauco-cap-badak.netlify.app` |
+| Netlify deploy ID | `6a671c07dba5f22c9cfab616` |
+| Commit SHA | `2ce0a310075224b2cb8bb470d0e0ba4d0d301b98` |
+| Published timestamp | 27 Juli 2026, 15:52:14 WIB |
+| Robots URL | `https://tauco-cap-badak.netlify.app/robots.txt` |
+| Sitemap URL | `https://tauco-cap-badak.netlify.app/sitemap.xml` |
+| Schema validation URL/result | Schema.org Validator: homepage dan detail produk, 0 error dan 0 warning |
+| Lighthouse result | 12/12 lulus; Performance 96-100, Accessibility 100, SEO 100, LCP maksimum 2.132 ms, CLS 0 |
 
 ### Lulus jika
 
@@ -641,19 +766,20 @@ Rollback segera bila:
 ## G7. Forms, Search Console, dan operasional
 
 **Owner:** Pemilik inbox dan pemilik project  
-**Status:** [ ] Belum dilakukan
+**Status:** [x] Lulus pada 28 Juli 2026
 
 ### 7.1 Production form acceptance
 
-- [ ] Submit pesan test dari production.
-- [ ] Pastikan submission berada di verified submissions.
-- [ ] Pastikan bukan spam.
-- [ ] Aktifkan email notification utama.
-- [ ] Aktifkan backup notification.
-- [ ] Pastikan email notifikasi benar-benar diterima.
-- [ ] Balasan tidak dikirim kepada data test yang tidak sah.
-- [ ] Hapus submission test jika tidak lagi dibutuhkan.
-- [ ] Buat pengingat review retensi.
+- [x] Submit tepat satu pesan test sintetis dari production.
+- [x] Pastikan submission berada di verified submissions.
+- [x] Pastikan bukan spam.
+- [x] Aktifkan email notification utama.
+- [x] Backup notification secara formal ditunda dan risikonya diterima owner
+  untuk launch.
+- [x] Pastikan email notifikasi utama benar-benar diterima.
+- [x] Balasan tidak dikirim kepada alamat sintetis.
+- [x] Hapus tiga submission QA setelah acceptance selesai.
+- [x] Buat pengingat review retensi.
 
 Path notifikasi Netlify:
 
@@ -666,35 +792,70 @@ Project configuration
 
 ### 7.2 Google Search Console
 
-- [ ] Tambahkan exact production URL sebagai URL-prefix property.
-- [ ] Gunakan akun bisnis yang akan menjadi owner jangka panjang.
-- [ ] Verifikasi ownership.
-- [ ] Pastikan verification meta tetap ada setelah deploy berikutnya.
-- [ ] Submit `https://<production-origin>/sitemap.xml`.
-- [ ] URL Inspection homepage.
-- [ ] URL Inspection `/tauco`.
-- [ ] URL Inspection `/produk`.
-- [ ] URL Inspection detail produk.
-- [ ] Request indexing hanya setelah konten production final.
-- [ ] Catat baseline Pages dan Enhancements.
+- [x] Tambahkan exact production URL
+  `https://tauco-cap-badak.netlify.app/` sebagai URL-prefix property.
+- [x] Gunakan akun owner yang akan dipertahankan jangka panjang.
+- [x] Verifikasi ownership.
+- [x] Pastikan verification meta tetap ada setelah deploy berikutnya.
+- [x] Submit `https://tauco-cap-badak.netlify.app/sitemap.xml`.
+- [x] URL Inspection homepage.
+- [x] URL Inspection `/tauco`.
+- [x] URL Inspection `/produk`.
+- [x] URL Inspection detail produk.
+- [x] Request indexing hanya setelah konten production final.
+- [x] Catat baseline Pages dan Enhancements.
+
+Baseline 28 Juli 2026:
+
+- Sitemap sukses dan menemukan tujuh halaman.
+- URL Inspection serta request indexing selesai untuk empat URL prioritas.
+- Data performa/index historis belum tersedia karena property baru.
+- Detail produk tersedia untuk Google, tetapi belum eligible untuk seluruh
+  Product enhancement. Ini diterima untuk Phase 1A karena `Offer`, review, dan
+  rating yang belum terverifikasi sengaja tidak diterbitkan.
+
+Status pemeriksaan publik 27 Juli 2026 pukul 15:53 WIB: production merespons
+200 dan memuat exact meta `google-site-verification`. Deploy
+`6a671c07dba5f22c9cfab616` dipublikasikan pukul 15:52:14 WIB dari commit
+`2ce0a310075224b2cb8bb470d0e0ba4d0d301b98`. Ownership sudah diverifikasi
+dan sitemap berhasil dikirim.
 
 ### 7.3 Operasional
 
-- [ ] Owner inbox mengetahui cara melihat verified dan spam submission.
-- [ ] Owner mengetahui cara menghapus submission.
-- [ ] Owner menjalankan SOP access/correction/deletion request.
-- [ ] Owner mengetahui jadwal penghapusan maksimal 12 bulan.
-- [ ] Netlify usage/credit diperiksa.
-- [ ] Notification recipient diuji ulang jika alamat berubah.
+- [x] Owner inbox mengetahui cara melihat verified dan spam submission.
+- [x] Owner mengetahui cara menghapus submission.
+- [x] SOP access/correction/deletion terdokumentasi dan dipahami owner.
+- [x] Owner mengetahui jadwal penghapusan maksimal 12 bulan.
+- [x] Netlify usage diperiksa; Free Legacy masih jauh di bawah kuota.
+- [x] Prosedur mewajibkan notification recipient diuji ulang jika alamat
+  berubah; belum ada perubahan alamat pada launch.
 
 ### Bukti
 
 - Screenshot Active forms.
-- ID dan timestamp production test submission.
+- Production test submission: request ID
+  `01KYHB76A0M1N2HJQY4HVSZQDH`, 27 Juli 2026 pukul 15:31:43 WIB,
+  run ID `2026-07-27-G7-PRODUCTION`, HTTP 200.
+- Notification acceptance submission: request ID
+  `01KYHDDP0DCHWME30K7EV0NY3J`, 27 Juli 2026 pukul 16:10:13 WIB,
+  run ID `2026-07-27-G7-NOTIFICATION`, HTTP 200, satu attempt tanpa retry.
+- Owner mengonfirmasi email notification utama diterima. Notification cadangan
+  belum ditambahkan dan ditunda berdasarkan keputusan owner.
+- Owner mengonfirmasi ketiga submission QA telah dihapus permanen dan pengingat
+  review retensi telah dibuat pada 28 Juli 2026.
+- Owner mengonfirmasi akun Search Console sebagai owner jangka panjang,
+  memahami SOP privasi, dan memahami prosedur rollback pada 28 Juli 2026.
+- Screenshot owner menunjukkan submission G7 berada di Verified submissions
+  dan tidak dikategorikan sebagai spam.
 - Bukti email notification diterima.
-- Screenshot Search Console verified.
-- Screenshot sitemap submitted.
-- Nama owner operasional.
+- Screenshot Search Console property dapat diakses setelah verification.
+- Screenshot sitemap berstatus **Sukses**, terakhir dibaca 27 Juli 2026,
+  dan menemukan tujuh halaman.
+- Owner operasional: pemilik project.
+- Public verification meta: exact token ditemukan, HTTP 200, tidak ada
+  `noindex`; sitemap tetap berisi tujuh production URL tanpa preview/localhost.
+- Owner mengonfirmasi URL Inspection dan request indexing selesai untuk
+  homepage, `/tauco`, `/produk`, dan detail produk pada 27 Juli 2026.
 
 ### Lulus jika
 
@@ -708,30 +869,32 @@ Project configuration
 ## G8. Dokumentasi dan penutupan Phase 1A
 
 **Owner:** Pemilik project  
-**Status:** [ ] Belum dilakukan
+**Status:** [x] Complete pada 28 Juli 2026
 
 ### File yang harus diperbarui
 
-- [ ] `PRD.md`
-- [ ] `WALKTHROUGH.md`
-- [ ] `README.md`
-- [ ] `FACT_CHECK.md`
-- [ ] `plan.md`
+- [x] `PRD.md`
+- [x] `WALKTHROUGH.md`
+- [x] `README.md`
+- [x] `FACT_CHECK.md`
+- [x] `plan.md`
+- [x] `plan.pdf` diregenerasi dari `plan.md`
 
 ### Pembaruan minimum
 
-- [ ] Ubah status target deployment Phase 1A menjadi implemented.
-- [ ] Catat production URL.
-- [ ] Catat deploy ID, commit SHA, dan timestamp.
-- [ ] Catat hasil production route dan SEO smoke test.
-- [ ] Catat Netlify Forms detection dan test submission.
-- [ ] Catat notification owner.
-- [ ] Catat hasil manual Edge, Firefox, Safari, dan mobile.
-- [ ] Catat Search Console verification dan sitemap submission.
-- [ ] Perbaiki pernyataan lama bahwa repository belum commit/push.
-- [ ] Perbarui dependency audit agar membedakan production dan development.
-- [ ] Tandai data resmi yang benar-benar sudah dikonfirmasi.
-- [ ] Jangan menandai data yang masih dihilangkan sebagai verified.
+- [x] Ubah status target deployment Phase 1A menjadi implemented.
+- [x] Catat production URL.
+- [x] Catat deploy ID, commit SHA, dan timestamp.
+- [x] Catat hasil production route dan SEO smoke test.
+- [x] Catat Netlify Forms detection dan test submission.
+- [x] Catat notification owner.
+- [x] Catat hasil manual Edge, Firefox, Safari, dan mobile.
+- [x] Catat Search Console verification dan sitemap submission.
+- [x] Perbaiki pernyataan lama: release production sudah commit/push/merge,
+  sedangkan perubahan closeout G8 menunggu commit owner.
+- [x] Perbarui dependency audit agar membedakan production dan development.
+- [x] Tandai data resmi yang benar-benar sudah dikonfirmasi.
+- [x] Jangan menandai data yang masih dihilangkan sebagai verified.
 
 ### Commit dokumentasi penutupan
 
@@ -746,24 +909,42 @@ git diff -- PRD.md WALKTHROUGH.md README.md FACT_CHECK.md plan.md
 Commit dan push dilakukan oleh pemilik project. Jika continuous deployment tetap
 aktif, push ke `main` akan memicu production deployment baru.
 
+Status version control G8: seluruh perubahan closeout siap direview, tetapi
+belum di-commit atau di-push oleh assistant sesuai pembagian tanggung jawab.
+
 ### Definition of Done Phase 1A
 
 Phase 1A hanya boleh diberi status **Complete** jika seluruh item berikut benar:
 
-- [ ] Production deployment berstatus Published.
-- [ ] Origin production stabil dan terdokumentasi.
-- [ ] Seluruh published route 200 dan unknown product 404.
-- [ ] Production indexable dan preview non-indexable.
-- [ ] Canonical, robots, sitemap, Open Graph, dan JSON-LD benar.
-- [ ] Form terdeteksi dan verified submission masuk.
-- [ ] Notification utama dan cadangan teruji.
-- [ ] Owner inbox dan SOP retensi tersedia.
-- [ ] Manual keyboard, Edge, Firefox, Safari, dan mobile lulus.
-- [ ] Search Console verified dan sitemap dikirim.
-- [ ] Tidak ada unverified brand claim.
-- [ ] Production dependency audit 0.
-- [ ] Evidence log lengkap.
-- [ ] PRD, WALKTHROUGH, README, FACT_CHECK, dan plan diperbarui.
+- [x] Production deployment berstatus Published.
+- [x] Origin production stabil dan terdokumentasi.
+- [x] Seluruh published route 200 dan unknown product 404.
+- [x] Production indexable dan preview non-indexable.
+- [x] Canonical, robots, sitemap, Open Graph, dan JSON-LD benar.
+- [x] Form terdeteksi dan verified submission masuk.
+- [x] Notification utama teruji end-to-end; backup ditunda dan risikonya
+  diterima owner sebagai follow-up operasional.
+- [x] Owner inbox dan SOP retensi tersedia.
+- [x] Manual keyboard, Edge, Firefox, Safari, dan mobile lulus.
+- [x] Search Console verified dan sitemap dikirim.
+- [x] Tidak ada unverified brand claim.
+- [x] Production dependency audit 0.
+- [x] Evidence log lengkap.
+- [x] PRD, WALKTHROUGH, README, FACT_CHECK, plan, dan PDF diperbarui.
+
+### Final validation G8
+
+| Pemeriksaan | Hasil 28 Juli 2026 |
+| --- | --- |
+| `npm.cmd run check` | Lulus |
+| ESLint dan TypeScript | Lulus |
+| Unit test | 73/73 lulus |
+| Production build | Lulus, 13 route Static/SSG |
+| Production smoke test terbaru | 29/29 lulus |
+| `npm.cmd audit --omit=dev` | 0 vulnerability |
+| Full `npm.cmd audit` | 9 high pada development-only ESLint chain; accepted risk |
+| `git diff --check` | Lulus |
+| `npm.cmd run plan:pdf` | Lulus; PDF valid dan diregenerasi dari Markdown |
 
 ---
 
@@ -812,30 +993,49 @@ akan menggantikan hasil rollback jika auto publishing masih aktif.
 
 ## 6. Free-tier guardrail
 
-Untuk credit-based Free plan berdasarkan informasi Netlify pada 27 Juli 2026:
+Screenshot pemilik pada 27 Juli 2026 mengonfirmasi **Free Legacy** tanpa payment
+method.
 
-| Meter | Nilai saat dokumen dibuat |
+| Meter Legacy Free | Allowance |
 | --- | --- |
-| Monthly credit | 300 credits dengan hard limit |
-| Production deploy | 15 credits per published production deploy |
-| Deploy Preview | Tidak memakai deployment credits |
-| Branch deploy | Tidak memakai deployment credits |
-| Failed deploy | Tidak memakai deployment credits |
-| Form submission | Gratis dan unlimited pada credit-based plans |
-| Bandwidth | 20 credits per GB |
-| Web requests | 2 credits per 10.000 requests |
-| Compute | 10 credits per GB-hour |
+| Bandwidth | 100 GB per bulan, hard limit |
+| Build minutes | 300 menit per bulan, hard limit |
+| Serverless Functions | 125.000 invocation per site per bulan |
+| Edge Functions | 1 juta invocation per bulan |
+| Form submission | 100 submission per site per bulan |
+| Concurrent build | 1 |
+
+Snapshot sebelum launch:
+
+| Meter | Pemakaian | Persentase |
+| --- | --- | --- |
+| Bandwidth | 70 MB / 100 GB | Kurang dari 0,1% |
+| Build minutes | 3 / 300 menit | 1% |
+| Concurrent builds | 0 / 1 | Tidak ada build aktif |
+| Team members | 1 | Sesuai single-owner operation |
+
+Seluruh meter yang terlihat jauh di bawah threshold internal 90 persen.
 
 Aturan:
 
-- [ ] Periksa plan aktual di dashboard karena legacy plan dapat berbeda.
-- [ ] Jangan mengaktifkan paid add-on tanpa persetujuan.
-- [ ] Gunakan Deploy Preview untuk QA.
-- [ ] Hindari production deploy berulang yang tidak perlu.
-- [ ] Catat credit sebelum dan sesudah launch.
+1. Dari team dashboard, buka halaman **Projects** untuk ringkasan usage.
+2. Buka **Usage & billing > Account usage insights** untuk rincian.
+3. Catat persentase bandwidth, build minutes, Functions, Edge Functions, dan
+   Forms serta tanggal reset.
+4. Launch hanya jika seluruh meter masih di bawah 90 persen. Jika satu meter
+   mencapai 90 persen, hentikan production deploy dan evaluasi lebih dahulu.
+
+- [x] Plan aktual dikonfirmasi Free oleh pemilik.
+- [x] Tidak ada payment method pada akun.
+- [x] Jangan mengaktifkan paid add-on tanpa persetujuan.
+- [x] Gunakan Deploy Preview untuk QA.
+- [x] Hindari production deploy berulang yang tidak perlu.
+- [x] Catat usage sebelum launch.
+- [ ] Catat usage sesudah launch.
 - [ ] Periksa usage secara rutin setelah Search Console mulai mengirim traffic.
 
-Free plan dapat pause ketika hard limit habis. Free tier bukan SLA bisnis.
+Pada Legacy Free, build limit menghentikan build baru. Limit meter lainnya dapat
+menonaktifkan build dan mem-pause site. Free tier bukan SLA bisnis.
 
 ---
 
@@ -853,7 +1053,7 @@ hari deployment:
 | INP p75 | Setelah field data tersedia | <= 200 ms |
 | CLS p75 | Setelah field data tersedia | <= 0,1 |
 | Valid form submission | Mingguan | Tidak ada pesan yang terlewat |
-| Netlify credits | Mingguan pada bulan pertama | Tetap di bawah hard limit |
+| Netlify usage quota | Mingguan pada bulan pertama | Seluruh meter di bawah hard limit |
 | Broken links | Setiap content release | 0 |
 
 Target halaman pertama Google untuk kueri `tauco` dalam 6-12 bulan adalah KPI
@@ -865,32 +1065,32 @@ aspiratif, bukan jaminan atau acceptance criterion pada hari launch.
 
 | Gate | Status | Owner | Tanggal | Evidence/link | Catatan |
 | --- | --- | --- | --- | --- | --- |
-| G0 Scope dan baseline | [ ] |  |  |  |  |
-| G1 Bisnis dan privasi | [ ] |  |  |  |  |
-| G2 Release candidate lokal | [ ] |  |  |  |  |
-| G3 Konfigurasi Netlify | [ ] |  |  |  |  |
-| G4 Deploy Preview QA | [ ] |  |  |  |  |
-| G5 Go/No-Go | [ ] |  |  |  |  |
-| G6 Production dan smoke | [ ] |  |  |  |  |
-| G7 Forms dan Search Console | [ ] |  |  |  |  |
-| G8 Dokumentasi dan closure | [ ] |  |  |  |  |
+| G0 Scope dan baseline | [x] | Pemilik project | 2026-07-27 | Percakapan project, GitHub PR #1 | Scope, origin, branch, dan release SHA final |
+| G1 Bisnis dan privasi | [x] | Pemilik project | 2026-07-27 | Konfirmasi tertulis pemilik | Owner, inbox, retensi, copy, visual, omission, dan risiko dikonfirmasi |
+| G2 Release candidate lokal | [x] | Technical QA | 2026-07-27 | `.lighthouseci`, local command log | Seluruh gate teknis lulus |
+| G3 Konfigurasi Netlify | [x] | Pemilik project | 2026-07-27 | Production origin, PR #1, konfirmasi dashboard | Free plan, environment scope, form detection, dan preview dikonfirmasi |
+| G4 Deploy Preview QA | [x] | Pemilik project | 2026-07-27 | PR #1, `playwright-report/g4/*`, request ID Netlify | 53 PASS, 7 intentional skip; verified form dan perangkat fisik dikonfirmasi |
+| G5 Go/No-Go | [x] | Pemilik project dan bisnis | 2026-07-28 | Merge PR #1, production publish, konfirmasi owner | GO dilaksanakan dan prosedur rollback dipahami |
+| G6 Production dan smoke | [x] | Technical QA | 2026-07-27 | `playwright-report/production`, `.lighthouseci-production` | 29/29 Playwright dan 12/12 Lighthouse lulus |
+| G7 Forms dan Search Console | [x] | Pemilik inbox dan project | 2026-07-28 | Request ID form, Search Console, sitemap, konfirmasi owner | Lulus; backup notification ditunda dan diterima sebagai follow-up |
+| G8 Dokumentasi dan closure | [x] | Technical QA dan pemilik project | 2026-07-28 | PRD, README, WALKTHROUGH, FACT_CHECK, plan, PDF, final gates | Complete; commit/push closeout dilakukan owner |
 
 ## 9. Final handoff record
 
 | Field | Nilai |
 | --- | --- |
-| Production URL |  |
-| Netlify project name |  |
-| Netlify project ID |  |
-| Production deploy ID |  |
-| Production commit SHA |  |
-| Published timestamp |  |
-| Owner Netlify |  |
-| Owner inbox |  |
-| Search Console owner |  |
-| Sitemap submitted at |  |
-| Phase 1A closed at |  |
-| Closed by |  |
+| Production URL | `https://tauco-cap-badak.netlify.app` |
+| Netlify project name | `tauco-cap-badak` |
+| Netlify project ID | `5a64a9b3-659d-452e-95ea-dcc973b72d12` |
+| Production deploy ID | `6a671c07dba5f22c9cfab616` |
+| Production commit SHA | `2ce0a310075224b2cb8bb470d0e0ba4d0d301b98` |
+| Published timestamp | 27 Juli 2026, 15:52:14 WIB |
+| Owner Netlify | Pemilik project |
+| Owner inbox | Pemilik project |
+| Search Console owner | Pemilik project |
+| Sitemap submitted at | 27 Juli 2026; status Sukses, 7 halaman ditemukan |
+| Phase 1A closed at | 28 Juli 2026 |
+| Closed by | Technical QA dan pemilik project |
 
 ## 10. Referensi
 
@@ -905,6 +1105,8 @@ aspiratif, bukan jaminan atau acceptance criterion pada hari launch.
 - [Next.js Forms workaround](https://opennext.js.org/netlify/forms)
 - [Form notifications](https://docs.netlify.com/manage/forms/notifications/)
 - [Netlify credit-based plans](https://docs.netlify.com/manage/accounts-and-billing/billing/billing-for-credit-based-plans/credit-based-pricing-plans/)
+- [Netlify Legacy pricing plans](https://docs.netlify.com/manage/accounts-and-billing/billing/billing-for-legacy-plans/legacy-pricing-plans/)
+- [Netlify Legacy billing FAQ](https://docs.netlify.com/manage/accounts-and-billing/billing/billing-for-legacy-plans/billing-faq-for-legacy-plans/)
 - [Google Search Console property](https://support.google.com/webmasters/answer/34592)
 - [Google sitemap documentation](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap)
 - [Schema Markup Validator](https://validator.schema.org/)

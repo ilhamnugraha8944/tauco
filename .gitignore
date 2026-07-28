@@ -12,6 +12,7 @@
 # Tests and quality reports
 /coverage/
 /.lighthouseci/
+/.lighthouseci-production/
 /playwright-report/
 /test-results/
 

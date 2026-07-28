@@ -19,6 +19,12 @@ async function expectSingleHeading(page: Page) {
   await expect(page.locator("h1")).toHaveCount(1);
 }
 
+function createAxeBuilder(page: Page) {
+  return new AxeBuilder({ page }).exclude(
+    'iframe[title="Netlify Drawer"]',
+  );
+}
+
 async function fillValidContactForm(page: Page) {
   await page.getByLabel(/^Nama/).fill("Ilham Pratama");
   await page.getByLabel(/^Email/).fill("ilham@example.com");
@@ -409,7 +415,7 @@ test.describe("accessibility", () => {
   for (const route of ["/", "/tauco", "/produk", "/kontak"] as const) {
     test(`${route} has no serious axe violations`, async ({ page }) => {
       await page.goto(route);
-      const results = await new AxeBuilder({ page }).analyze();
+      const results = await createAxeBuilder(page).analyze();
 
       expect(
         results.violations.filter((violation) =>

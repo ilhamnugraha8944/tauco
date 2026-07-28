@@ -5,7 +5,7 @@ website Phase 1A. Tujuannya bukan membuat narasi pemasaran, melainkan mencegah
 copy, metadata, structured data, alt text, dan visual menyatakan sesuatu yang
 belum dibuktikan.
 
-Terakhir diaudit: **24 Juli 2026**
+Terakhir diaudit: **28 Juli 2026**
 
 ## 1. Aturan penggunaan
 
@@ -331,17 +331,30 @@ sebagai deskripsi sensori, bukan fakta ilmiah. Hindari superlatif.
 
 ### 8.6 Privacy dan operasional form
 
-- [ ] Nama pihak yang mengendalikan data contact form.
-- [ ] Email/kanal privacy request.
-- [ ] Siapa yang menerima Netlify submission.
+- [x] Pengendali data contact form: pemilik project/bisnis. Identitas pribadi
+      lengkap tidak ditulis di repository publik.
+- [x] Kanal privacy request Phase 1A: form `/kontak`.
+- [x] Penerima Netlify submission: pemilik project/bisnis.
 - [x] Public wording membatasi akses kepada pengelola inbox yang ditunjuk dan
       menyebut Netlify sebagai pemroses teknis.
 - [x] Retention period untuk scope Phase 1A: maksimal 12 bulan.
-- [ ] Persetujuan pemilik bisnis dan SOP operasional untuk retensi 12 bulan.
+- [x] Persetujuan pemilik bisnis dan SOP operasional untuk retensi 12 bulan.
 - [x] Public flow untuk permintaan akses, koreksi, dan penghapusan melalui form.
-- [ ] SOP operasional untuk verifikasi, koreksi, dan penghapusan.
+- [x] SOP operasional untuk verifikasi, koreksi, dan penghapusan dipahami owner.
 - [ ] Response-time wording yang boleh dijanjikan.
-- [ ] Notification recipient dan backup recipient.
+- [x] Notification recipient utama aktif dan diuji end-to-end.
+- [ ] Backup recipient ditunda berdasarkan keputusan owner; jangan tandai aktif
+      sebelum dikonfigurasi dan diuji.
+
+Konfirmasi operasional 28 Juli 2026:
+
+- submission production berada pada Verified submissions dan bukan spam;
+- email notification utama diterima;
+- tiga submission QA dihapus permanen setelah acceptance;
+- pengingat review retensi dibuat;
+- akun Search Console dipertahankan sebagai akun owner jangka panjang;
+- backup notification diterima sebagai follow-up dan tidak boleh dilaporkan
+  sebagai sudah aktif.
 
 ## 9. Template pengajuan fakta kepada pemilik
 

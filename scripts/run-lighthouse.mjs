@@ -277,7 +277,10 @@ function checkAssertions(resultsByUrl) {
       }
 
       const comparison = hasMinimum ? ">=" : "<=";
-      const message = `${url} ${auditName}: ${actualValue.toFixed(3)} harus ${comparison} ${expectedValue}.`;
+      const observedValues = values
+        .map((value) => value.toFixed(3))
+        .join(", ");
+      const message = `${url} ${auditName}: ${actualValue.toFixed(3)} harus ${comparison} ${expectedValue} (run: ${observedValues}).`;
 
       if (level === "warn") {
         warnings.push(message);
@@ -361,6 +364,15 @@ async function runLighthouseAudits(
         ]);
 
         reports.push(result.lhr);
+        console.log(
+          `    Performance ${Math.round(
+            result.lhr.categories.performance.score * 100,
+          )}, LCP ${Math.round(
+            result.lhr.audits["largest-contentful-paint"].numericValue,
+          )} ms, TBT ${Math.round(
+            result.lhr.audits["total-blocking-time"].numericValue,
+          )} ms.`,
+        );
         manifest.push({
           url,
           jsonPath: relative(

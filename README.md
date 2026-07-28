@@ -9,9 +9,10 @@ REST API Go, PostgreSQL, Redis, image worker, authentication, dan Admin CMS
 belum menjadi bagian runtime saat ini. Rencana lengkapnya ada di
 [PRD.md](./PRD.md).
 
-**Status handoff:** Phase 1A berstatus PRD-complete dan tervalidasi di local.
-Belum ada deployment, site Netlify/Vercel, koneksi Supabase, atau perubahan
-layanan eksternal. Hasil dan screenshot tersedia di
+**Status handoff:** Phase 1A berstatus PRD-complete dan telah tersedia di
+`https://tauco-cap-badak.netlify.app`. Gate G0–G8 sudah lulus dan Phase 1A
+berstatus **Complete** pada 28 Juli 2026. Tidak ada koneksi Supabase atau
+layanan backend. Bukti ada di
 [WALKTHROUGH.md](./WALKTHROUGH.md).
 
 ## Status fitur
@@ -21,7 +22,7 @@ layanan eksternal. Hasil dan screenshot tersedia di
 | Beranda | Phase 1A |
 | Tentang Kami | Phase 1A |
 | Katalog dan detail produk | Phase 1A |
-| Contact form | Contract Netlify Forms siap local; dashboard belum diverifikasi |
+| Contact form | Active; verified submission dan notification utama lulus |
 | Privacy notice | Phase 1A |
 | Metadata, canonical, sitemap, robots, JSON-LD | Phase 1A |
 | Go REST API dan database | Future |
@@ -38,7 +39,7 @@ layanan eksternal. Hasil dan screenshot tersedia di
 - Vitest untuk unit test
 - Playwright dan axe untuk end-to-end/accessibility test
 - Lighthouse API untuk performance/SEO gate lokal
-- Netlify sebagai target deployment dan transport form mendatang
+- Netlify sebagai production hosting dan transport form
 
 Gunakan versi dependency yang dikunci oleh `package-lock.json`; jangan
 mengandalkan versi global.
@@ -132,9 +133,20 @@ Jalankan script menggunakan `npm.cmd run <nama>`.
 | `test:watch` | Menjalankan unit test dalam watch mode |
 | `test:e2e` | Menjalankan Playwright end-to-end test |
 | `test:e2e:ui` | Membuka Playwright UI; jalankan server local secara terpisah |
+| `qa:g4:functional` | Menjalankan Functional QA terhadap Deploy Preview |
+| `qa:g4:seo` | Memeriksa isolasi index preview, canonical, robots, dan sitemap |
+| `qa:g4:form` | Memeriksa form tanpa membuat submission eksternal |
+| `qa:g4:form:live` | Mengirim satu submission sintetis nyata; jalankan hanya sengaja |
+| `qa:g4:a11y` | Menjalankan accessibility, keyboard, dark mode, dan reflow QA |
+| `qa:g4:browsers` | Menjalankan Edge, Firefox, WebKit, dan emulasi Android |
+| `qa:g4` | Menjalankan seluruh automated G4 kecuali live submission |
+| `qa:g6` | Menjalankan production smoke, SEO, schema, security, dan accessibility QA |
+| `qa:g7:form:live` | Mengirim tepat satu submission production; perlu opt-in eksplisit |
 | `images:optimize` | Membuat WebP/AVIF dari master image provisional |
 | `walkthrough:capture` | Build, start local, dan membuat tujuh screenshot |
-| `lighthouse` | Build audit terpisah dan mengaudit empat route sebanyak 3x |
+| `plan:pdf` | Membuat ulang `plan.pdf` dari `plan.md` |
+| `lighthouse` | Build audit terpisah dan mengaudit empat route local sebanyak 3x |
+| `lighthouse:production` | Mengaudit empat route production sebanyak 3x |
 | `check` | Menjalankan lint, typecheck, unit test, dan build berurutan |
 
 Quality gate lengkap sebelum handoff atau deployment mendatang:
@@ -155,6 +167,19 @@ Command `check` adalah gate cepat tanpa browser:
 npm.cmd run check
 ```
 
+Release evidence Phase 1A:
+
+| Pemeriksaan | Hasil |
+| --- | --- |
+| Unit test | 73/73 lulus |
+| Deploy Preview G4 | 53 lulus, 7 intentional skip |
+| Production G6 | 29/29 lulus |
+| Lighthouse production | 12/12 lulus; Performance 96–100, Accessibility dan SEO 100 |
+| Manual browser/device | Edge, Firefox, Safari asli, Android Chrome asli, keyboard, zoom 200% lulus |
+| Schema.org Validator | Homepage dan detail produk: 0 error, 0 warning |
+| Production dependency audit | 0 vulnerability |
+| Full dependency audit | Advisori development-only pada tree ESLint diterima owner |
+
 Untuk pertama kali menjalankan Playwright pada mesin baru:
 
 ```powershell
@@ -168,6 +193,29 @@ port kosong, dan mengaktifkan indexability hanya pada loopback audit. Manifest
 baru dipublikasikan setelah seluruh assertion lulus. Runner juga membersihkan
 staging, menghentikan server/Chrome, serta memulihkan `next-env.d.ts`. Skor
 local bukan field data production.
+
+Seluruh automated G4 dapat dijalankan langsung terhadap Deploy Preview tanpa
+membuat build local:
+
+```powershell
+$env:PLAYWRIGHT_BASE_URL = "https://deploy-preview-1--tauco-cap-badak.netlify.app"
+npm.cmd run qa:g4
+Remove-Item Env:PLAYWRIGHT_BASE_URL
+```
+
+Runner memeriksa functional flow, preview SEO isolation, form tanpa submission
+eksternal, WCAG/keyboard, responsive layout, serta browser matrix. Laporan
+terpisah disimpan di `playwright-report/g4/`.
+
+Live form test sengaja tidak termasuk agregat agar inbox tidak menerima pesan
+berulang. Jalankan hanya bila memang ingin membuat satu submission sintetis:
+
+```powershell
+npm.cmd run qa:g4:form:live
+```
+
+Gunakan URL Deploy Preview aktif milik Pull Request yang sedang diuji. Jangan
+menjalankan gate G4 terhadap origin production atau localhost.
 
 ## Routes
 
@@ -291,10 +339,16 @@ Saat menambahkan image:
 - hindari menaruh teks penting hanya di dalam image;
 - kompres secukupnya tanpa membuat label produk tidak terbaca.
 
-## Netlify deployment mendatang
+## Netlify deployment dan redeploy
 
-Bagian ini adalah future runbook. Jangan menjalankannya pada handoff local-only
-ini tanpa instruksi baru dari pemilik project.
+Production saat ini:
+
+```text
+https://tauco-cap-badak.netlify.app
+```
+
+Bagian ini menjadi runbook untuk deployment ulang atau recovery. Setiap push ke
+production branch dapat memicu build baru bila continuous deployment aktif.
 
 Netlify mendukung Next.js App Router melalui adapter modernnya. Project ini
 memakai output `.next`, bukan static `out` dan bukan legacy plugin yang dipin
@@ -318,12 +372,12 @@ Referensi resmi:
    deploy. Nilainya tetap origin production final:
 
    ```text
-   NEXT_PUBLIC_SITE_URL=https://nama-site-final.netlify.app
+   NEXT_PUBLIC_SITE_URL=https://tauco-cap-badak.netlify.app
    ```
 
-6. Jika Search Console sudah memberi token, tambahkan
-   `GOOGLE_SITE_VERIFICATION`; variable ini opsional.
-7. Pilih nama subdomain Netlify final sebelum launch.
+6. Pertahankan `GOOGLE_SITE_VERIFICATION`; penghapusan variable dapat
+   menghilangkan metode ownership Search Console.
+7. Jangan rename subdomain production tanpa migration plan.
 8. Deploy.
 9. Periksa deploy log, route, metadata, image, sitemap, robots, dan form.
 
@@ -332,7 +386,8 @@ setting. Hindari konfigurasi yang berbeda antara dashboard dan repository.
 
 ### Menjaga biaya Rp0
 
-- Gunakan Free plan dan pantau usage/credit pada dashboard.
+- Gunakan Free plan dan pantau usage quota atau credit sesuai tipe plan pada
+  dashboard.
 - Jangan mengaktifkan paid add-on tanpa persetujuan.
 - Batasi deploy production yang tidak perlu; gunakan local checks dan Deploy
   Preview.
@@ -383,9 +438,14 @@ Jika submission tidak muncul:
 Local `next dev` tidak membuktikan bahwa Netlify telah mendeteksi atau menerima
 form.
 
-## SEO launch checklist
+Acceptance Phase 1A membuktikan form `kontak` aktif, submission berada pada
+Verified submissions, bukan spam, dan notification email utama diterima.
+Backup recipient ditunda oleh owner. Seluruh submission QA sudah dihapus.
 
-Sebelum production:
+## SEO production checklist
+
+Baseline berikut sudah lulus pada G6 dan wajib diulang setelah perubahan
+metadata, origin, route, atau structured data:
 
 - `NEXT_PUBLIC_SITE_URL` adalah origin production final.
 - Semua route published menghasilkan `200`.
@@ -406,11 +466,16 @@ halaman pertama untuk kata `tauco`.
 ## Google Search Console
 
 Untuk subdomain gratis Netlify, gunakan **URL-prefix property** dengan URL
-production lengkap, misalnya:
+production lengkap:
 
 ```text
-https://nama-site-final.netlify.app/
+https://tauco-cap-badak.netlify.app/
 ```
+
+Status Phase 1A: ownership verified, verification meta aktif, sitemap berstatus
+Sukses dengan tujuh halaman ditemukan, serta URL Inspection/request indexing
+selesai untuk homepage, `/tauco`, `/produk`, dan detail produk. Property masih
+baru sehingga data performa historis belum tersedia.
 
 Panduan resmi:
 
@@ -421,16 +486,25 @@ Langkah:
 
 1. Login dengan akun bisnis yang akan menjadi owner jangka panjang.
 2. Tambahkan URL-prefix property production.
-3. Selesaikan ownership verification menggunakan metode yang ditawarkan Google.
-   Simpan verification artifact di repository bila metode tersebut
-   mengharuskannya; jangan menghapusnya setelah berhasil.
-4. Kirim `sitemap.xml` melalui laporan Sitemaps.
-5. Gunakan URL Inspection untuk homepage, katalog, dan detail produk.
-6. Request indexing hanya setelah production content final.
-7. Pantau Pages, Core Web Vitals, Enhancements, dan Manual Actions.
-8. Catat baseline impression, click, CTR, serta average position.
-9. Review query dan landing page setiap 28 hari; jangan mengubah strategi hanya
+3. Pilih metode **HTML tag**, lalu salin hanya nilai `content` dari meta tag.
+4. Tambahkan nilai tersebut di Netlify sebagai environment variable
+   `GOOGLE_SITE_VERIFICATION` untuk Builds dan production, lalu deploy ulang.
+5. Pastikan meta verification tampil pada source production, kemudian klik
+   **Verify** di Search Console.
+6. Kirim
+   `https://tauco-cap-badak.netlify.app/sitemap.xml` melalui laporan Sitemaps.
+7. Gunakan URL Inspection untuk homepage, `/tauco`, `/produk`, dan detail
+   produk.
+8. Request indexing hanya setelah production content final.
+9. Pantau Pages, Core Web Vitals, Enhancements, dan Manual Actions.
+10. Catat baseline impression, click, CTR, serta average position.
+11. Review query dan landing page setiap 28 hari; jangan mengubah strategi hanya
    karena fluktuasi harian.
+
+Detail produk dapat diindeks sebagai hasil biasa, tetapi belum eligible untuk
+seluruh Product enhancement karena Phase 1A tidak menerbitkan `Offer`, harga,
+review, atau rating yang belum terverifikasi. Jangan membuat data palsu hanya
+untuk menghilangkan warning Search Console.
 
 Jika kelak memakai custom domain, buat Domain property melalui verifikasi DNS,
 perbarui canonical/sitemap, dan ikuti migration checklist pada PRD.
