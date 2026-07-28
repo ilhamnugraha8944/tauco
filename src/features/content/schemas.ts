@@ -64,7 +64,7 @@ export const informativeImageAssetSchema = z
       .max(160)
       .refine(
         (value) =>
-          !/^(?:foto|gambar|image|photo)(?:\s+(?:produk|tauco))?$/i.test(
+          !/^(?:foto|gambar|image|photo)(?:\s+(?:produk|tauco|product))?$/i.test(
             value,
           ),
         "Alt text harus menjelaskan isi gambar, bukan label generik.",
@@ -132,7 +132,12 @@ export const homeContentSchema = z
       actions: z.array(internalLinkSchema).min(1).max(2),
     }),
     introduction: textSectionSchema,
-    featuredProductSlugs: z.array(slugSchema).max(6),
+    featuredProductSlugs: z
+      .array(slugSchema)
+      .max(6)
+      .refine((slugs) => new Set(slugs).size === slugs.length, {
+        message: "Slug produk unggulan tidak boleh duplikat.",
+      }),
     guidePreview: z
       .object({
         heading: shortTextSchema,

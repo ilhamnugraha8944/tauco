@@ -1,4 +1,9 @@
 export type { ContactGateway } from "./contact-gateway";
+export {
+  contactApiRequestSchema,
+  contactApiResponseSchema,
+  contactApiResultSchema,
+} from "./api-contract-schemas";
 export { contactMessageSchema } from "./contact-schema";
 export {
   contactEmailPattern,

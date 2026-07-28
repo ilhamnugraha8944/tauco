@@ -1,0 +1,9 @@
+{
+  "name": "Pengunjung Contoh",
+  "email": "pengunjung@example.com",
+  "phone": "+62 812-3456-7890",
+  "subject": "Informasi produk",
+  "message": "Saya ingin mengetahui informasi produk Tauco Cap Badak.",
+  "privacyConsent": true,
+  "botField": ""
+}

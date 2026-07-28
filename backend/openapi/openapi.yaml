@@ -1,0 +1,1854 @@
+openapi: 3.0.3
+info:
+  title: Tauco Cap Badak Public API
+  version: 1.0.0
+  description: |
+    Contract-first REST API for the Phase 1B shadow backend.
+    This contract exposes published public content, contact intake, health, and
+    protected metrics only. It intentionally contains no administration routes.
+  license:
+    name: Proprietary
+servers:
+  - url: http://127.0.0.1:8080
+    description: Local development
+tags:
+  - name: Content
+    description: Published page content
+  - name: Catalog
+    description: Published product catalog
+  - name: Contact
+    description: Public contact intake
+  - name: Health
+    description: Process and dependency health
+  - name: Operations
+    description: Protected operational endpoints
+paths:
+  /api/v1/home:
+    get:
+      tags:
+        - Content
+      summary: Get published homepage content
+      operationId: getHome
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Published homepage content
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestID'
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Cache-Control:
+              $ref: '#/components/headers/PublicCacheControl'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomeResponse'
+              examples:
+                published:
+                  $ref: '#/components/examples/HomeResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/about:
+    get:
+      tags:
+        - Content
+      summary: Get published about-page content
+      operationId: getAbout
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Published about-page content
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestID'
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Cache-Control:
+              $ref: '#/components/headers/PublicCacheControl'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AboutResponse'
+              examples:
+                published:
+                  $ref: '#/components/examples/AboutResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/tauco-guide:
+    get:
+      tags:
+        - Content
+      summary: Get the published informational tauco guide
+      operationId: getTaucoGuide
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Published tauco guide
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestID'
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Cache-Control:
+              $ref: '#/components/headers/PublicCacheControl'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaucoGuideResponse'
+              examples:
+                published:
+                  $ref: '#/components/examples/TaucoGuideResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/products:
+    get:
+      tags:
+        - Catalog
+      summary: List published products
+      description: |
+        Results are ordered deterministically by `sort_order ASC, id ASC`.
+        Unknown query parameters are rejected. The cursor is opaque, signed,
+        and bound to the query and filter state.
+      operationId: listProducts
+      x-reject-unknown-query-parameters: true
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/IfNoneMatch'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: A bounded page of published products
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestID'
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Cache-Control:
+              $ref: '#/components/headers/PublicCacheControl'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductListResponse'
+              examples:
+                firstPage:
+                  $ref: '#/components/examples/ProductListResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/ProductListBadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/products/{slug}:
+    get:
+      tags:
+        - Catalog
+      summary: Get a published product by slug
+      operationId: getProductBySlug
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/IfNoneMatch'
+        - $ref: '#/components/parameters/ProductSlug'
+      responses:
+        '200':
+          description: Published product detail
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestID'
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Cache-Control:
+              $ref: '#/components/headers/PublicCacheControl'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDetailResponse'
+              examples:
+                published:
+                  $ref: '#/components/examples/ProductDetailResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/ProductNotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/contact-messages:
+    post:
+      tags:
+        - Contact
+      summary: Submit a visitor contact message
+      description: |
+        Persists the contact message and its asynchronous notification jobs in
+        one transaction. A repeated idempotency key with the same normalized
+        payload returns the same semantic result without creating duplicates.
+      operationId: createContactMessage
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        x-max-body-bytes: 32768
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContactMessageRequest'
+            examples:
+              productQuestion:
+                $ref: '#/components/examples/ContactMessageRequest'
+      responses:
+        '201':
+          description: Contact message received
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestID'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+            Idempotency-Replayed:
+              $ref: '#/components/headers/IdempotencyReplayed'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContactMessageResponse'
+              examples:
+                received:
+                  $ref: '#/components/examples/ContactMessageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /health/live:
+    get:
+      tags:
+        - Health
+      summary: Check process liveness
+      description: Does not perform any network or dependency calls.
+      operationId: getLiveness
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+      responses:
+        '200':
+          description: Process is alive
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestID'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LivenessResponse'
+              examples:
+                alive:
+                  $ref: '#/components/examples/LivenessResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /health/ready:
+    get:
+      tags:
+        - Health
+      summary: Check critical dependency readiness
+      description: |
+        PostgreSQL must be healthy. Redis and storage may be degraded without
+        making the public read and contact API unready. No endpoint or
+        credential detail is returned.
+      operationId: getReadiness
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+      responses:
+        '200':
+          description: API is ready; optional dependencies may be degraded
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestID'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+              examples:
+                ready:
+                  $ref: '#/components/examples/ReadinessResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /internal/metrics:
+    get:
+      tags:
+        - Operations
+      summary: Read Prometheus metrics
+      operationId: getMetrics
+      security:
+        - InternalMetricsBearer: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+      responses:
+        '200':
+          description: Prometheus text exposition
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestID'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |
+                # HELP http_requests_total Total HTTP requests.
+                # TYPE http_requests_total counter
+                http_requests_total{method="GET",route="/health/live",status="200"} 1
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+components:
+  securitySchemes:
+    InternalMetricsBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: A dedicated rotatable operations token; never an admin JWT.
+  parameters:
+    XRequestID:
+      name: X-Request-ID
+      in: header
+      required: false
+      description: |
+        Optional caller-provided trace identifier. Invalid values are replaced
+        by the server.
+      schema:
+        $ref: '#/components/schemas/RequestID'
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      required: false
+      description: ETag validator returned by a prior successful content read.
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 160
+      example: '"sha256-8e7d6f5c4b3a"'
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: |
+        Opaque base64url cursor signed with HMAC and bound to the current
+        version, filters, query hash, sort position, and product identifier.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 1024
+        pattern: '^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$'
+      example: eyJ2IjoxLCJzb3J0IjoxMDB9.4uM2fGfRUq7Z
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of products in this page.
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        maximum: 50
+        default: 20
+      example: 20
+    ProductSlug:
+      name: slug
+      in: path
+      required: true
+      description: Stable lowercase product slug.
+      schema:
+        $ref: '#/components/schemas/Slug'
+      example: tauco-cap-badak
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: |
+        Printable ASCII key. Only an HMAC digest of this value is persisted.
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
+        pattern: '^[ -~]{16,128}$'
+      example: contact-20260728-000001
+  headers:
+    XRequestID:
+      description: Request trace identifier.
+      required: true
+      schema:
+        $ref: '#/components/schemas/RequestID'
+    ETag:
+      description: Strong validator derived from the immutable revision checksum.
+      required: true
+      schema:
+        type: string
+      example: '"sha256-8e7d6f5c4b3a"'
+    PublicCacheControl:
+      description: Shared-cache policy for published public content.
+      required: true
+      schema:
+        type: string
+        enum:
+          - public, max-age=0, s-maxage=300, stale-while-revalidate=60
+    NoStore:
+      description: Prevents storage of private or operational responses.
+      required: true
+      schema:
+        type: string
+        enum:
+          - no-store
+    RetryAfter:
+      description: Seconds until another request may be attempted.
+      required: true
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+      example: 60
+    IdempotencyReplayed:
+      description: True only when the response is a replay of a completed request.
+      required: false
+      schema:
+        type: boolean
+      example: true
+  responses:
+    NotModified:
+      description: Cached representation is still current
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/XRequestID'
+        ETag:
+          $ref: '#/components/headers/ETag'
+        Cache-Control:
+          $ref: '#/components/headers/PublicCacheControl'
+    BadRequest:
+      description: Malformed JSON, header, cursor, or query
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/XRequestID'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            malformedRequest:
+              value:
+                type: urn:tauco-cap-badak:problem:bad-request
+                title: Permintaan tidak valid
+                status: 400
+                detail: Format permintaan tidak dapat diproses.
+                instance: /api/v1/contact-messages
+                code: BAD_REQUEST
+                requestId: 98a70ee8a919423b883c23ea275d468a
+    ProductListBadRequest:
+      description: Cursor, limit, request header, or query parameter is invalid
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/XRequestID'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            invalidCursor:
+              value:
+                type: urn:tauco-cap-badak:problem:invalid-cursor
+                title: Cursor tidak valid
+                status: 400
+                detail: Mulai kembali dari halaman pertama.
+                instance: /api/v1/products
+                code: INVALID_CURSOR
+                requestId: 98a70ee8a919423b883c23ea275d468a
+            invalidLimit:
+              value:
+                type: urn:tauco-cap-badak:problem:bad-request
+                title: Permintaan tidak valid
+                status: 400
+                detail: Limit harus bernilai antara 1 dan 50.
+                instance: /api/v1/products
+                code: INVALID_LIMIT
+                requestId: 98a70ee8a919423b883c23ea275d468a
+    ProductNotFound:
+      description: No published product has the requested slug
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/XRequestID'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            missingProduct:
+              value:
+                type: urn:tauco-cap-badak:problem:product-not-found
+                title: Produk tidak ditemukan
+                status: 404
+                detail: Produk yang diminta tidak ditemukan.
+                instance: /api/v1/products/tidak-ada
+                code: PRODUCT_NOT_FOUND
+                requestId: 98a70ee8a919423b883c23ea275d468a
+    IdempotencyConflict:
+      description: Idempotency key was already used with a different payload
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/XRequestID'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            keyConflict:
+              value:
+                type: urn:tauco-cap-badak:problem:idempotency-conflict
+                title: Kunci idempotensi sudah digunakan
+                status: 409
+                detail: Gunakan kunci baru untuk payload yang berbeda.
+                instance: /api/v1/contact-messages
+                code: IDEMPOTENCY_KEY_REUSED
+                requestId: 98a70ee8a919423b883c23ea275d468a
+    PayloadTooLarge:
+      description: Request body exceeds 32 KiB
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/XRequestID'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            tooLarge:
+              value:
+                type: urn:tauco-cap-badak:problem:payload-too-large
+                title: Payload terlalu besar
+                status: 413
+                detail: Ukuran body tidak boleh melebihi 32 KiB.
+                instance: /api/v1/contact-messages
+                code: PAYLOAD_TOO_LARGE
+                requestId: 98a70ee8a919423b883c23ea275d468a
+    UnsupportedMediaType:
+      description: Content-Type is not application/json
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/XRequestID'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            unsupportedType:
+              value:
+                type: urn:tauco-cap-badak:problem:unsupported-media-type
+                title: Media type tidak didukung
+                status: 415
+                detail: Gunakan Content-Type application/json.
+                instance: /api/v1/contact-messages
+                code: UNSUPPORTED_MEDIA_TYPE
+                requestId: 98a70ee8a919423b883c23ea275d468a
+    ValidationFailed:
+      description: One or more semantic field validations failed
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/XRequestID'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            invalidEmail:
+              value:
+                type: urn:tauco-cap-badak:problem:validation
+                title: Permintaan tidak valid
+                status: 422
+                detail: Periksa field yang ditandai.
+                instance: /api/v1/contact-messages
+                code: CONTACT_VALIDATION_FAILED
+                requestId: 98a70ee8a919423b883c23ea275d468a
+                errors:
+                  - field: email
+                    code: INVALID_EMAIL
+                    message: Masukkan alamat email yang valid.
+    TooManyRequests:
+      description: Rate limit exceeded
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/XRequestID'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            rateLimited:
+              value:
+                type: urn:tauco-cap-badak:problem:rate-limit
+                title: Terlalu banyak permintaan
+                status: 429
+                detail: Coba kembali setelah waktu yang ditentukan.
+                instance: /api/v1/contact-messages
+                code: RATE_LIMIT_EXCEEDED
+                requestId: 98a70ee8a919423b883c23ea275d468a
+    Unauthorized:
+      description: Missing or invalid operations token
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/XRequestID'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+        WWW-Authenticate:
+          description: Bearer authentication challenge.
+          schema:
+            type: string
+          example: Bearer
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            unauthorized:
+              value:
+                type: urn:tauco-cap-badak:problem:unauthorized
+                title: Autentikasi diperlukan
+                status: 401
+                detail: Token operasional tidak tersedia atau tidak valid.
+                instance: /internal/metrics
+                code: UNAUTHORIZED
+                requestId: 98a70ee8a919423b883c23ea275d468a
+    Forbidden:
+      description: Authenticated principal is not allowed to read metrics
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/XRequestID'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            forbidden:
+              value:
+                type: urn:tauco-cap-badak:problem:forbidden
+                title: Akses ditolak
+                status: 403
+                detail: Kredensial tidak memiliki akses ke resource ini.
+                instance: /internal/metrics
+                code: FORBIDDEN
+                requestId: 98a70ee8a919423b883c23ea275d468a
+    InternalServerError:
+      description: Unexpected server error with no internal detail exposed
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/XRequestID'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            internal:
+              value:
+                type: urn:tauco-cap-badak:problem:internal
+                title: Terjadi kesalahan internal
+                status: 500
+                detail: Permintaan tidak dapat diproses saat ini.
+                instance: /api/v1/home
+                code: INTERNAL_SERVER_ERROR
+                requestId: 98a70ee8a919423b883c23ea275d468a
+    ServiceUnavailable:
+      description: A critical dependency is not ready
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/XRequestID'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            unavailable:
+              value:
+                type: urn:tauco-cap-badak:problem:service-unavailable
+                title: Layanan belum siap
+                status: 503
+                detail: Coba kembali beberapa saat lagi.
+                instance: /health/ready
+                code: SERVICE_UNAVAILABLE
+                requestId: 98a70ee8a919423b883c23ea275d468a
+  schemas:
+    RequestID:
+      type: string
+      minLength: 1
+      maxLength: 128
+      pattern: '^[A-Za-z0-9._:-]+$'
+      example: 98a70ee8a919423b883c23ea275d468a
+    Slug:
+      type: string
+      minLength: 1
+      maxLength: 80
+      pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+      example: tauco-cap-badak
+    InternalPath:
+      type: string
+      pattern: '^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$'
+      example: /produk
+    InternalHref:
+      type: string
+      pattern: '^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?(?:\?[a-z0-9-]+=[a-z0-9-]+(?:&[a-z0-9-]+=[a-z0-9-]+)*)?$'
+      example: /kontak?topik=produk
+    InternalLink:
+      type: object
+      additionalProperties: false
+      required:
+        - label
+        - href
+      properties:
+        label:
+          type: string
+          minLength: 2
+          maxLength: 80
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        href:
+          $ref: '#/components/schemas/InternalHref'
+    InformativeImageAsset:
+      type: object
+      additionalProperties: false
+      x-string-normalization: trim-on-parse-emit-canonical
+      required:
+        - src
+        - alt
+        - decorative
+      properties:
+        src:
+          type: string
+          pattern: '^/images/[a-z0-9][a-z0-9/-]*\.(?:avif|jpe?g|png|svg|webp)$'
+        alt:
+          type: string
+          minLength: 8
+          maxLength: 160
+          pattern: '^\S(?:[\s\S]*\S)?$'
+          not:
+            pattern: '^(?:[Ff][Oo][Tt][Oo]|[Gg][Aa][Mm][Bb][Aa][Rr]|[Ii][Mm][Aa][Gg][Ee]|[Pp][Hh][Oo][Tt][Oo])(?:\s+(?:[Pp][Rr][Oo][Dd][Uu][Kk]|[Tt][Aa][Uu][Cc][Oo]|[Pp][Rr][Oo][Dd][Uu][Cc][Tt]))?$'
+          description: |
+            Parsers may trim authored input, but every emitted API value must
+            already be canonical without leading or trailing whitespace.
+            Generic image labels are rejected case-insensitively.
+          x-case-insensitive-exclusion: generic-image-label-v1
+        decorative:
+          type: boolean
+          enum:
+            - false
+    DecorativeImageAsset:
+      type: object
+      additionalProperties: false
+      required:
+        - src
+        - alt
+        - decorative
+      properties:
+        src:
+          type: string
+          pattern: '^/images/[a-z0-9][a-z0-9/-]*\.(?:avif|jpe?g|png|svg|webp)$'
+        alt:
+          type: string
+          enum:
+            - ''
+        decorative:
+          type: boolean
+          enum:
+            - true
+    ImageAsset:
+      oneOf:
+        - $ref: '#/components/schemas/InformativeImageAsset'
+        - $ref: '#/components/schemas/DecorativeImageAsset'
+    SeoMetadata:
+      type: object
+      additionalProperties: false
+      required:
+        - title
+        - description
+        - canonicalPath
+        - openGraphImage
+      properties:
+        title:
+          type: string
+          minLength: 8
+          maxLength: 80
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        description:
+          type: string
+          minLength: 50
+          maxLength: 180
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        canonicalPath:
+          $ref: '#/components/schemas/InternalPath'
+        openGraphImage:
+          $ref: '#/components/schemas/InformativeImageAsset'
+    TextSection:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - heading
+        - paragraphs
+      properties:
+        id:
+          $ref: '#/components/schemas/Slug'
+        heading:
+          type: string
+          minLength: 2
+          maxLength: 120
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        paragraphs:
+          type: array
+          minItems: 1
+          maxItems: 6
+          items:
+            type: string
+            minLength: 20
+            maxLength: 600
+            pattern: '^\S(?:[\s\S]*\S)?$'
+    SourceReference:
+      type: object
+      additionalProperties: false
+      required:
+        - label
+        - publisher
+        - url
+      properties:
+        label:
+          type: string
+          minLength: 3
+          maxLength: 140
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        publisher:
+          type: string
+          minLength: 3
+          maxLength: 140
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        url:
+          type: string
+          format: uri
+          pattern: '^https://'
+    PageHero:
+      type: object
+      additionalProperties: false
+      required:
+        - eyebrow
+        - title
+        - description
+        - image
+      properties:
+        eyebrow:
+          type: string
+          minLength: 2
+          maxLength: 120
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        title:
+          type: string
+          minLength: 4
+          maxLength: 100
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        description:
+          type: string
+          minLength: 40
+          maxLength: 240
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        image:
+          $ref: '#/components/schemas/ImageAsset'
+    HomeHero:
+      type: object
+      additionalProperties: false
+      required:
+        - eyebrow
+        - title
+        - description
+        - image
+        - actions
+      properties:
+        eyebrow:
+          type: string
+          minLength: 2
+          maxLength: 120
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        title:
+          type: string
+          minLength: 4
+          maxLength: 100
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        description:
+          type: string
+          minLength: 40
+          maxLength: 240
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        image:
+          $ref: '#/components/schemas/ImageAsset'
+        actions:
+          type: array
+          minItems: 1
+          maxItems: 2
+          items:
+            $ref: '#/components/schemas/InternalLink'
+    ContentPreview:
+      type: object
+      additionalProperties: false
+      required:
+        - heading
+        - description
+        - link
+      properties:
+        heading:
+          type: string
+          minLength: 2
+          maxLength: 120
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        description:
+          type: string
+          minLength: 40
+          maxLength: 240
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        link:
+          $ref: '#/components/schemas/InternalLink'
+    HomeContent:
+      type: object
+      additionalProperties: false
+      required:
+        - metadata
+        - hero
+        - introduction
+        - featuredProductSlugs
+        - guidePreview
+        - aboutPreview
+      properties:
+        metadata:
+          $ref: '#/components/schemas/SeoMetadata'
+        hero:
+          $ref: '#/components/schemas/HomeHero'
+        introduction:
+          $ref: '#/components/schemas/TextSection'
+        featuredProductSlugs:
+          type: array
+          maxItems: 6
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/Slug'
+        guidePreview:
+          $ref: '#/components/schemas/ContentPreview'
+        aboutPreview:
+          $ref: '#/components/schemas/ContentPreview'
+    AboutContent:
+      type: object
+      additionalProperties: false
+      required:
+        - metadata
+        - hero
+        - sections
+        - relatedLinks
+        - sources
+      properties:
+        metadata:
+          $ref: '#/components/schemas/SeoMetadata'
+        hero:
+          $ref: '#/components/schemas/PageHero'
+        sections:
+          type: array
+          minItems: 2
+          maxItems: 8
+          items:
+            $ref: '#/components/schemas/TextSection'
+        relatedLinks:
+          type: array
+          minItems: 1
+          maxItems: 4
+          items:
+            $ref: '#/components/schemas/InternalLink'
+        sources:
+          type: array
+          minItems: 1
+          maxItems: 8
+          items:
+            $ref: '#/components/schemas/SourceReference'
+    TaucoGuideContent:
+      type: object
+      additionalProperties: false
+      required:
+        - metadata
+        - publishedAt
+        - updatedAt
+        - hero
+        - sections
+        - relatedLinks
+        - sources
+      properties:
+        metadata:
+          $ref: '#/components/schemas/SeoMetadata'
+        publishedAt:
+          type: string
+          format: date
+        updatedAt:
+          type: string
+          format: date
+          description: Must not precede publishedAt.
+          x-invariant: updatedAt-greater-than-or-equal-to-publishedAt
+        hero:
+          $ref: '#/components/schemas/PageHero'
+        sections:
+          type: array
+          minItems: 4
+          maxItems: 12
+          items:
+            $ref: '#/components/schemas/TextSection'
+        relatedLinks:
+          type: array
+          minItems: 1
+          maxItems: 4
+          items:
+            $ref: '#/components/schemas/InternalLink'
+        sources:
+          type: array
+          minItems: 1
+          maxItems: 8
+          items:
+            $ref: '#/components/schemas/SourceReference'
+    ProductFact:
+      type: object
+      additionalProperties: false
+      required:
+        - label
+        - value
+      properties:
+        label:
+          type: string
+          minLength: 2
+          maxLength: 60
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        value:
+          type: string
+          minLength: 2
+          maxLength: 160
+          pattern: '^\S(?:[\s\S]*\S)?$'
+    Money:
+      type: object
+      nullable: true
+      additionalProperties: false
+      required:
+        - currency
+        - amount
+        - qualifier
+      properties:
+        currency:
+          type: string
+          enum:
+            - IDR
+        amount:
+          type: integer
+          format: int64
+          minimum: 0
+        qualifier:
+          type: string
+          enum:
+            - estimated
+            - fixed
+    ProductResearchEvidence:
+      type: object
+      additionalProperties: false
+      required:
+        - heading
+        - summary
+        - facts
+        - scopeNote
+        - source
+      properties:
+        heading:
+          type: string
+          minLength: 2
+          maxLength: 120
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        summary:
+          type: string
+          minLength: 40
+          maxLength: 300
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        facts:
+          type: array
+          minItems: 1
+          maxItems: 8
+          items:
+            $ref: '#/components/schemas/ProductFact'
+        scopeNote:
+          type: string
+          minLength: 60
+          maxLength: 400
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        source:
+          $ref: '#/components/schemas/SourceReference'
+    ProductSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - slug
+        - name
+        - category
+        - summary
+        - image
+        - facts
+      properties:
+        slug:
+          $ref: '#/components/schemas/Slug'
+        name:
+          type: string
+          minLength: 3
+          maxLength: 120
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        category:
+          type: string
+          minLength: 2
+          maxLength: 120
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        summary:
+          type: string
+          minLength: 40
+          maxLength: 220
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        image:
+          $ref: '#/components/schemas/InformativeImageAsset'
+        facts:
+          type: array
+          minItems: 1
+          maxItems: 12
+          items:
+            $ref: '#/components/schemas/ProductFact'
+    ProductDetail:
+      type: object
+      additionalProperties: false
+      required:
+        - slug
+        - name
+        - category
+        - summary
+        - image
+        - facts
+        - metadata
+        - description
+        - usageSuggestions
+        - priceEstimate
+        - purchaseNote
+        - contactLink
+        - researchEvidence
+      properties:
+        slug:
+          $ref: '#/components/schemas/Slug'
+        name:
+          type: string
+          minLength: 3
+          maxLength: 120
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        category:
+          type: string
+          minLength: 2
+          maxLength: 120
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        summary:
+          type: string
+          minLength: 40
+          maxLength: 220
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        image:
+          $ref: '#/components/schemas/InformativeImageAsset'
+        facts:
+          type: array
+          minItems: 1
+          maxItems: 12
+          items:
+            $ref: '#/components/schemas/ProductFact'
+        metadata:
+          $ref: '#/components/schemas/SeoMetadata'
+        description:
+          type: array
+          minItems: 1
+          maxItems: 6
+          items:
+            type: string
+            minLength: 20
+            maxLength: 600
+            pattern: '^\S(?:[\s\S]*\S)?$'
+        usageSuggestions:
+          type: array
+          minItems: 1
+          maxItems: 8
+          items:
+            type: string
+            minLength: 20
+            maxLength: 220
+            pattern: '^\S(?:[\s\S]*\S)?$'
+        priceEstimate:
+          $ref: '#/components/schemas/Money'
+        purchaseNote:
+          type: string
+          minLength: 20
+          maxLength: 220
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        contactLink:
+          $ref: '#/components/schemas/InternalLink'
+        researchEvidence:
+          $ref: '#/components/schemas/ProductResearchEvidence'
+    ProductCatalogContent:
+      type: object
+      additionalProperties: false
+      required:
+        - metadata
+        - heading
+        - description
+        - contactLink
+        - products
+      properties:
+        metadata:
+          $ref: '#/components/schemas/SeoMetadata'
+        heading:
+          type: string
+          minLength: 4
+          maxLength: 120
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        description:
+          type: string
+          minLength: 40
+          maxLength: 240
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        contactLink:
+          $ref: '#/components/schemas/InternalLink'
+        products:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/ProductSummary'
+    ResponseMeta:
+      type: object
+      additionalProperties: false
+      required:
+        - requestId
+        - apiVersion
+      properties:
+        requestId:
+          $ref: '#/components/schemas/RequestID'
+        apiVersion:
+          type: string
+          enum:
+            - v1
+    PageMeta:
+      type: object
+      description: |
+        `nextCursor` is non-null exactly when `hasMore` is true. This invariant
+        is enforced by the application and frontend contract validators.
+      x-invariant: nextCursor-non-null-iff-hasMore
+      additionalProperties: false
+      required:
+        - nextCursor
+        - hasMore
+        - limit
+      properties:
+        nextCursor:
+          type: string
+          nullable: true
+          minLength: 1
+          maxLength: 1024
+          pattern: '^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$'
+        hasMore:
+          type: boolean
+        limit:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 50
+    ListResponseMeta:
+      type: object
+      additionalProperties: false
+      required:
+        - requestId
+        - apiVersion
+        - page
+      properties:
+        requestId:
+          $ref: '#/components/schemas/RequestID'
+        apiVersion:
+          type: string
+          enum:
+            - v1
+        page:
+          $ref: '#/components/schemas/PageMeta'
+    HomeResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          $ref: '#/components/schemas/HomeContent'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    AboutResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          $ref: '#/components/schemas/AboutContent'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    TaucoGuideResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          $ref: '#/components/schemas/TaucoGuideContent'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    ProductListResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          $ref: '#/components/schemas/ProductCatalogContent'
+        meta:
+          $ref: '#/components/schemas/ListResponseMeta'
+    ProductDetailResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          $ref: '#/components/schemas/ProductDetail'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    ContactMessageRequest:
+      type: object
+      description: |
+        Text input is trimmed before transport. The API rejects leading or
+        trailing whitespace so every accepted payload has one canonical form.
+        `phone` remains a required wire property; an empty string means omitted.
+      x-string-normalization: trim-before-transport
+      additionalProperties: false
+      required:
+        - name
+        - email
+        - phone
+        - subject
+        - message
+        - privacyConsent
+        - botField
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        email:
+          type: string
+          format: email
+          maxLength: 160
+          pattern: '^[^\s@]+@[^\s@]+\.[^\s@]+$'
+        phone:
+          type: string
+          maxLength: 30
+          pattern: '^(?:$|[+0-9()-][+0-9()\s-]{5,28}[+0-9()-])$'
+          description: Empty string means no phone number was supplied.
+        subject:
+          type: string
+          enum:
+            - Informasi produk
+            - Kerja sama dan distribusi
+            - Pertanyaan umum
+        message:
+          type: string
+          minLength: 20
+          maxLength: 2000
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        privacyConsent:
+          type: boolean
+          enum:
+            - true
+        botField:
+          type: string
+          maxLength: 0
+          description: Honeypot; must be an empty string.
+    ContactMessageResult:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - received
+    ContactMessageResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          $ref: '#/components/schemas/ContactMessageResult'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+    ValidationError:
+      type: object
+      additionalProperties: false
+      required:
+        - field
+        - code
+        - message
+      properties:
+        field:
+          type: string
+          minLength: 1
+          maxLength: 120
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        code:
+          type: string
+          minLength: 3
+          maxLength: 80
+          pattern: '^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$'
+        message:
+          type: string
+          minLength: 3
+          maxLength: 240
+          pattern: '^\S(?:[\s\S]*\S)?$'
+    Problem:
+      type: object
+      additionalProperties: false
+      required:
+        - type
+        - title
+        - status
+        - detail
+        - instance
+        - code
+        - requestId
+      properties:
+        type:
+          type: string
+          format: uri
+          maxLength: 160
+          pattern: '^urn:tauco-cap-badak:problem:[a-z0-9]+(?:-[a-z0-9]+)*$'
+        title:
+          type: string
+          minLength: 3
+          maxLength: 120
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        status:
+          type: integer
+          format: int32
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+          minLength: 3
+          maxLength: 500
+          pattern: '^\S(?:[\s\S]*\S)?$'
+        instance:
+          $ref: '#/components/schemas/ProblemInstance'
+        code:
+          type: string
+          minLength: 3
+          maxLength: 80
+          pattern: '^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$'
+        requestId:
+          $ref: '#/components/schemas/RequestID'
+        errors:
+          type: array
+          minItems: 1
+          maxItems: 32
+          items:
+            $ref: '#/components/schemas/ValidationError'
+    ProblemInstance:
+      type: string
+      format: uri-reference
+      minLength: 1
+      maxLength: 2048
+      pattern: "^/(?:$|(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f]{2})(?:[A-Za-z0-9._~!$&'()*+,;=:@/-]|%[0-9A-Fa-f]{2})*)$"
+      description: |
+        Absolute, path-only URI-reference built from the escaped request path.
+        Uppercase segments, a trailing slash, and percent-encoded octets are
+        valid. Empty, non-absolute, network-path, or oversized values fall back
+        to `/` before a problem response is emitted.
+      x-source: escaped-request-path
+    LivenessResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+    DependencyState:
+      type: string
+      enum:
+        - healthy
+        - degraded
+    ReadinessDependencies:
+      type: object
+      additionalProperties: false
+      required:
+        - postgres
+        - redis
+        - storage
+      properties:
+        postgres:
+          type: string
+          enum:
+            - healthy
+        redis:
+          $ref: '#/components/schemas/DependencyState'
+        storage:
+          $ref: '#/components/schemas/DependencyState'
+    ReadinessResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+        - dependencies
+      properties:
+        status:
+          type: string
+          enum:
+            - ready
+            - degraded
+        dependencies:
+          $ref: '#/components/schemas/ReadinessDependencies'
+  examples:
+    HomeResponse:
+      summary: Published homepage
+      value:
+        data:
+          metadata:
+            title: Tauco Cap Badak Cianjur | Produk & Cerita Kami
+            description: Kenali Tauco Cap Badak dari Cianjur, lihat produk kami, pelajari tentang tauco, dan hubungi kami untuk memperoleh informasi terbaru.
+            canonicalPath: /
+            openGraphImage:
+              src: /images/tauco-hero-provisional.webp
+              alt: Semangkuk tauco dengan kedelai dan tumisan sayuran
+              decorative: false
+          hero:
+            eyebrow: Tauco dari Cianjur
+            title: Tauco Cap Badak
+            description: Mengenal produk tauco dari Cianjur dan kegunaannya sebagai bumbu dalam beragam masakan Indonesia.
+            image:
+              src: /images/tauco-hero-provisional.webp
+              alt: Semangkuk tauco dengan kedelai dan tumisan sayuran
+              decorative: false
+            actions:
+              - label: Lihat produk
+                href: /produk
+          introduction:
+            id: mengenal-tauco
+            heading: Kenali tauco lebih dekat
+            paragraphs:
+              - Tauco merupakan bumbu berbahan kedelai yang diproses melalui fermentasi dan digunakan dalam berbagai masakan.
+          featuredProductSlugs:
+            - tauco-cap-badak
+          guidePreview:
+            heading: Apa itu tauco?
+            description: Pelajari bahan, proses fermentasi secara umum, ragam rasa, dan cara menggunakan tauco dalam masakan.
+            link:
+              label: Baca panduan tauco
+              href: /tauco
+          aboutPreview:
+            heading: Mengenal Tauco Cap Badak
+            description: Temukan profil singkat Tauco Cap Badak dan konteks kuliner tauco di Cianjur.
+            link:
+              label: Tentang kami
+              href: /tentang-kami
+        meta:
+          requestId: 98a70ee8a919423b883c23ea275d468a
+          apiVersion: v1
+    AboutResponse:
+      summary: Published about page
+      value:
+        data:
+          metadata:
+            title: Tentang Kami | Tauco Cap Badak Cianjur
+            description: Kenali profil Tauco Cap Badak dan hubungannya dengan kekayaan kuliner tauco yang telah lama dikenal oleh masyarakat Cianjur.
+            canonicalPath: /tentang-kami
+            openGraphImage:
+              src: /images/tauco-dish-provisional.webp
+              alt: Tumis tahu dan sayuran dengan bumbu tauco
+              decorative: false
+          hero:
+            eyebrow: Tentang kami
+            title: Tentang Tauco Cap Badak
+            description: Tauco Cap Badak dikenal sebagai salah satu produk tauco dari Cianjur, Jawa Barat.
+            image:
+              src: /images/tauco-dish-provisional.webp
+              alt: Tumis tahu dan sayuran dengan bumbu tauco
+              decorative: false
+          sections:
+            - id: profil-singkat
+              heading: Profil singkat
+              paragraphs:
+                - Tauco Cap Badak merupakan produk tauco asal Cianjur, Jawa Barat, yang diperkenalkan melalui website ini.
+            - id: cianjur-dan-tauco
+              heading: Cianjur dan tauco
+              paragraphs:
+                - Tauco telah menjadi bagian dari identitas kuliner Cianjur dan digunakan untuk memberi rasa gurih pada masakan.
+          relatedLinks:
+            - label: Pelajari apa itu tauco
+              href: /tauco
+          sources:
+            - label: Tauco - Explore Cianjur
+              publisher: Dinas Kebudayaan dan Pariwisata Kabupaten Cianjur
+              url: https://hayuka.cianjurkab.go.id/kuliner/tauco
+        meta:
+          requestId: 98a70ee8a919423b883c23ea275d468a
+          apiVersion: v1
+    TaucoGuideResponse:
+      summary: Published tauco guide
+      value:
+        data:
+          metadata:
+            title: Apa Itu Tauco? Bahan, Fermentasi & Cara Menggunakannya
+            description: "Panduan tentang tauco: bahan dasar kedelai, proses fermentasi, ragam rasa, konteks tauco Cianjur, dan cara memakainya dalam masakan."
+            canonicalPath: /tauco
+            openGraphImage:
+              src: /images/tauco-fermentation-provisional.webp
+              alt: Tauco semipadat dalam mangkuk dengan kedelai
+              decorative: false
+          publishedAt: '2026-07-24'
+          updatedAt: '2026-07-24'
+          hero:
+            eyebrow: Panduan tauco
+            title: Apa itu tauco?
+            description: Tauco adalah bumbu hasil fermentasi kedelai yang dikenal karena rasa gurih, asin, dan aromanya yang khas.
+            image:
+              src: /images/tauco-fermentation-provisional.webp
+              alt: Tauco semipadat dalam mangkuk dengan kedelai
+              decorative: false
+          sections:
+            - id: pengertian-tauco
+              heading: Pengertian tauco
+              paragraphs:
+                - Tauco adalah bumbu makanan berbentuk pasta yang dibuat dari kedelai melalui proses fermentasi.
+            - id: bahan-dan-fermentasi
+              heading: Bahan dan proses fermentasi secara umum
+              paragraphs:
+                - Pembuatan tauco secara umum melibatkan pengolahan kedelai, fermentasi dengan kapang, lalu pematangan dalam larutan garam.
+            - id: ragam-tauco
+              heading: Ragam tauco
+              paragraphs:
+                - Tauco dapat dijumpai dalam bentuk basah atau lebih kering dengan karakter rasa yang dapat berbeda.
+            - id: tauco-cianjur
+              heading: Tauco dan Cianjur
+              paragraphs:
+                - Cianjur dikenal sebagai salah satu pusat tauco di Indonesia dan tauco menjadi bagian dari kekayaan kuliner lokal.
+          relatedLinks:
+            - label: Lihat Tauco Cap Badak
+              href: /produk/tauco-cap-badak
+          sources:
+            - label: Tauco - Explore Cianjur
+              publisher: Dinas Kebudayaan dan Pariwisata Kabupaten Cianjur
+              url: https://hayuka.cianjurkab.go.id/kuliner/tauco
+        meta:
+          requestId: 98a70ee8a919423b883c23ea275d468a
+          apiVersion: v1
+    ProductListResponse:
+      summary: First product page
+      value:
+        data:
+          metadata:
+            title: Produk Tauco Cap Badak | Katalog Produk
+            description: Jelajahi produk Tauco Cap Badak dari Cianjur dan temukan informasi dasar serta saran penggunaannya dalam beragam masakan.
+            canonicalPath: /produk
+            openGraphImage:
+              src: /images/tauco-fermentation-provisional.webp
+              alt: Ilustrasi tauco semipadat dalam mangkuk dengan kedelai
+              decorative: false
+          heading: Produk Tauco Cap Badak
+          description: Katalog ini hanya memuat informasi produk yang telah dapat dipastikan dan tersedia untuk publik.
+          contactLink:
+            label: Tanyakan informasi produk
+            href: /kontak?topik=produk
+          products:
+            - slug: tauco-cap-badak
+              name: Tauco Cap Badak
+              category: Bumbu fermentasi
+              summary: Produk tauco dari Cianjur untuk digunakan sebagai bumbu dalam aneka masakan.
+              image:
+                src: /images/tauco-fermentation-provisional.webp
+                alt: Ilustrasi tauco semipadat dalam mangkuk dengan kedelai
+                decorative: false
+              facts:
+                - label: Asal
+                  value: Cianjur, Jawa Barat
+        meta:
+          requestId: 98a70ee8a919423b883c23ea275d468a
+          apiVersion: v1
+          page:
+            nextCursor: null
+            hasMore: false
+            limit: 20
+    ProductDetailResponse:
+      summary: Published product detail
+      value:
+        data:
+          slug: tauco-cap-badak
+          name: Tauco Cap Badak
+          category: Bumbu fermentasi
+          summary: Produk tauco dari Cianjur untuk digunakan sebagai bumbu dalam aneka masakan.
+          image:
+            src: /images/tauco-fermentation-provisional.webp
+            alt: Ilustrasi tauco semipadat dalam mangkuk dengan kedelai
+            decorative: false
+          facts:
+            - label: Asal
+              value: Cianjur, Jawa Barat
+          metadata:
+            title: Tauco Cap Badak | Produk Tauco dari Cianjur
+            description: Kenali Tauco Cap Badak dari Cianjur, kegunaannya sebagai bumbu masakan, serta cara memperoleh informasi produk yang terbaru.
+            canonicalPath: /produk/tauco-cap-badak
+            openGraphImage:
+              src: /images/tauco-fermentation-provisional.webp
+              alt: Ilustrasi tauco semipadat dalam mangkuk dengan kedelai
+              decorative: false
+          description:
+            - Tauco Cap Badak dikenal sebagai produk tauco dari Cianjur, Jawa Barat.
+          usageSuggestions:
+            - Gunakan sedikit demi sedikit dan cicipi sebelum menambahkan garam.
+          priceEstimate: null
+          purchaseNote: Hubungi kami untuk informasi ukuran, komposisi, harga, dan ketersediaan terbaru.
+          contactLink:
+            label: Hubungi kami
+            href: /kontak?topik=produk
+          researchEvidence:
+            heading: Catatan dari penelitian 2022
+            summary: Journal of Ethnic Foods meneliti satu sampel Tauco Cap Badak Cianjur sebagai bagian dari studi produk tauco Indonesia.
+            facts:
+              - label: Kategori sampel
+                value: Semipadat
+            scopeNote: Data ini hanya menjelaskan sampel studi tahun 2022 dan bukan konfirmasi formula atau keseluruhan katalog saat ini.
+            source:
+              label: Nutritional composition of tauco as Indonesian fermented soybean paste
+              publisher: Journal of Ethnic Foods
+              url: https://link.springer.com/article/10.1186/s42779-022-00159-y
+        meta:
+          requestId: 98a70ee8a919423b883c23ea275d468a
+          apiVersion: v1
+    ContactMessageRequest:
+      summary: Product-information question
+      value:
+        name: Nama pengirim
+        email: pengirim@example.com
+        phone: ''
+        subject: Informasi produk
+        message: Mohon informasi produk Tauco Cap Badak yang tersedia saat ini.
+        privacyConsent: true
+        botField: ''
+    ContactMessageResponse:
+      summary: Message accepted without exposing its internal identifier
+      value:
+        data:
+          status: received
+        meta:
+          requestId: 98a70ee8a919423b883c23ea275d468a
+          apiVersion: v1
+    LivenessResponse:
+      summary: Process is alive
+      value:
+        status: ok
+    ReadinessResponse:
+      summary: Critical dependency ready with an optional dependency degraded
+      value:
+        status: degraded
+        dependencies:
+          postgres: healthy
+          redis: degraded
+          storage: healthy

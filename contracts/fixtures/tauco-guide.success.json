@@ -1,0 +1,103 @@
+{
+  "data": {
+    "metadata": {
+      "title": "Apa Itu Tauco? Bahan, Fermentasi & Cara Menggunakannya",
+      "description": "Panduan tentang tauco: bahan dasar kedelai, proses fermentasi, ragam rasa, konteks tauco Cianjur, dan cara memakainya dalam masakan.",
+      "canonicalPath": "/tauco",
+      "openGraphImage": {
+        "src": "/images/tauco-fermentation-provisional.webp",
+        "alt": "Tauco semipadat dalam mangkuk dengan kedelai",
+        "decorative": false
+      }
+    },
+    "publishedAt": "2026-07-24",
+    "updatedAt": "2026-07-24",
+    "hero": {
+      "eyebrow": "Panduan tauco",
+      "title": "Apa itu tauco?",
+      "description": "Tauco adalah bumbu hasil fermentasi kedelai yang dikenal karena rasa gurih, asin, dan aromanya yang khas.",
+      "image": {
+        "src": "/images/tauco-fermentation-provisional.webp",
+        "alt": "Tauco semipadat dalam mangkuk dengan kedelai",
+        "decorative": false
+      }
+    },
+    "sections": [
+      {
+        "id": "pengertian-tauco",
+        "heading": "Pengertian tauco",
+        "paragraphs": [
+          "Tauco adalah bumbu makanan berbentuk pasta yang dibuat dari kedelai melalui fermentasi. Proses tersebut membentuk rasa gurih, asin, dan aroma khas. Di Indonesia, tauco digunakan sebagai bumbu atau penyedap pada tumisan, sambal, serta masakan berkuah, dengan karakter yang dapat berbeda menurut daerah dan produsen."
+        ]
+      },
+      {
+        "id": "bahan-dan-fermentasi",
+        "heading": "Bahan dan proses fermentasi secara umum",
+        "paragraphs": [
+          "Pembuatan tauco secara umum melibatkan pengolahan kedelai, fermentasi dengan kapang, lalu pematangan dalam larutan garam. Tahapan, durasi, bahan tambahan, dan teknik rinci dapat berbeda menurut produsen.",
+          "Fermentasi membantu membentuk aroma dan cita rasa khas yang membedakan tauco dari kedelai yang belum diolah."
+        ]
+      },
+      {
+        "id": "ragam-tauco",
+        "heading": "Ragam tauco",
+        "paragraphs": [
+          "Tauco dapat dijumpai dalam bentuk basah atau lebih kering, serta memiliki karakter asin atau manis. Sebutan dan profil rasanya dapat berbeda antardaerah maupun produsen."
+        ]
+      },
+      {
+        "id": "tauco-cianjur",
+        "heading": "Tauco dan Cianjur",
+        "paragraphs": [
+          "Cianjur dikenal sebagai salah satu pusat tauco di Indonesia. Tauco menjadi bagian dari kekayaan kuliner lokal dan digunakan dalam beragam hidangan."
+        ]
+      },
+      {
+        "id": "cara-menggunakan",
+        "heading": "Cara menggunakan tauco",
+        "paragraphs": [
+          "Tambahkan tauco sedikit demi sedikit pada tumisan, sambal, atau masakan berkuah, lalu cicipi sebelum menambahkan garam lain.",
+          "Rasa tauco dapat dipadukan dengan bahan aromatik seperti bawang, cabai, tomat, atau rempah sesuai hidangan yang dibuat."
+        ]
+      },
+      {
+        "id": "cara-menyimpan",
+        "heading": "Cara menyimpan",
+        "paragraphs": [
+          "Ikuti petunjuk penyimpanan pada label produk. Gunakan alat yang bersih dan kering saat mengambil tauco, kemudian tutup kembali kemasannya dengan rapat."
+        ]
+      }
+    ],
+    "relatedLinks": [
+      {
+        "label": "Lihat Tauco Cap Badak",
+        "href": "/produk/tauco-cap-badak"
+      },
+      {
+        "label": "Mengenal Tauco Cap Badak",
+        "href": "/tentang-kami"
+      }
+    ],
+    "sources": [
+      {
+        "label": "Tauco - Explore Cianjur",
+        "publisher": "Dinas Kebudayaan dan Pariwisata Kabupaten Cianjur",
+        "url": "https://hayuka.cianjurkab.go.id/kuliner/tauco"
+      },
+      {
+        "label": "Tauco",
+        "publisher": "Program Studi Teknologi Pangan, Universitas Katolik Widya Mandala Surabaya",
+        "url": "https://www.foodtech.ukwms.ac.id/post/tauco"
+      },
+      {
+        "label": "Potensi Tauco sebagai Pangan Fungsional",
+        "publisher": "Chimica et Natura Acta, Universitas Padjadjaran",
+        "url": "https://jurnal.unpad.ac.id/jcena/article/view/9157"
+      }
+    ]
+  },
+  "meta": {
+    "requestId": "01J00000000000000000000002",
+    "apiVersion": "v1"
+  }
+}
