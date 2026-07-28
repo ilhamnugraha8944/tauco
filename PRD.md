@@ -4,12 +4,12 @@
 
 | Atribut | Nilai |
 | --- | --- |
-| Versi dokumen | 1.0 |
-| Tanggal | 24 Juli 2026 |
-| Status produk | Phase 1A implemented scope; Phase 1B–1D planned |
+| Versi dokumen | 1.1 |
+| Tanggal | 28 Juli 2026 |
+| Status produk | Phase 1A complete di production; Phase 1B–1D planned |
 | Bahasa produk | Indonesia |
 | Target pasar awal | Indonesia |
-| Target deployment Phase 1A | Netlify Free setelah approval; belum dieksekusi |
+| Target deployment Phase 1A | Implemented di `https://tauco-cap-badak.netlify.app` |
 | Pemilik dokumen | Product / Engineering |
 
 ## 1. Ringkasan
@@ -22,10 +22,11 @@ dapat berkembang menjadi sistem inventory dan order management.
 
 Delivery dibagi agar website publik dapat diluncurkan lebih cepat:
 
-- **Phase 1A — implemented local scope:** website publik SEO-first dengan konten lokal
+- **Phase 1A — complete production scope:** website publik SEO-first dengan konten lokal
   tervalidasi, halaman yang diprerender, katalog awal, detail produk, formulir
   kontak berkontrak Netlify Forms, metadata SEO, sitemap, robots, structured
-  data, dan privacy notice. Deployment serta validasi dashboard ditunda.
+  data, dan privacy notice. Deployment, Forms, Search Console, serta production
+  quality gate sudah diverifikasi.
 - **Phase 1B — future:** fondasi REST API Go, PostgreSQL, Redis, media storage,
   job processing, observability, dan security middleware.
 - **Phase 1C — future:** Admin CMS, authentication, publishing workflow,
@@ -37,8 +38,8 @@ Delivery dibagi agar website publik dapat diluncurkan lebih cepat:
 
 Label status dalam dokumen ini:
 
-- `IMPLEMENTED-1A`: termasuk implementasi repository dan verifikasi local
-  Phase 1A, bukan bukti deployment atau integrasi dashboard eksternal.
+- `IMPLEMENTED-1A`: termasuk implementasi repository, deployment production,
+  dan acceptance Phase 1A yang tercatat pada `plan.md` serta `WALKTHROUGH.md`.
 - `PLANNED`: desain target yang belum diimplementasikan pada Phase 1A.
 - `OUT-OF-SCOPE`: bukan bagian delivery Phase 1.
 
@@ -148,7 +149,7 @@ inbox, dan audit trail.
 | Panduan tauco | `IMPLEMENTED-1A` | Konten edukatif untuk intent informasional |
 | Katalog produk | `IMPLEMENTED-1A` | Katalog awal berbasis konten lokal |
 | Detail produk dengan slug | `IMPLEMENTED-1A` | Slug harus dipertahankan |
-| Kontak | `IMPLEMENTED-1A` | Contract/blueprint local; dashboard belum diuji |
+| Kontak | `IMPLEMENTED-1A` | Active Netlify Form; verified submission dan notification utama lulus |
 | Kebijakan privasi | `IMPLEMENTED-1A` | Mencakup data formulir |
 | Technical SEO | `IMPLEMENTED-1A` | Metadata, canonical, sitemap, robots, JSON-LD |
 | Responsive dan accessibility baseline | `IMPLEMENTED-1A` | Semantic HTML dan keyboard flow |
@@ -289,8 +290,9 @@ Privacy notice minimal menjelaskan:
 - prinsip penyimpanan dan penghapusan;
 - cara meminta koreksi atau penghapusan setelah kontak resmi tersedia.
 
-Scope Phase 1A menetapkan retensi pesan maksimal 12 bulan. Pemilik operasional
-data dan prosedur penghapusan tetap harus dikonfirmasi sebelum deployment.
+Scope Phase 1A menetapkan retensi pesan maksimal 12 bulan. Pemilik project
+menjadi pengelola data dan inbox, memahami SOP akses/koreksi/penghapusan, serta
+telah membuat pengingat retensi.
 
 ### 6.9 Error dan not found
 
@@ -391,8 +393,9 @@ data dan prosedur penghapusan tetap harus dikonfirmasi sebelum deployment.
 
 ### 9.3 Browser dan responsive behavior
 
-- Automated browser test berjalan pada Chromium desktop dan mobile. Verifikasi
-  manual Edge, Firefox, dan Safari menjadi deferred launch gate.
+- Automated browser test berjalan pada Edge/Chromium, Firefox, WebKit, dan
+  emulasi mobile. Verifikasi manual Edge, Safari perangkat asli, Android Chrome,
+  keyboard, serta zoom 200 persen sudah lulus.
 - Layout diuji minimal pada 320 px, 768 px, 1024 px, dan desktop lebar.
 - Tidak ada horizontal scroll akibat content overflow pada viewport target.
 
@@ -414,8 +417,16 @@ data dan prosedur penghapusan tetap harus dikonfirmasi sebelum deployment.
 
 ## 10. Target Deployment Phase 1A
 
-**Status:** `PLANNED` — konfigurasi repository siap, deployment belum
-dieksekusi atas instruksi pemilik project.
+**Status:** `IMPLEMENTED-1A` — production aktif dan launch gate lulus.
+
+| Evidence | Nilai |
+| --- | --- |
+| Production URL | `https://tauco-cap-badak.netlify.app` |
+| Netlify project ID | `5a64a9b3-659d-452e-95ea-dcc973b72d12` |
+| Current production deploy ID | `6a671c07dba5f22c9cfab616` |
+| Production commit SHA | `2ce0a310075224b2cb8bb470d0e0ba4d0d301b98` |
+| Published timestamp | 27 Juli 2026, 15:52:14 WIB |
+| Search Console | Ownership verified; sitemap sukses, 7 halaman ditemukan |
 
 - Runtime target: Netlify dengan adapter Next.js modern.
 - Output tetap `.next`; aplikasi tidak menggunakan legacy `next export`.
@@ -424,10 +435,14 @@ dieksekusi atas instruksi pemilik project.
   persis dengan public origin.
 - Production subdomain `*.netlify.app` dipilih sekali dan dijaga stabil sampai
   custom domain tersedia.
-- Deploy Preview dapat dipakai untuk QA setelah pemilik project memberi
-  approval; production deploy hanya dilakukan setelah launch gate lulus.
-- Saat deployment diizinkan, Netlify Form Detection harus aktif dan deploy
-  harus mendeteksi static form blueprint.
+- Deploy Preview digunakan untuk QA sebelum merge; hanya production yang
+  indexable.
+- Netlify Form Detection aktif dan mendeteksi static form blueprint.
+- Notification email utama lulus end-to-end. Backup recipient ditunda dan
+  diterima owner sebagai follow-up operasional.
+- Production audit melaporkan 0 vulnerability. Full audit tetap mencatat
+  advisori development-only pada dependency ESLint; risiko tersebut diterima
+  dan tidak diperbaiki menggunakan forced major upgrade.
 - Panduan operasional lengkap tersedia di [README.md](./README.md).
 
 ### 10.1 Domain strategy
@@ -650,7 +665,8 @@ movement, order, transaction, race-condition handling, dan reconciliation.
 - Axe accessibility automation serta manual keyboard test.
 - Lighthouse API dengan tiga synthetic run untuk setiap route representatif.
 - Broken-link dan structured-data validation.
-- Post-deploy Netlify Forms smoke test sebagai deferred launch gate.
+- Post-deploy route, SEO, accessibility, Lighthouse, dan Netlify Forms smoke
+  test.
 
 ### 13.2 Future backend test
 
@@ -674,10 +690,9 @@ movement, order, transaction, race-condition handling, dan reconciliation.
    detail slug dibuat serta saling terhubung.
 4. **Given** slug tidak dikenal, **when** route dibuka, **then** visitor mendapat
    not-found response dan jalur kembali.
-5. **Given** input form valid, **when** local contract test mengintersep
-   submission, **then** payload URL-encoded benar dan UI memberi status sukses.
-   Visibilitas submission di dashboard Netlify menjadi acceptance tambahan
-   setelah deployment diizinkan.
+5. **Given** input form valid, **when** submission dikirim, **then** payload
+   URL-encoded benar, UI memberi status sukses, submission masuk sebagai
+   verified Netlify Form, dan notification utama diterima owner.
 6. **Given** input tidak valid atau network gagal, **when** visitor submit,
    **then** error dapat dipahami, focus dapat diarahkan, dan input tidak hilang.
 7. **Given** keyboard-only user, **when** menavigasi seluruh flow, **then**
@@ -700,7 +715,9 @@ movement, order, transaction, race-condition handling, dan reconciliation.
 
 ## 16. Dependencies dari Pemilik Bisnis
 
-Sebelum public launch final, pemilik bisnis perlu menyediakan atau menyetujui:
+Public launch Phase 1A telah disetujui dengan copy dan visual provisional.
+Data berikut tetap diperlukan hanya sebelum hendak dipublikasikan sebagai
+peningkatan konten:
 
 - logo resmi dan panduan penggunaan;
 - foto produk dan foto usaha beserta hak penggunaan;
@@ -710,8 +727,15 @@ Sebelum public launch final, pemilik bisnis perlu menyediakan atau menyetujui:
 - daftar produk, SKU, ukuran, harga, komposisi, allergen, dan penyimpanan;
 - bukti sertifikat halal, SPP-IRT/BPOM, serta status merek bila hendak
   ditampilkan;
-- privacy contact, pemilik operasional inbox, dan persetujuan retensi 12 bulan;
-- akun Netlify dan Google Search Console.
+- email atau kanal privacy khusus jika kelak berbeda dari form kontak.
+
+Dependency launch yang sudah dipenuhi:
+
+- pemilik operasional inbox dan pengelola data;
+- persetujuan retensi maksimal 12 bulan serta SOP privasi;
+- akun Netlify dan Google Search Console dengan owner jangka panjang;
+- persetujuan copy/visual provisional serta penghilangan data yang belum
+  terverifikasi.
 
 Daftar status rinci berada di [FACT_CHECK.md](./FACT_CHECK.md).
 

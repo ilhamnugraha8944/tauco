@@ -23,6 +23,12 @@ function desktopOnly(testInfo: TestInfo) {
   );
 }
 
+function createAxeBuilder(page: Page) {
+  return new AxeBuilder({ page }).exclude(
+    'iframe[title="Netlify Drawer"]',
+  );
+}
+
 async function readStructuredData(page: Page) {
   const scripts = await page
     .locator('script[type="application/ld+json"]')
@@ -170,7 +176,7 @@ test.describe("WCAG and responsive pre-flight", () => {
       page,
     }) => {
       await page.goto(route);
-      const results = await new AxeBuilder({ page })
+      const results = await createAxeBuilder(page)
         .withTags([
           "wcag2a",
           "wcag2aa",
@@ -338,7 +344,7 @@ test.describe("WCAG and responsive pre-flight", () => {
 
     for (const route of primaryRoutes) {
       await page.goto(route);
-      const results = await new AxeBuilder({ page })
+      const results = await createAxeBuilder(page)
         .withTags([
           "wcag2a",
           "wcag2aa",
@@ -357,7 +363,7 @@ test.describe("WCAG and responsive pre-flight", () => {
   }, testInfo) => {
     desktopOnly(testInfo);
     const analyzeCurrentState = async (state: string) => {
-      const results = await new AxeBuilder({ page })
+      const results = await createAxeBuilder(page)
         .withTags([
           "wcag2a",
           "wcag2aa",

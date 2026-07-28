@@ -15,6 +15,7 @@ export default defineConfig([
     ".next-lighthouse/**",
     ".netlify/**",
     ".lighthouseci/**",
+    ".lighthouseci-production/**",
     "coverage/**",
     "playwright-report/**",
     "test-results/**",
