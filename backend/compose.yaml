@@ -1,0 +1,87 @@
+name: tauco-phase1b
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: postgres:17.10-alpine3.22
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${TAUCO_POSTGRES_DB:-tauco}
+      POSTGRES_USER: ${TAUCO_POSTGRES_USER:-tauco_app}
+      POSTGRES_PASSWORD: ${TAUCO_POSTGRES_PASSWORD:-tauco-local-postgres-only}
+    ports:
+      - "127.0.0.1:${TAUCO_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - tauco_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'pg_isready -h 127.0.0.1 -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    stop_grace_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+
+  redis:
+    image: redis:8.8.0-alpine3.23
+    restart: unless-stopped
+    environment:
+      REDISCLI_AUTH: ${TAUCO_REDIS_PASSWORD:-tauco-local-redis-only}
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --requirepass
+      - ${TAUCO_REDIS_PASSWORD:-tauco-local-redis-only}
+      - --loglevel
+      - warning
+    ports:
+      - "127.0.0.1:${TAUCO_REDIS_PORT:-6379}:6379"
+    volumes:
+      - tauco_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    stop_grace_period: 15s
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+
+  mailpit:
+    image: axllent/mailpit:v1.30.0
+    profiles:
+      - mail
+    restart: unless-stopped
+    environment:
+      MP_DATABASE: /data/mailpit.db
+      MP_MAX_MESSAGES: "500"
+      MP_DISABLE_VERSION_CHECK: "true"
+    ports:
+      - "127.0.0.1:${TAUCO_MAILPIT_SMTP_PORT:-1025}:1025"
+      - "127.0.0.1:${TAUCO_MAILPIT_UI_PORT:-8025}:8025"
+    volumes:
+      - tauco_mailpit_data:/data
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+
+volumes:
+  tauco_postgres_data:
+  tauco_redis_data:
+  tauco_mailpit_data:

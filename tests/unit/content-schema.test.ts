@@ -85,6 +85,36 @@ describe("content schemas", () => {
         decorative: false,
       }).success,
     ).toBe(false);
+
+    for (const genericAlt of [
+      "foto tauco",
+      "FOTO TAUCO",
+      "Gambar Produk",
+      "IMAGE PRODUCT",
+      "photo product",
+    ]) {
+      expect(
+        imageAssetSchema.safeParse({
+          src: "/images/tauco-fermentation-provisional.png",
+          alt: genericAlt,
+          decorative: false,
+        }).success,
+      ).toBe(false);
+    }
+
+    const paddedAlt = imageAssetSchema.parse({
+      src: "/images/tauco-fermentation-provisional.png",
+      alt: "  Tauco semipadat dalam mangkuk  ",
+      decorative: false,
+    });
+    expect(paddedAlt.alt).toBe("Tauco semipadat dalam mangkuk");
+    expect(
+      imageAssetSchema.safeParse({
+        src: "/images/tauco-fermentation-provisional.png",
+        alt: "        ",
+        decorative: false,
+      }).success,
+    ).toBe(false);
   });
 
   it("requires an empty alt only for explicitly decorative images", () => {

@@ -1,0 +1,16 @@
+{
+  "type": "urn:tauco-cap-badak:problem:validation",
+  "title": "Permintaan tidak valid",
+  "status": 422,
+  "detail": "Periksa field yang ditandai.",
+  "instance": "/api/v1/contact-messages",
+  "code": "CONTACT_VALIDATION_FAILED",
+  "requestId": "01J00000000000000000000005",
+  "errors": [
+    {
+      "field": "email",
+      "code": "INVALID_EMAIL",
+      "message": "Masukkan alamat email yang valid."
+    }
+  ]
+}

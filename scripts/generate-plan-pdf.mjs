@@ -13,8 +13,6 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { chromium } from "@playwright/test";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const markdownPath = join(projectRoot, "plan.md");
-const pdfPath = join(projectRoot, "plan.pdf");
 
 function escapeHtml(value) {
   return value
@@ -278,7 +276,7 @@ function renderMarkdown(markdown) {
   return html.join("\n");
 }
 
-export function buildDocument(markdown) {
+export function buildDocument(markdown, options = {}) {
   const title =
     markdown.match(/^#\s+(.+)$/m)?.[1] ?? "Phase 1A Launch Completion Plan";
   const subtitle =
@@ -292,6 +290,23 @@ export function buildDocument(markdown) {
     .replace(/^#\s+.+\r?\n(?:\r?\n)?/, "")
     .replace(/^##\s+.+\r?\n(?:\r?\n)?/, "");
   const body = renderMarkdown(bodyMarkdown);
+  const kicker = options.kicker ?? "Deployment runbook";
+  const badges = options.badges ?? [
+    "G0 Baseline",
+    "G1 Approval",
+    "G2 Local gates",
+    "G3 Netlify",
+    "G4 Preview QA",
+    "G5 Go/No-Go",
+    "G6 Production",
+    "G7 Operations",
+    "G8 Closure",
+  ];
+  const target = options.target ?? "Netlify Free";
+  const scope = options.scope ?? "Phase 1A";
+  const renderedBadges = badges
+    .map((badge) => `<span>${escapeHtml(badge)}</span>`)
+    .join("");
 
   return `<!doctype html>
 <html lang="id-ID">
@@ -636,27 +651,19 @@ export function buildDocument(markdown) {
   <body>
     <section class="cover">
       <div>
-        <div class="cover-kicker">Deployment runbook</div>
+        <div class="cover-kicker">${escapeHtml(kicker)}</div>
         <div class="cover-rule"></div>
         <h1>${escapeHtml(title)}</h1>
         <h2>${escapeHtml(subtitle)}</h2>
         <div class="cover-gates">
-          <span>G0 Baseline</span>
-          <span>G1 Approval</span>
-          <span>G2 Local gates</span>
-          <span>G3 Netlify</span>
-          <span>G4 Preview QA</span>
-          <span>G5 Go/No-Go</span>
-          <span>G6 Production</span>
-          <span>G7 Operations</span>
-          <span>G8 Closure</span>
+          ${renderedBadges}
         </div>
       </div>
       <div class="cover-meta">
         <div><small>Versi</small><strong>${escapeHtml(documentVersion)}</strong></div>
         <div><small>Tanggal</small><strong>${escapeHtml(documentDate)}</strong></div>
-        <div><small>Target</small><strong>Netlify Free</strong></div>
-        <div><small>Scope</small><strong>Phase 1A</strong></div>
+        <div><small>Target</small><strong>${escapeHtml(target)}</strong></div>
+        <div><small>Scope</small><strong>${escapeHtml(scope)}</strong></div>
       </div>
     </section>
     <main>${body}</main>
@@ -665,12 +672,43 @@ export function buildDocument(markdown) {
 }
 
 async function main() {
+  const [markdownArgument, pdfArgument, profile] = process.argv.slice(2);
+  const markdownPath = resolve(
+    projectRoot,
+    markdownArgument ?? "plan.md",
+  );
+  const pdfPath = resolve(projectRoot, pdfArgument ?? "plan.pdf");
+  for (const candidate of [markdownPath, pdfPath]) {
+    if (
+      candidate !== projectRoot &&
+      !candidate.startsWith(`${projectRoot}\\`) &&
+      !candidate.startsWith(`${projectRoot}/`)
+    ) {
+      throw new Error("Input dan output PDF wajib berada di dalam repository.");
+    }
+  }
+
   if (!existsSync(markdownPath)) {
     throw new Error(`File Markdown tidak ditemukan: ${markdownPath}`);
   }
 
   const markdown = readFileSync(markdownPath, "utf8");
-  const html = buildDocument(markdown);
+  const documentOptions =
+    profile === "backend"
+      ? {
+          kicker: "Dokumentasi kode",
+          badges: [
+            "Clean Architecture",
+            "Go + Gin",
+            "PostgreSQL",
+            "OpenAPI",
+            "Local-first",
+          ],
+          target: "Backend Go",
+          scope: "Phase 1B B1-B4",
+        }
+      : {};
+  const html = buildDocument(markdown, documentOptions);
   const baseTemp = await realpath(tmpdir());
   const tempDirectory = await mkdtemp(join(baseTemp, "tauco-plan-pdf-"));
   const resolvedTempDirectory = resolve(tempDirectory);
@@ -697,7 +735,7 @@ async function main() {
           ["EBUSY", "EPERM"].includes(error.code)
         ) {
           throw new Error(
-            "plan.pdf sedang dibuka aplikasi lain. Tutup PDF tersebut, lalu jalankan kembali npm.cmd run plan:pdf.",
+            `${basename(pdfPath)} sedang dibuka aplikasi lain. Tutup PDF tersebut, lalu jalankan generator kembali.`,
           );
         }
 

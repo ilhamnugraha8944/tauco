@@ -16,6 +16,7 @@ export default defineConfig([
     ".netlify/**",
     ".lighthouseci/**",
     ".lighthouseci-production/**",
+    ".cache/**",
     "coverage/**",
     "playwright-report/**",
     "test-results/**",

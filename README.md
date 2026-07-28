@@ -1,13 +1,18 @@
 # Tauco Cap Badak Website
 
 Website company profile dan katalog awal Tauco Cap Badak yang berfokus pada
-SEO, performance, dan accessibility. Repository ini saat ini berisi
+SEO, performance, dan accessibility. Production saat ini tetap menjalankan
 **Phase 1A**: public website dengan konten lokal serta formulir kontak melalui
 Netlify Forms.
 
-REST API Go, PostgreSQL, Redis, image worker, authentication, dan Admin CMS
-belum menjadi bagian runtime saat ini. Rencana lengkapnya ada di
-[PRD.md](./PRD.md).
+Fondasi REST API Go untuk **Phase 1B** dikembangkan di `backend/` dalam
+shadow-mode. Backend ini belum menjadi dependency website production dan tidak
+mengubah canonical, sitemap, maupun alur form Phase 1A. Rencana serta evidence
+implementasinya ada di [PHASE_1B_PLAN.md](./PHASE_1B_PLAN.md) dan
+[PHASE_1B_WALKTHROUGH.md](./PHASE_1B_WALKTHROUGH.md).
+Dokumentasi struktur dan cara kerja kode tersedia di
+[BACKEND_CODE_DOCUMENTATION.md](./BACKEND_CODE_DOCUMENTATION.md) serta
+[BACKEND_CODE_DOCUMENTATION.pdf](./BACKEND_CODE_DOCUMENTATION.pdf).
 
 **Status handoff:** Phase 1A berstatus PRD-complete dan telah tersedia di
 `https://tauco-cap-badak.netlify.app`. Gate G0–G8 sudah lulus dan Phase 1A
@@ -25,7 +30,9 @@ layanan backend. Bukti ada di
 | Contact form | Active; verified submission dan notification utama lulus |
 | Privacy notice | Phase 1A |
 | Metadata, canonical, sitemap, robots, JSON-LD | Phase 1A |
-| Go REST API dan database | Future |
+| Go REST API | Phase 1B B4; lima public read route aktif lokal |
+| PostgreSQL | Phase 1B B3 complete; migration v3, seed, repository, dan integration lulus |
+| Redis | Compose local tersedia; container smoke B3, adapter dan integration B8 |
 | Admin CMS | Future |
 | Inventory dan order management | Out of scope Phase 1 |
 
@@ -40,6 +47,8 @@ layanan backend. Bukti ada di
 - Playwright dan axe untuk end-to-end/accessibility test
 - Lighthouse API untuk performance/SEO gate lokal
 - Netlify sebagai production hosting dan transport form
+- Go, Gin, dan Zap untuk fondasi API shadow-mode
+- PostgreSQL dan Redis sebagai dependency lokal Phase 1B
 
 Gunakan versi dependency yang dikunci oleh `package-lock.json`; jangan
 mengandalkan versi global.
@@ -50,12 +59,15 @@ mengandalkan versi global.
 - npm yang disertakan bersama Node.js
 - Git untuk workflow deploy berbasis repository
 - Browser Chromium untuk end-to-end test
+- Go sesuai `backend/go.mod`
+- Docker Desktop mulai wajib pada Phase 1B gate B3
 
 Versi lokal dapat diperiksa dengan:
 
 ```powershell
 node --version
 npm.cmd --version
+go version
 ```
 
 Dokumentasi ini memakai `npm.cmd`, bukan `npm`, agar command konsisten pada
@@ -145,9 +157,25 @@ Jalankan script menggunakan `npm.cmd run <nama>`.
 | `images:optimize` | Membuat WebP/AVIF dari master image provisional |
 | `walkthrough:capture` | Build, start local, dan membuat tujuh screenshot |
 | `plan:pdf` | Membuat ulang `plan.pdf` dari `plan.md` |
+| `backend:docs:pdf` | Membuat ulang dokumentasi kode backend dalam PDF |
 | `lighthouse` | Build audit terpisah dan mengaudit empat route local sebanyak 3x |
 | `lighthouse:production` | Mengaudit empat route production sebanyak 3x |
-| `check` | Menjalankan lint, typecheck, unit test, dan build berurutan |
+| `backend:dev` | Menjalankan API lokal pada `127.0.0.1:8080` |
+| `backend:migrate:up` | Menerapkan migration PostgreSQL lokal |
+| `backend:migrate:version` | Menampilkan versi dan dirty state migration |
+| `backend:seed:phase1a` | Mengimpor konten Phase 1A secara idempotent |
+| `backend:format` | Memformat seluruh package Go |
+| `backend:generate` | Membuat ulang Go types/server contract dari OpenAPI |
+| `backend:generate:check` | Menolak drift antara OpenAPI dan generated Go code |
+| `backend:test` | Menjalankan seluruh unit test Go, termasuk fallback aman untuk Windows Application Control |
+| `backend:test:integration` | Menjalankan gate PostgreSQL disposable tanpa cache |
+| `backend:vet` | Menjalankan static analysis standar Go |
+| `backend:build` | Mengompilasi entrypoint API |
+| `backend:check` | Menjalankan codegen drift check, test, vet, dan build backend |
+| `backend:compose:up` | Menyalakan dependency local setelah Docker tersedia |
+| `backend:compose:down` | Menghentikan dependency local tanpa menghapus volume |
+| `check:frontend` | Menjalankan gate cepat frontend Phase 1A |
+| `check` | Menjalankan gate frontend dan backend berurutan |
 
 Quality gate lengkap sebelum handoff atau deployment mendatang:
 
@@ -166,6 +194,31 @@ Command `check` adalah gate cepat tanpa browser:
 ```powershell
 npm.cmd run check
 ```
+
+### Kontrak API Phase 1B
+
+Sumber kebenaran kontrak berada di `backend/openapi/openapi.yaml`. File
+`backend/internal/delivery/api/api.gen.go` dihasilkan oleh tool yang versinya
+dikunci di `backend/go.mod`; jangan diedit manual.
+
+Setelah mengubah OpenAPI:
+
+```powershell
+npm.cmd run backend:generate
+npm.cmd run backend:generate:check
+npm.cmd run backend:test
+```
+
+B2 mendefinisikan lima public read route, contact intake, dua health route, dan
+protected metrics. Tidak ada route admin. B4 telah meregistrasikan lima public
+read route pada runtime lokal; contact, readiness, dan metrics tetap tidak
+diregistrasikan sampai gate masing-masing.
+
+Generated defaults yang menulis `err.Error()` tidak boleh dipakai. B4 memakai
+selective safe registration dan handwritten response factory pada package
+generated API. Unknown query, duplicate query, cursor, limit, published-only,
+ETag/304, dan true product 404 sudah diuji. Body limit, strict contact JSON,
+Content-Type, serta authorization metrics tetap menjadi gate B5/B8/B9.
 
 Release evidence Phase 1A:
 

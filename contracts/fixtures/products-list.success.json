@@ -1,0 +1,52 @@
+{
+  "data": {
+    "metadata": {
+      "title": "Produk Tauco Cap Badak | Katalog Produk",
+      "description": "Jelajahi produk Tauco Cap Badak dari Cianjur dan temukan informasi dasar serta saran penggunaannya dalam beragam masakan.",
+      "canonicalPath": "/produk",
+      "openGraphImage": {
+        "src": "/images/tauco-fermentation-provisional.webp",
+        "alt": "Ilustrasi tauco semipadat dalam mangkuk dengan kedelai",
+        "decorative": false
+      }
+    },
+    "heading": "Produk Tauco Cap Badak",
+    "description": "Katalog ini hanya memuat informasi produk yang telah dapat dipastikan. Hubungi kami untuk ukuran, komposisi, harga, dan ketersediaan terbaru.",
+    "contactLink": {
+      "label": "Tanyakan informasi produk",
+      "href": "/kontak?topik=produk"
+    },
+    "products": [
+      {
+        "slug": "tauco-cap-badak",
+        "name": "Tauco Cap Badak",
+        "category": "Bumbu fermentasi",
+        "summary": "Produk tauco dari Cianjur untuk digunakan sebagai bumbu dalam aneka masakan.",
+        "image": {
+          "src": "/images/tauco-fermentation-provisional.webp",
+          "alt": "Ilustrasi tauco semipadat dalam mangkuk dengan kedelai",
+          "decorative": false
+        },
+        "facts": [
+          {
+            "label": "Asal",
+            "value": "Cianjur, Jawa Barat"
+          },
+          {
+            "label": "Kegunaan umum",
+            "value": "Bumbu masakan"
+          }
+        ]
+      }
+    ]
+  },
+  "meta": {
+    "requestId": "01J00000000000000000000003",
+    "apiVersion": "v1",
+    "page": {
+      "nextCursor": null,
+      "hasMore": false,
+      "limit": 20
+    }
+  }
+}
