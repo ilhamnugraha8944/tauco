@@ -18,6 +18,7 @@
 
 # Local caches
 /.npm-cache/
+/.cache/
 /.eslintcache
 *.tsbuildinfo
 
@@ -27,6 +28,16 @@
 .env.development.local
 .env.test.local
 .env.production.local
+backend/.env*
+!backend/.env.example
+
+# Go build and test output
+backend/bin/
+backend/.test-bin/
+backend/api
+backend/api.exe
+backend/coverage.out
+backend/*.test
 
 # Editor and operating-system files
 .DS_Store
