@@ -6,7 +6,7 @@
 | --- | --- |
 | Versi dokumen | 1.2 |
 | Tanggal | 28 Juli 2026 |
-| Status produk | Phase 1A complete di production; Phase 1B implementation; Phase 1C–1D planned |
+| Status produk | Phase 1A complete di production; Phase 1B complete lokal; Phase 1C–1D planned |
 | Bahasa produk | Indonesia |
 | Target pasar awal | Indonesia |
 | Target deployment Phase 1A | Implemented di `https://tauco-cap-badak.netlify.app` |
@@ -27,10 +27,10 @@ Delivery dibagi agar website publik dapat diluncurkan lebih cepat:
   kontak berkontrak Netlify Forms, metadata SEO, sitemap, robots, structured
   data, dan privacy notice. Deployment, Forms, Search Console, serta production
   quality gate sudah diverifikasi.
-- **Phase 1B — implementation:** B0 scope freeze, B1 backend skeleton, B2
-  executable API contract, B3 database dan seed, serta B4 public read API sudah
-  complete. Fondasi berikutnya mencakup contact transaction, durable worker,
-  media storage, Redis, observability, dan security middleware. Delivery
+- **Phase 1B — complete lokal:** B0-B10 mencakup scope freeze, backend skeleton,
+  executable API contract, database/seed, public read, contact transaction,
+  durable worker, media storage, Redis/security, observability, dan quality
+  gate. Delivery
   dilakukan local-first dalam shadow-mode sehingga production Phase 1A tetap
   memakai konten lokal dan Netlify Forms.
 - **Phase 1C — future:** Admin CMS, authentication, publishing workflow,
@@ -44,8 +44,9 @@ Label status dalam dokumen ini:
 
 - `IMPLEMENTED-1A`: termasuk implementasi repository, deployment production,
   dan acceptance Phase 1A yang tercatat pada `plan.md` serta `WALKTHROUGH.md`.
-- `IMPLEMENTING-1B`: termasuk implementation gate B0–B10 yang tercatat pada
-  `PHASE_1B_PLAN.md` serta `PHASE_1B_WALKTHROUGH.md`.
+- `IMPLEMENTED-1B-LOCAL`: gate B0-B10 selesai dan tercatat pada
+  `PHASE_1B_PLAN.md`, `PHASE_1B_WALKTHROUGH.md`, serta
+  `PHASE_1B_QUALITY_REPORT.md`; belum dideploy.
 - `PLANNED`: desain target yang belum diimplementasikan pada Phase 1A.
 - `OUT-OF-SCOPE`: bukan bagian delivery Phase 1.
 
@@ -159,10 +160,10 @@ inbox, dan audit trail.
 | Kebijakan privasi | `IMPLEMENTED-1A` | Mencakup data formulir |
 | Technical SEO | `IMPLEMENTED-1A` | Metadata, canonical, sitemap, robots, JSON-LD |
 | Responsive dan accessibility baseline | `IMPLEMENTED-1A` | Semantic HTML dan keyboard flow |
-| REST API Go | `IMPLEMENTING-1B` | B4 public read runtime complete; contact transaction mulai B5 |
-| PostgreSQL/Supabase | `IMPLEMENTING-1B` | Migration, seed, repository, dan integration B3 complete di PostgreSQL lokal |
-| Redis/Upstash | `IMPLEMENTING-1B` | Compose scaffold B1; runtime adapter B8 |
-| Object storage dan image worker | `PLANNED` | Phase 1B |
+| REST API Go | `IMPLEMENTED-1B-LOCAL` | Public/contact/health/metrics dan quality gate complete lokal |
+| PostgreSQL/Supabase | `IMPLEMENTED-1B-LOCAL` | Migration v4, repository, durable jobs, retention, dan integration lokal |
+| Redis/Upstash | `IMPLEMENTED-1B-LOCAL` | Cache, rate limit, fail-open, dan integration lokal |
+| Object storage dan image worker | `IMPLEMENTED-1B-LOCAL` | Local/S3 port, safe image pipeline, dan worker lokal |
 | Admin authentication | `PLANNED` | Phase 1C |
 | CMS homepage/about | `PLANNED` | Phase 1C |
 | Product/media CMS | `PLANNED` | Phase 1C |
@@ -470,7 +471,7 @@ Jika berpindah ke custom domain:
 
 ## 11. Backend Architecture — Phase 1B dan 1C
 
-Phase 1B berstatus `IMPLEMENTING-1B`. Requirement Admin CMS dan authentication
+Phase 1B berstatus `IMPLEMENTED-1B-LOCAL`. Requirement Admin CMS dan authentication
 di bagian ini tetap `PLANNED` untuk Phase 1C dan bukan dependency runtime Phase
 1A.
 

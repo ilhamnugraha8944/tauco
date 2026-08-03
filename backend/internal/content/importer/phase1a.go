@@ -168,7 +168,7 @@ func BuildPhase1APlan(
 		return application.SeedPlan{}, err
 	}
 
-	spec, err := api.GetSwagger()
+	spec, err := api.GetSpec()
 	if err != nil {
 		return application.SeedPlan{}, fmt.Errorf("load embedded OpenAPI contract: %w", err)
 	}
@@ -208,7 +208,7 @@ func BuildPhase1APlan(
 		return application.SeedPlan{}, err
 	}
 
-	if guide.UpdatedAt.Time.Before(guide.PublishedAt.Time) {
+	if guide.UpdatedAt.Before(guide.PublishedAt.Time) {
 		return application.SeedPlan{}, errors.New(
 			"tauco-guide.json updatedAt must not precede publishedAt",
 		)

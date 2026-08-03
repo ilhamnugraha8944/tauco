@@ -19,6 +19,7 @@
 # Local caches
 /.npm-cache/
 /.cache/
+/.local-chat/
 /.eslintcache
 *.tsbuildinfo
 
@@ -38,6 +39,9 @@ backend/api
 backend/api.exe
 backend/coverage.out
 backend/*.test
+backend/.local-media/
+backend/.go-build-cache/
+backend/.tool-bin/
 
 # Editor and operating-system files
 .DS_Store

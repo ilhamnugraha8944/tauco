@@ -5,7 +5,7 @@
 | Atribut | Nilai |
 | --- | --- |
 | Mulai | 28 Juli 2026 |
-| Status keseluruhan | B0-B4 complete, B5 pending |
+| Status keseluruhan | Phase 1B B0-B10 complete lokal; B11 deferred |
 | Mode | Local-first, shadow-mode |
 | Production Phase 1A | Tidak berubah |
 | Dokumen rencana | `PHASE_1B_PLAN.md` |
@@ -32,12 +32,12 @@ Status:
 | B2 OpenAPI dan contract | Complete | Executable contract, generated types, cursor, dan parity fixtures lulus |
 | B3 Database dan seed | Complete | Migration, role, schema, repository, deterministic seed, dan PostgreSQL integration gate lokal selesai |
 | B4 Public read API | Complete | Lima public read route, cursor, ETag/304, 404, dan PostgreSQL-to-HTTP integration lulus |
-| B5 Contact transaction | Pending | Belum dimulai |
-| B6 Durable worker | Pending | Belum dimulai |
-| B7 Media pipeline | Pending | Belum dimulai |
-| B8 Redis dan security | Pending | Belum dimulai |
-| B9 Observability/operations | Pending | Belum dimulai |
-| B10 Quality gate | Pending | Belum dimulai |
+| B5 Contact transaction | Complete | Atomic message + email/activity jobs, idempotency, retention, dan strict HTTP validation lulus |
+| B6 Durable worker | Complete | PostgreSQL lease, bounded worker pool, retry/dead-letter, replay, dan crash recovery lulus |
+| B7 Media pipeline | Complete | Sanitized original, bounded WebP variants, local/S3 storage port, state machine, dan abuse test lulus |
+| B8 Redis dan security | Complete | Cache-aside fail-open, atomic rate limit + bounded fallback, CORS/proxy/header hardening lulus |
+| B9 Observability/operations | Complete | Health, protected metrics, trace propagation, retention scheduler, worker probe, dan runbook lulus lokal |
+| B10 Quality gate | Complete | Acceptance 1-33, race/lint/vuln/container/load, frontend/E2E/production smoke lulus |
 | B11 Optional remote pilot | Deferred | Membutuhkan instruksi owner |
 
 ## Update 1: Deep Analysis Sebelum Implementasi
@@ -711,6 +711,319 @@ Test diulang memakai workspace Go build cache dan seluruh package lulus.
 
 B5 contact transaction.
 
+## Update 7: B5 Contact Transaction
+
+**Tanggal:** 3 Agustus 2026
+**Status:** Complete
+
+### Output
+
+- `POST /api/v1/contact-messages` aktif hanya pada backend lokal shadow-mode.
+- Request wajib `application/json`, maksimal 32 KiB, tanpa unknown field atau
+  query parameter.
+- Validasi parity mencakup nama, email, telepon, subject, pesan, consent, dan
+  honeypot.
+- `Idempotency-Key` wajib 16-128 printable ASCII dan hanya digest HMAC-SHA256
+  yang disimpan.
+- Satu transaksi PostgreSQL membuat contact message, email notification job,
+  dan activity log job. Payload job hanya memuat contact message ID tanpa PII.
+- Replay payload identik menghasilkan `201` dengan
+  `Idempotency-Replayed: true`; payload berbeda menghasilkan `409`.
+- `retention_delete_at` dibatasi tepat 12 bulan dari consent dan maintenance
+  repository dapat menghapus record expired secara batch dengan `SKIP LOCKED`.
+- Production Next.js tetap mengirim ke Netlify Forms; tidak ada dual-write.
+
+### Evidence
+
+```text
+npm.cmd run backend:test: lulus
+npm.cmd run backend:test:integration: lulus dengan PostgreSQL disposable
+contact HTTP validation/replay/conflict: lulus
+message + 2 jobs transaction/replay/retention purge: lulus
+```
+
+### Next
+
+B6 durable worker.
+
+## Update 8: B6 Durable Worker
+
+**Tanggal:** 3 Agustus 2026
+**Status:** Complete
+
+### Output
+
+- PostgreSQL menjadi source of truth antrean; Redis tidak dibutuhkan untuk
+  menjamin delivery job.
+- Claim job bersifat atomic dengan `FOR UPDATE SKIP LOCKED`, lease owner, dan
+  lease expiry sehingga beberapa worker tidak memproses job yang sama.
+- Worker memakai channel berkapasitas terbatas dan dua goroutine default.
+- Handler yang lama memperpanjang lease melalui heartbeat setiap 30 detik.
+- Kegagalan memakai exponential backoff dengan jitter +/-20 persen, lalu
+  berpindah ke dead-letter setelah batas attempt.
+- Dead-letter dapat di-replay menjadi retry dan menghasilkan activity log
+  append-only pada transaksi yang sama.
+- Cancellation berhenti menerima pekerjaan baru, menunggu batch berjalan, dan
+  melepaskan lease agar job dapat diambil worker lain.
+- Email contact memakai adapter SMTP standard library; activity handler tetap
+  idempotent dan payload durable job tidak memuat PII.
+
+### Evidence
+
+```text
+npm.cmd run backend:test: lulus
+npm.cmd run backend:test:integration: lulus
+two-repository concurrent claim tanpa duplikasi: lulus
+expired lease crash/reclaim dan attempt increment: lulus
+dead-letter replay + activity log: lulus
+Windows Application Control fallback: lulus, final exit code 0
+```
+
+### Next
+
+B7 media pipeline.
+
+## Update 9: B7 Media Pipeline
+
+**Tanggal:** 3 Agustus 2026
+**Status:** Complete
+
+### Output
+
+- Ingest hanya tersedia melalui CLI internal `backend:media:import`; tidak ada
+  public atau admin upload endpoint.
+- Source dibatasi 10 MiB dan hanya menerima JPEG, PNG, atau static WebP setelah
+  magic-byte, decode-config, dan full-decode validation.
+- Animated WebP, data corrupt/truncated, sisi di atas 12.000 pixel, serta image
+  di atas 40 megapixel ditolak sebelum processing berat.
+- Orientasi EXIF diterapkan. Normalized original di-encode ulang sebagai PNG
+  privat sehingga metadata EXIF/GPS tidak ikut disimpan.
+- Width 320, 640, dan 1280 diproses menjadi WebP oleh maksimal dua goroutine;
+  target yang melebihi source dilewati tanpa upscale dan dicatat pada activity.
+- Object key memakai SHA-256 content address. Local adapter memakai atomic
+  create dan S3 adapter memakai `If-None-Match: *`; replay dengan byte berbeda
+  menghasilkan conflict.
+- Satu transaksi PostgreSQL membuat media `processing` dan durable job.
+  Seluruh variant harus tersimpan sebelum status `ready`; error menandai asset
+  `failed` agar retry/dead-letter B6 tetap dapat bekerja.
+- Migration v4 memberi runtime hanya `INSERT/UPDATE` pada dua tabel media;
+  DDL, delete, dan content publishing tetap tidak diberikan.
+
+### Evidence
+
+```text
+media unit + storage contract tests: lulus
+JPEG EXIF, PNG, static/animated WebP, corrupt, size/pixel abuse: lulus
+no-upscale dan WebP 320/640/1280: lulus
+S3 conditional-put/idempotency contract: lulus
+migration version=4 dirty=false
+npm.cmd run backend:test:integration: lulus
+PostgreSQL media ingest + handler replay tanpa duplikasi: lulus
+```
+
+### Boundary
+
+- S3 adapter belum diberi credential dan belum diuji ke bucket remote karena
+  remote pilot B11 masih deferred.
+- Object production Phase 1A dan Netlify tidak berubah.
+- Tidak ada commit, push, atau deployment.
+
+### Next
+
+B8 Redis cache, rate limiting, trusted proxy, CORS, dan HTTP hardening.
+
+## Update 10: B8 Redis dan Security Middleware
+
+**Tanggal:** 3 Agustus 2026
+**Status:** Complete
+
+### Output
+
+- Public page, catalog list, dan product detail memakai cache-aside Redis dengan
+  TTL dasar lima menit, jitter +/-10 persen, dan validation setelah decode.
+- `singleflight` menggabungkan concurrent miss untuk key yang sama agar tidak
+  memicu cache stampede ke PostgreSQL.
+- Redis error, corrupt value, atau generation lookup failure bersifat fail-open
+  ke PostgreSQL. Redis tidak menjadi source of truth.
+- Generation tag tersedia untuk `home`, `about`, `tauco-guide`, `products`, dan
+  `product:{slug}`. Invalidation cukup menaikkan generation tanpa scan/delete
+  key lama.
+- Lua Redis mengimplementasikan atomic fixed-window rate limit. Baseline public
+  read adalah 60 request/menit/IP dan contact 5 request/jam/IP.
+- Redis limiter failure otomatis memakai local limiter dengan map maksimal
+  10.000 key sehingga fallback tidak tumbuh tanpa batas.
+- Client IP diubah menjadi HMAC-SHA256 sebelum menjadi rate key dan tidak masuk
+  structured log. `X-Forwarded-For` hanya dipakai bila immediate proxy berada
+  pada `TRUSTED_PROXY_CIDRS`.
+- CORS hanya mengizinkan exact origin pada `CORS_ALLOWED_ORIGINS`; wildcard dan
+  origin dengan path ditolak. Preflight hanya menerima GET/POST.
+- Security headers, GET body rejection, strict contact Content-Type/body,
+  unknown query rejection, safe 405, recovery global, dan RFC 7807 mapper aktif.
+
+### Evidence
+
+```text
+npm.cmd run backend:test: lulus
+npm.cmd run backend:test:integration: lulus dengan PostgreSQL + Redis nyata
+cache miss/hit/corrupt/fail-open/singleflight/invalidation: lulus
+50 concurrent Redis rate checks: tepat 10 request diizinkan
+Redis-down local fallback dan memory bound: lulus
+composed API home/CORS/security/contact rate-limit: lulus in-process
+trusted vs untrusted proxy client-IP test: lulus
+npm.cmd run backend:vet: lulus
+npm.cmd run backend:build: lulus
+npm.cmd run backend:generate:check: lulus
+```
+
+### Boundary
+
+- Cache invalidator sudah executable tetapi baru akan dipanggil publish/unpublish
+  pada Phase 1C.
+- Redis remote belum dikonfigurasi; B8 diverifikasi terhadap container lokal.
+- Website production masih memakai content lokal dan Netlify Forms.
+- Tidak ada commit, push, deploy, atau cloud mutation.
+
+### Next
+
+B9 observability dan operations.
+
+## Update 11: B9 Observability dan Operations
+
+**Tanggal:** 3 Agustus 2026
+**Status:** Complete
+
+### Output
+
+- `/health/live` tetap murni process liveness tanpa network call.
+- `/health/ready` mewajibkan PostgreSQL; Redis dan local media storage boleh
+  berstatus `degraded` tanpa membocorkan endpoint atau credential.
+- `npm.cmd run backend:worker:ready` memeriksa PostgreSQL, media storage yang
+  writable, dan koneksi SMTP aktif.
+- `/internal/metrics` memakai bearer token khusus yang dibandingkan constant
+  time dan mengeluarkan Prometheus text tanpa label PII/high-cardinality.
+- HTTP count/latency/in-flight/problem, DB pool, cache, rate-limit, queue per
+  kind/status, media state, email job state, serta contact retention due dapat
+  diamati dari metrics.
+- Valid W3C `traceparent` dipropagasikan ke response dan trace ID masuk ke
+  structured access/panic log. Invalid traceparent diabaikan.
+- Worker menjalankan contact retention purge saat startup dan setiap 24 jam
+  dalam batch bounded sampai seluruh record jatuh tempo selesai.
+- CLI `backend:ops` menyediakan audited dead-job replay dan targeted cache
+  generation purge.
+- Runbook replay, media retry, cache purge, incident order, dan backup/restore
+  design berada di `backend/docs/OPERATIONS.md`.
+
+### Evidence
+
+```text
+npm.cmd run backend:test: lulus
+npm.cmd run backend:test:integration: lulus PostgreSQL + Redis nyata
+npm.cmd run backend:worker:ready: worker ready dengan Mailpit nyata
+npm.cmd run backend:ops -- cache-purge home: operation completed
+readiness PostgreSQL healthy: 200
+metrics tanpa bearer: 401
+metrics dengan bearer: 200 Prometheus text
+traceparent valid: dipropagasikan
+npm.cmd run backend:build: lulus
+```
+
+### Boundary
+
+- Metrics disajikan lokal; remote scraper/tracing exporter menunggu deployment
+  profile B11.
+- Backup pada B9 adalah desain dan runbook. Remote backup baru dapat diuji saat
+  provider dipilih owner.
+- Tidak ada perubahan production, commit, push, atau deployment.
+
+### Next
+
+B10 full quality gate dan penutupan Phase 1B lokal.
+
+## Update 12: B10 Quality Gate dan Phase 1B Local Completion
+
+**Tanggal:** 3 Agustus 2026
+**Status:** Complete
+
+### Output
+
+- Root wrapper tersedia untuk format, full backend check, race detector,
+  golangci-lint, govulncheck, load baseline, container build, frontend, E2E,
+  dan production smoke.
+- Race detector dijalankan dalam Linux container karena local Go Windows tidak
+  memiliki CGO compiler.
+- Empat reachable vulnerability pada AWS SDK EventStream/S3, pgx, dan quic-go
+  ditemukan lalu ditutup dengan dependency upgrade; final scan bersih.
+- Final Docker image memakai scratch runtime. Build context cache/tool/media
+  lokal dikecualikan dan turun dari 1,15 GB menjadi sekitar 11 KB.
+- Evidence acceptance 1-33 dibekukan pada `PHASE_1B_QUALITY_REPORT.md`.
+- Security findings dan residual risk tercatat di
+  `backend/docs/SECURITY_REVIEW.md`.
+
+### Evidence
+
+```text
+gofmt: 128 Go files formatted
+OpenAPI drift: reproducible
+npm.cmd run backend:check: exit 0
+go test -race ./...: lulus seluruh package
+go vet: lulus
+golangci-lint v2.11.4: 0 issues
+govulncheck v1.6.0: 0 reachable vulnerabilities
+npm audit --omit=dev: 0 vulnerabilities
+container build: tauco-api:phase1b-local lulus
+cold/warm: 65 ms; 200 request; p95 47 ms; p99 49 ms; error 0%
+frontend: lint/typecheck/85 unit/build lulus
+local E2E: 79 lulus, 13 intentional skip
+Phase 1A production smoke: 29/29 lulus
+```
+
+### Boundary
+
+- Phase 1B selesai lokal dan tetap shadow-mode.
+- B11 remote pilot tetap deferred sampai owner meminta secara eksplisit.
+- Tidak ada commit, push, deployment, cloud migration, frontend cutover, atau
+  contact cutover.
+
+### Next
+
+Atas instruksi owner, hapus unit-test files setelah evidence B10 dibekukan,
+tetapi pertahankan integration/architecture/contract/E2E regression gates.
+
+## Update 13: Unit-Test Cleanup atas Instruksi Owner
+
+**Tanggal:** 3 Agustus 2026
+**Status:** Complete
+
+### Dihapus
+
+- 42 Go unit-test files.
+- 6 frontend unit-test files pada `tests/unit`.
+- `vitest.config.ts`, `vitest.setup.ts`, serta dependency/script unit test yang
+  tidak lagi mempunyai consumer.
+
+### Dipertahankan
+
+- Clean Architecture dependency test.
+- B4 acceptance dan composed API integration.
+- OpenAPI contract test.
+- Redis/PostgreSQL integration dan migration embed test.
+- Seluruh Playwright E2E serta production smoke test.
+
+### Post-removal evidence
+
+```text
+frontend lint + typecheck + build: lulus
+OpenAPI generated drift: lulus
+remaining Go regression/integration: lulus
+go vet: lulus
+all backend command builds: lulus
+Windows-blocked architecture executable: lulus melalui Docker fallback
+```
+
+Unit-test result B10 tetap tercatat sebagai historical gate evidence sebelum
+file dihapus. Penghapusan ini mengurangi future fine-grained regression
+coverage dan dilakukan hanya karena instruksi eksplisit owner.
+
 ## B0 Checklist
 
 - [x] Audit PRD.
@@ -794,99 +1107,99 @@ B5 contact transaction.
 
 ## B5 Checklist
 
-- [ ] Contact validation parity.
-- [ ] Mandatory idempotency.
-- [ ] Message + email job + activity job transaction.
-- [ ] Consent metadata.
-- [ ] 12-month retention field.
-- [ ] Honeypot.
-- [ ] PII-free log.
-- [ ] Duplicate/conflict tests.
-- [ ] Retention test.
-- [ ] Netlify production tetap aktif.
-- [ ] Walkthrough update B5.
+- [x] Contact validation parity.
+- [x] Mandatory idempotency.
+- [x] Message + email job + activity job transaction.
+- [x] Consent metadata.
+- [x] 12-month retention field.
+- [x] Honeypot.
+- [x] PII-free log.
+- [x] Duplicate/conflict tests.
+- [x] Retention test.
+- [x] Netlify production tetap aktif.
+- [x] Walkthrough update B5.
 
 ## B6 Checklist
 
-- [ ] Atomic claim.
-- [ ] Lease.
-- [ ] Heartbeat.
-- [ ] Bounded channel.
-- [ ] Goroutine pool.
-- [ ] Retry/backoff/jitter.
-- [ ] Dead-letter.
-- [ ] Replay.
-- [ ] Graceful shutdown.
-- [ ] Two-worker concurrency test.
-- [ ] Crash/reclaim test.
-- [ ] Walkthrough update B6.
+- [x] Atomic claim.
+- [x] Lease.
+- [x] Heartbeat.
+- [x] Bounded channel.
+- [x] Goroutine pool.
+- [x] Retry/backoff/jitter.
+- [x] Dead-letter.
+- [x] Replay.
+- [x] Graceful shutdown.
+- [x] Two-worker concurrency test.
+- [x] Crash/reclaim test.
+- [x] Walkthrough update B6.
 
 ## B7 Checklist
 
-- [ ] Object storage port.
-- [ ] Local/test adapter.
-- [ ] S3 adapter.
-- [ ] Magic/decode validation.
-- [ ] Pixel/dimension limit.
-- [ ] EXIF orientation.
-- [ ] Metadata stripping.
-- [ ] Normalized original.
-- [ ] 320/640/1280 WebP.
-- [ ] No-upscale.
-- [ ] Idempotent object key.
-- [ ] Media state machine.
-- [ ] Abuse/failure tests.
-- [ ] Walkthrough update B7.
+- [x] Object storage port.
+- [x] Local/test adapter.
+- [x] S3 adapter.
+- [x] Magic/decode validation.
+- [x] Pixel/dimension limit.
+- [x] EXIF orientation.
+- [x] Metadata stripping.
+- [x] Normalized original.
+- [x] 320/640/1280 WebP.
+- [x] No-upscale.
+- [x] Idempotent object key.
+- [x] Media state machine.
+- [x] Abuse/failure tests.
+- [x] Walkthrough update B7.
 
 ## B8 Checklist
 
-- [ ] Redis adapter.
-- [ ] Cache-aside.
-- [ ] TTL jitter.
-- [ ] Singleflight.
-- [ ] Generation invalidation.
-- [ ] Redis fail-open.
-- [ ] Public rate limit.
-- [ ] Contact rate limit.
-- [ ] Local fallback.
-- [ ] Trusted proxy.
-- [ ] CORS.
-- [ ] Body/method/content-type limit.
-- [ ] Recovery/error mapper.
-- [ ] Walkthrough update B8.
+- [x] Redis adapter.
+- [x] Cache-aside.
+- [x] TTL jitter.
+- [x] Singleflight.
+- [x] Generation invalidation.
+- [x] Redis fail-open.
+- [x] Public rate limit.
+- [x] Contact rate limit.
+- [x] Local fallback.
+- [x] Trusted proxy.
+- [x] CORS.
+- [x] Body/method/content-type limit.
+- [x] Recovery/error mapper.
+- [x] Walkthrough update B8.
 
 ## B9 Checklist
 
-- [ ] Liveness.
-- [ ] API readiness.
-- [ ] Worker readiness.
-- [ ] Prometheus metrics.
-- [ ] Trace propagation.
-- [ ] DB/cache/job/media/email metrics.
-- [ ] Runbook replay.
-- [ ] Runbook cache purge.
-- [ ] Runbook media retry.
-- [ ] Backup design.
-- [ ] Walkthrough update B9.
+- [x] Liveness.
+- [x] API readiness.
+- [x] Worker readiness.
+- [x] Prometheus metrics.
+- [x] Trace propagation.
+- [x] DB/cache/job/media/email metrics.
+- [x] Runbook replay.
+- [x] Runbook cache purge.
+- [x] Runbook media retry.
+- [x] Backup design.
+- [x] Walkthrough update B9.
 
 ## B10 Checklist
 
-- [ ] Go unit.
-- [ ] Go integration.
-- [ ] Race.
-- [ ] Vet.
-- [ ] Lint.
-- [ ] Vulnerability scan.
-- [ ] OpenAPI drift.
-- [ ] Migration.
-- [ ] Container build.
-- [ ] Warm load.
-- [ ] Cold-start measurement.
-- [ ] Existing `npm.cmd run check`.
-- [ ] Existing E2E.
-- [ ] Phase 1A production smoke test.
-- [ ] Acceptance 1 sampai 33 mempunyai evidence.
-- [ ] Walkthrough update B10.
+- [x] Go unit (evidence historis sebelum cleanup atas instruksi owner).
+- [x] Go integration.
+- [x] Race.
+- [x] Vet.
+- [x] Lint.
+- [x] Vulnerability scan.
+- [x] OpenAPI drift.
+- [x] Migration.
+- [x] Container build.
+- [x] Warm load.
+- [x] Cold-start measurement.
+- [x] Existing `npm.cmd run check`.
+- [x] Existing E2E.
+- [x] Phase 1A production smoke test.
+- [x] Acceptance 1 sampai 33 mempunyai evidence.
+- [x] Walkthrough update B10.
 
 ## B11 Checklist
 

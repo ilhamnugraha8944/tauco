@@ -435,6 +435,8 @@ matrix AS (
               AND privilege_name = 'INSERT' THEN true
             WHEN table_name = 'background_jobs'
               AND privilege_name IN ('INSERT', 'UPDATE') THEN true
+            WHEN table_name IN ('media_assets', 'media_variants')
+              AND privilege_name IN ('INSERT', 'UPDATE') THEN true
             WHEN table_name = 'activity_logs'
               AND privilege_name = 'INSERT' THEN true
             ELSE false

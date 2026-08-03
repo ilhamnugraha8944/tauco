@@ -30,9 +30,9 @@ layanan backend. Bukti ada di
 | Contact form | Active; verified submission dan notification utama lulus |
 | Privacy notice | Phase 1A |
 | Metadata, canonical, sitemap, robots, JSON-LD | Phase 1A |
-| Go REST API | Phase 1B B4; lima public read route aktif lokal |
-| PostgreSQL | Phase 1B B3 complete; migration v3, seed, repository, dan integration lulus |
-| Redis | Compose local tersedia; container smoke B3, adapter dan integration B8 |
+| Go REST API | Phase 1B local complete; public/contact/health/protected metrics aktif lokal |
+| PostgreSQL | Phase 1B local complete; migration v4, durable job, media, retention, dan integration lulus |
+| Redis | Phase 1B local complete; cache-aside, atomic limiter, fail-open, dan metrics lulus |
 | Admin CMS | Future |
 | Inventory dan order management | Out of scope Phase 1 |
 
@@ -43,7 +43,6 @@ layanan backend. Bukti ada di
 - TypeScript 5
 - Tailwind CSS 4
 - Zod untuk validasi konten lokal
-- Vitest untuk unit test
 - Playwright dan axe untuk end-to-end/accessibility test
 - Lighthouse API untuk performance/SEO gate lokal
 - Netlify sebagai production hosting dan transport form
@@ -141,8 +140,6 @@ Jalankan script menggunakan `npm.cmd run <nama>`.
 | `start` | Menjalankan production build secara lokal |
 | `lint` | Menjalankan ESLint |
 | `typecheck` | Memeriksa TypeScript tanpa menulis output |
-| `test` | Menjalankan unit test sekali |
-| `test:watch` | Menjalankan unit test dalam watch mode |
 | `test:e2e` | Menjalankan Playwright end-to-end test |
 | `test:e2e:ui` | Membuka Playwright UI; jalankan server local secara terpisah |
 | `qa:g4:functional` | Menjalankan Functional QA terhadap Deploy Preview |
@@ -161,17 +158,29 @@ Jalankan script menggunakan `npm.cmd run <nama>`.
 | `lighthouse` | Build audit terpisah dan mengaudit empat route local sebanyak 3x |
 | `lighthouse:production` | Mengaudit empat route production sebanyak 3x |
 | `backend:dev` | Menjalankan API lokal pada `127.0.0.1:8080` |
+| `backend:worker` | Menjalankan durable background worker |
+| `backend:worker:ready` | Memeriksa readiness dependency worker |
+| `backend:media:import` | Ingest media internal tanpa HTTP upload |
+| `backend:ops` | Dead-job replay atau targeted cache purge |
+| `backend:load` | Mengukur cold-start dan warm-read baseline lokal |
 | `backend:migrate:up` | Menerapkan migration PostgreSQL lokal |
 | `backend:migrate:version` | Menampilkan versi dan dirty state migration |
 | `backend:seed:phase1a` | Mengimpor konten Phase 1A secara idempotent |
 | `backend:format` | Memformat seluruh package Go |
+| `backend:format:check` | Menolak Go source yang belum diformat |
 | `backend:generate` | Membuat ulang Go types/server contract dari OpenAPI |
 | `backend:generate:check` | Menolak drift antara OpenAPI dan generated Go code |
-| `backend:test` | Menjalankan seluruh unit test Go, termasuk fallback aman untuk Windows Application Control |
-| `backend:test:integration` | Menjalankan gate PostgreSQL disposable tanpa cache |
+| `backend:test` | Menjalankan regression Go yang dipertahankan, termasuk fallback Windows Application Control |
+| `backend:test:integration` | Menjalankan PostgreSQL disposable dan Redis integration |
+| `backend:race` | Menjalankan Go race detector di Linux container |
 | `backend:vet` | Menjalankan static analysis standar Go |
+| `backend:lint` | Menjalankan golangci-lint v2.11.4 di container |
+| `backend:vuln` | Menjalankan govulncheck v1.6.0 di container |
 | `backend:build` | Mengompilasi entrypoint API |
+| `backend:container:build` | Membuat image API local scratch runtime |
 | `backend:check` | Menjalankan codegen drift check, test, vet, dan build backend |
+| `backend:quality` | Menjalankan quality gate backend B10 lengkap |
+| `phase1b:quality` | Menjalankan backend, frontend, E2E, dan production smoke |
 | `backend:compose:up` | Menyalakan dependency local setelah Docker tersedia |
 | `backend:compose:down` | Menghentikan dependency local tanpa menghapus volume |
 | `check:frontend` | Menjalankan gate cepat frontend Phase 1A |
@@ -182,7 +191,6 @@ Quality gate lengkap sebelum handoff atau deployment mendatang:
 ```powershell
 npm.cmd run lint
 npm.cmd run typecheck
-npm.cmd run test
 npm.cmd run build
 npm.cmd run test:e2e
 npm.cmd run lighthouse
@@ -210,15 +218,16 @@ npm.cmd run backend:test
 ```
 
 B2 mendefinisikan lima public read route, contact intake, dua health route, dan
-protected metrics. Tidak ada route admin. B4 telah meregistrasikan lima public
-read route pada runtime lokal; contact, readiness, dan metrics tetap tidak
-diregistrasikan sampai gate masing-masing.
+protected metrics. Tidak ada route admin. B10 telah meregistrasikan public
+read, contact, readiness, protected metrics, trace propagation, dan operations
+tooling pada runtime lokal.
 
 Generated defaults yang menulis `err.Error()` tidak boleh dipakai. B4 memakai
 selective safe registration dan handwritten response factory pada package
 generated API. Unknown query, duplicate query, cursor, limit, published-only,
-ETag/304, dan true product 404 sudah diuji. Body limit, strict contact JSON,
-Content-Type, serta authorization metrics tetap menjadi gate B5/B8/B9.
+ETag/304, true product 404, body limit, strict contact JSON, Content-Type,
+cache, rate limit, CORS, dan trusted proxy sudah diuji. Authorization metrics
+memakai dedicated bearer token dan constant-time compare.
 
 Release evidence Phase 1A:
 
@@ -364,9 +373,7 @@ Workflow:
 7. Jalankan:
 
    ```powershell
-   npm.cmd run typecheck
-   npm.cmd run test
-   npm.cmd run build
+   npm.cmd run check:frontend
    ```
 
 8. Preview seluruh route yang terdampak, termasuk mobile viewport.
@@ -593,7 +600,7 @@ terbaru dari pemilik bisnis mengalahkan copy pemasaran.
 
 - Baca error schema dan path field.
 - Perbaiki data; jangan melemahkan schema hanya agar build lolos.
-- Jalankan unit test dan build ulang.
+- Jalankan `npm.cmd run check:frontend` dan E2E terkait setelah memperbaiki konten.
 
 ### Product route menjadi 404
 

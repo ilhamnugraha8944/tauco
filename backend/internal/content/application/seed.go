@@ -98,13 +98,13 @@ func (plan SeedPlan) Validate() error {
 	}
 	if len(pageKeys) != len(requiredPageKeys) {
 		return fmt.Errorf(
-			"Phase 1A seed must contain exactly %d singleton pages",
+			"phase 1A seed must contain exactly %d singleton pages",
 			len(requiredPageKeys),
 		)
 	}
 	for _, key := range requiredPageKeys {
 		if _, exists := pageKeys[key]; !exists {
-			return fmt.Errorf("Phase 1A seed is missing page %q", key)
+			return fmt.Errorf("phase 1A seed is missing page %q", key)
 		}
 	}
 
@@ -161,7 +161,7 @@ func validateRevisionSeed(revision RevisionSeed) error {
 	}
 	if revision.Status != domain.RevisionStatusPublished {
 		return fmt.Errorf(
-			"Phase 1A seed revision must be published, got %q",
+			"phase 1A seed revision must be published, got %q",
 			revision.Status,
 		)
 	}

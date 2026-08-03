@@ -152,9 +152,7 @@ func isCanonicalInteger(value string) bool {
 	if value == "0" {
 		return true
 	}
-	if strings.HasPrefix(value, "-") {
-		value = strings.TrimPrefix(value, "-")
-	}
+	value = strings.TrimPrefix(value, "-")
 	if len(value) == 0 || value[0] == '0' {
 		return false
 	}

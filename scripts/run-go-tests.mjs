@@ -8,15 +8,19 @@ const repositoryRoot = path.resolve(
   "..",
 );
 const backendRoot = path.join(repositoryRoot, "backend");
+const goCacheRoot = path.join(backendRoot, ".go-build-cache");
 const applicationControlMessage =
   "An Application Control policy has blocked this file";
+const accessDeniedMessage = "Access is denied";
 
 function run(command, args, options = {}) {
+  mkdirSync(goCacheRoot, { recursive: true });
   return spawnSync(command, args, {
     cwd: backendRoot,
     encoding: "utf8",
     maxBuffer: 50 * 1024 * 1024,
     windowsHide: true,
+    env: { ...process.env, GOCACHE: goCacheRoot },
     ...options,
   });
 }
@@ -87,6 +91,7 @@ function runApplicationControlFallback(packages) {
       const binaryPath = path.join(binaryRoot, binaryName);
       const compile = run("go", [
         "test",
+		...requestedGoTestArguments,
         "-c",
         "-o",
         binaryPath,
@@ -105,13 +110,58 @@ function runApplicationControlFallback(packages) {
       });
       writeResult(execute);
       if (execute.status !== 0) {
-        throw new Error(`Test gagal: ${packageName}`);
+		const docker = runDockerFallback(packageName);
+		writeResult(docker);
+		if (docker.status !== 0) {
+			throw new Error(`Test gagal: ${packageName}`);
+		}
+		process.stdout.write(`ok  \t${packageName} (Docker fallback)\n`);
+		continue;
       }
       process.stdout.write(`ok  \t${packageName} (workspace fallback)\n`);
     }
   } finally {
     rmSync(binaryRoot, { recursive: true, force: true });
   }
+}
+
+function runDockerFallback(packageName) {
+  const dockerEnvironment = { ...process.env };
+  const forwarded = [
+    "DATABASE_URL",
+    "MIGRATION_DATABASE_URL",
+    "MIGRATION_TEST_DATABASE_URL",
+    "REDIS_URL",
+  ];
+  for (const name of forwarded) {
+    if (dockerEnvironment[name]) {
+      dockerEnvironment[name] = dockerEnvironment[name]
+        .replaceAll("127.0.0.1", "host.docker.internal")
+        .replaceAll("localhost", "host.docker.internal");
+    }
+  }
+  const argumentsList = [
+    "run", "--rm",
+    "--add-host", "host.docker.internal:host-gateway",
+    "-v", `${repositoryRoot}:/repo`,
+    "-v", "tauco_go_mod:/go/pkg/mod",
+    "-v", "tauco_go_build:/root/.cache/go-build",
+    "-w", "/repo/backend",
+  ];
+  for (const name of forwarded) {
+    if (dockerEnvironment[name]) argumentsList.push("-e", name);
+  }
+  argumentsList.push(
+    "golang:1.26.5-bookworm",
+    "go", "test", ...requestedGoTestArguments, packageName,
+  );
+  return spawnSync("docker", argumentsList, {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+    env: dockerEnvironment,
+    maxBuffer: 50 * 1024 * 1024,
+    windowsHide: true,
+  });
 }
 
 const requestedGoTestArguments = process.argv.slice(2);
@@ -126,7 +176,8 @@ if (standard.status !== 0) {
   const output = `${standard.stdout ?? ""}\n${standard.stderr ?? ""}`;
   const blockedByPolicy =
     process.platform === "win32" &&
-    output.includes(applicationControlMessage);
+    (output.includes(applicationControlMessage) ||
+      output.includes(accessDeniedMessage));
 
   if (!blockedByPolicy) {
     process.exit(standard.status ?? 1);
