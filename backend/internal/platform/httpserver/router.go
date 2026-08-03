@@ -38,6 +38,7 @@ func NewRouter(options RouterOptions) (*gin.Engine, error) {
 
 	router.Use(
 		RequestIDMiddleware(options.RequestIDGenerator),
+		TraceContextMiddleware(),
 		RecoveryMiddleware(options.PanicReporter),
 	)
 	router.Use(options.Middleware...)

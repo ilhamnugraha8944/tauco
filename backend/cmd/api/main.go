@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -40,7 +41,18 @@ func run() int {
 		initializationContext,
 		cfg,
 		databaseConfig,
-		[]byte(os.Getenv("CURSOR_HMAC_SECRET")),
+		composition.PublicAPISecrets{
+			CursorHMAC:    []byte(os.Getenv("CURSOR_HMAC_SECRET")),
+			ContactHMAC:   []byte(os.Getenv("CONTACT_HMAC_SECRET")),
+			RateHMAC:      []byte(os.Getenv("RATE_LIMIT_HMAC_SECRET")),
+			MetricsBearer: []byte(os.Getenv("METRICS_BEARER_TOKEN")),
+		},
+		composition.PublicAPIInfrastructure{
+			RedisURL:          os.Getenv("REDIS_URL"),
+			CORSOrigins:       splitCSV(os.Getenv("CORS_ALLOWED_ORIGINS")),
+			TrustedProxyCIDRs: splitCSV(os.Getenv("TRUSTED_PROXY_CIDRS")),
+			MediaRoot:         os.Getenv("MEDIA_LOCAL_ROOT"),
+		},
 	)
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, "api initialization failed")
@@ -63,4 +75,14 @@ func run() int {
 		return 1
 	}
 	return 0
+}
+
+func splitCSV(value string) []string {
+	var result []string
+	for _, item := range strings.Split(value, ",") {
+		if item = strings.TrimSpace(item); item != "" {
+			result = append(result, item)
+		}
+	}
+	return result
 }
