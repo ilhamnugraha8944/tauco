@@ -17,6 +17,7 @@ import (
 	authdomain "github.com/ilhamnugraha8944/tauco/backend/internal/auth/domain"
 	authrepo "github.com/ilhamnugraha8944/tauco/backend/internal/auth/repository"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/platform/database"
+	"golang.org/x/term"
 )
 
 func main() {
@@ -70,7 +71,7 @@ func run(args []string, input io.Reader) error {
 	switch args[0] {
 	case "bootstrap", "reset-password":
 		fmt.Fprint(os.Stderr, "Password (input tidak ditampilkan oleh command): ")
-		password, err := bufio.NewReader(input).ReadString('\n')
+		password, err := readPassword(input)
 		if err != nil && !errors.Is(err, io.EOF) {
 			return err
 		}
@@ -88,6 +89,15 @@ func run(args []string, input io.Reader) error {
 	default:
 		return errors.New("unknown admin command")
 	}
+}
+
+func readPassword(input io.Reader) (string, error) {
+	if file, ok := input.(*os.File); ok && term.IsTerminal(int(file.Fd())) {
+		password, err := term.ReadPassword(int(file.Fd()))
+		fmt.Fprintln(os.Stderr)
+		return string(password), err
+	}
+	return bufio.NewReader(input).ReadString('\n')
 }
 
 func keygen(privatePath, publicPath string) error {
