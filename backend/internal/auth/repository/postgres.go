@@ -190,6 +190,9 @@ SET revoked_at = statement_timestamp()
 WHERE session_id = ? AND used_at IS NULL AND revoked_at IS NULL`, row.SessionID).Error; err != nil {
 				return err
 			}
+			if err := store.insertAudit(tx, "auth.refresh_reused", &row.UserID, &row.SessionID); err != nil {
+				return err
+			}
 			reused = true
 			return nil
 		}

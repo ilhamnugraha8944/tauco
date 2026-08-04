@@ -12,6 +12,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ilhamnugraha8944/tauco/backend/internal/auth"
+	authapp "github.com/ilhamnugraha8944/tauco/backend/internal/auth/application"
+	authrepo "github.com/ilhamnugraha8944/tauco/backend/internal/auth/repository"
 	catalogapp "github.com/ilhamnugraha8944/tauco/backend/internal/catalog/application"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/catalog/delivery/cursor"
 	catalogrepo "github.com/ilhamnugraha8944/tauco/backend/internal/catalog/repository"
@@ -32,11 +35,12 @@ import (
 
 // App owns the API process dependencies and their lifecycle.
 type App struct {
-	logger   *logging.Logger
-	handler  http.Handler
-	server   *httpserver.Server
-	database *sql.DB
-	cache    *platformcache.Redis
+	logger        *logging.Logger
+	handler       http.Handler
+	server        *httpserver.Server
+	database      *sql.DB
+	adminDatabase *sql.DB
+	cache         *platformcache.Redis
 }
 
 // New validates configuration and wires the B1 platform foundation.
@@ -57,6 +61,14 @@ type PublicAPIInfrastructure struct {
 	CORSOrigins       []string
 	TrustedProxyCIDRs []string
 	MediaRoot         string
+	AdminAuth         *AdminAuthOptions
+}
+
+type AdminAuthOptions struct {
+	Database       database.RuntimeConfig
+	Runtime        auth.Runtime
+	AllowedOrigins []string
+	SecureCookies  bool
 }
 
 func NewPublicAPI(
@@ -77,6 +89,7 @@ func NewPublicAPI(
 	closeDatabase := func() {
 		_ = sqlDatabase.Close()
 	}
+	var adminSQL *sql.DB
 
 	redisStore, err := platformcache.NewRedis(infrastructure.RedisURL)
 	if err != nil {
@@ -84,6 +97,9 @@ func NewPublicAPI(
 		return nil, err
 	}
 	closeAll := func() {
+		if adminSQL != nil {
+			_ = adminSQL.Close()
+		}
 		_ = redisStore.Close()
 		closeDatabase()
 	}
@@ -141,6 +157,37 @@ func NewPublicAPI(
 	}
 	localLimiter, _ := ratelimit.NewLocal(10_000)
 	limiter, _ := ratelimit.New(redisStore, localLimiter, metrics.ObserveRateLimit)
+	var adminAuthHandler *api.AdminAuthHandler
+	if options := infrastructure.AdminAuth; options != nil {
+		adminGORM, openErr := database.OpenAdminGORM(ctx, options.Database)
+		if openErr != nil {
+			closeAll()
+			return nil, openErr
+		}
+		adminSQL, err = adminGORM.DB()
+		if err != nil {
+			closeAll()
+			return nil, fmt.Errorf("access admin PostgreSQL pool: %w", err)
+		}
+		store, storeErr := authrepo.NewPostgres(adminGORM)
+		if storeErr != nil {
+			closeAll()
+			return nil, storeErr
+		}
+		service, serviceErr := authapp.NewService(store, options.Runtime.Tokens, options.Runtime.Secrets, options.Runtime.RecoverySecret)
+		if serviceErr != nil {
+			closeAll()
+			return nil, serviceErr
+		}
+		adminAuthHandler, err = api.NewAdminAuthHandler(service, limiter, api.AdminAuthConfig{
+			AllowedOrigins: options.AllowedOrigins, RateSecret: secrets.RateHMAC, SecureCookies: options.SecureCookies,
+			RequestID: func(c *gin.Context) string { id, _ := httpserver.RequestIDFromGinContext(c); return id },
+		})
+		if err != nil {
+			closeAll()
+			return nil, err
+		}
+	}
 	publicLimit, err := httpmiddleware.RateLimit(limiter, secrets.RateHMAC, httpmiddleware.RatePolicy{
 		Name: "public-read", Limit: 60, Window: time.Minute,
 	})
@@ -166,6 +213,9 @@ func NewPublicAPI(
 		trustedProxies: infrastructure.TrustedProxyCIDRs,
 		middleware:     []gin.HandlerFunc{metrics.HTTPMiddleware(), httpmiddleware.SecurityHeaders(), corsMiddleware},
 	}, func(router gin.IRouter) {
+		if adminAuthHandler != nil {
+			adminAuthHandler.Register(router)
+		}
 		api.RegisterSafePublicReadHandlers(
 			router,
 			publicReadServer,
@@ -191,6 +241,7 @@ func NewPublicAPI(
 		return nil, registrationError
 	}
 	app.database = sqlDatabase
+	app.adminDatabase = adminSQL
 	app.cache = redisStore
 	return app, nil
 }
@@ -313,12 +364,17 @@ func (a *App) Close() error {
 		databaseError = a.database.Close()
 		a.database = nil
 	}
+	var adminDatabaseError error
+	if a.adminDatabase != nil {
+		adminDatabaseError = a.adminDatabase.Close()
+		a.adminDatabase = nil
+	}
 	var cacheError error
 	if a.cache != nil {
 		cacheError = a.cache.Close()
 		a.cache = nil
 	}
-	return errors.Join(databaseError, cacheError, syncLogger(a.logger))
+	return errors.Join(databaseError, adminDatabaseError, cacheError, syncLogger(a.logger))
 }
 
 func syncLogger(logger *logging.Logger) error {

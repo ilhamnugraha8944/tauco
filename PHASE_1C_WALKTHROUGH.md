@@ -7,7 +7,7 @@
 | Tanggal mulai | 4 Agustus 2026 |
 | Branch | `feature/phase-1c` |
 | Baseline | `520d315` |
-| Status | C0-C2 complete; C3-C10 pending |
+| Status | C0-C3 complete; C4-C10 pending |
 | Production | Tidak berubah |
 
 Dokumen ini menjadi ledger pelaksanaan Phase 1C. Setiap gate diperbarui setelah
@@ -330,20 +330,106 @@ C3: auth API dan security middleware.
 - [x] Auth integration evidence.
 - [x] Walkthrough update C2.
 
+## Update C3: Auth API dan Security Middleware
+
+**Tanggal:** 4 Agustus 2026
+
+**Status:** Complete
+
+### Tujuan
+
+Mengaktifkan kontrak auth admin pada API lokal dengan browser security boundary,
+authorization, rate limiting, dan evidence abuse tanpa membuat UI atau BFF.
+
+### Perubahan
+
+- Mengaktifkan tujuh route auth: login, setup/enable TOTP, refresh, logout, me,
+  dan recovery-code regeneration.
+- Access/refresh disimpan pada cookie HttpOnly HostOnly; CSRF memakai cookie
+  terpisah. Seluruh cookie `SameSite=Strict`, `Path=/`, dan Secure configurable.
+- Mutation memerlukan exact Origin atau Referer, menolak Fetch Metadata
+  `cross-site`, serta membandingkan header/cookie/hash CSRF constant-time.
+- Login dibatasi 5/15 menit untuk HMAC IP+email; authenticated admin dibatasi
+  120/menit per admin melalui Redis dengan bounded local fallback.
+- Middleware permission reusable memeriksa permission dari session principal.
+- Seluruh response auth memakai `Cache-Control: no-store` dan error RFC7807.
+- Refresh reuse, login, setup, enable, refresh, logout, dan recovery dicatat
+  sebagai activity event tanpa memasukkan token atau secret.
+- Composition membuka pool admin terpisah hanya ketika konfigurasi C3 tersedia.
+
+### Keputusan arsitektur
+
+- API Go tetap authorization authority; UI/BFF C4 tidak akan menentukan role.
+- Route C3 menggunakan application service, tidak mengakses GORM dari handler.
+- Production tetap tidak berubah dan tidak menerima credential C3.
+- `Secure=false` hanya untuk HTTP loopback lokal; deployment HTTPS kelak wajib
+  `ADMIN_COOKIE_SECURE=true` pada Phase 1D.
+
+### Command yang dijalankan
+
+```powershell
+npm.cmd run backend:format
+npm.cmd run backend:test
+npm.cmd run backend:test:integration
+npm.cmd run backend:generate:check
+npm.cmd run backend:vet
+npm.cmd run backend:build
+npm.cmd run backend:migrate:version
+git diff --check
+```
+
+### Hasil pengujian
+
+```text
+seven auth routes: PASS
+cookie HostOnly/HttpOnly/SameSite/Path policy: PASS
+TOTP setup dan enable: PASS
+refresh rotation dan logout: PASS
+recovery-code regeneration: PASS
+CSRF missing: 403 PASS
+cross-site Origin/Fetch Metadata: 403 PASS
+permission missing: 403 PASS
+login attempt ke-6: 429 PASS
+auth activity evidence: PASS
+Phase 1B integration regression: PASS
+```
+
+### Evidence
+
+- Security flow dijalankan melalui HTTP terhadap database disposable dan
+  session/cookie jar nyata.
+- Permission dicabut melalui migrator fixture; endpoint account mengembalikan
+  403 sebelum use case dijalankan.
+- Login response tidak membedakan email, password, TOTP, atau recovery code
+  yang salah.
+- Local fallback limiter tetap bounded jika Redis tidak tersedia.
+- Tidak ada unit-test file baru, push, deploy, atau production cutover.
+
+### Known limitations
+
+- Belum ada Next.js BFF, halaman login, atau admin shell; itu C4.
+- Belum ada bootstrap akun owner permanen.
+- HTTPS cookie behavior diverifikasi lewat atribut/configuration, bukan deploy.
+- C3 tetap shadow-mode lokal.
+
+### Next gate
+
+C4: same-origin BFF dan admin shell.
+
 ## C3 Checklist: Auth API dan Security Middleware
 
-- [ ] Login.
-- [ ] TOTP setup/enable.
-- [ ] Refresh/logout/me.
-- [ ] Recovery code regeneration.
-- [ ] Cookie policy.
-- [ ] CSRF dan exact origin.
-- [ ] Fetch Metadata enforcement.
-- [ ] Login/admin rate limit.
-- [ ] RBAC/permission middleware.
-- [ ] Auth activity audit.
-- [ ] Security abuse evidence.
-- [ ] Walkthrough update C3.
+- [x] Login.
+- [x] TOTP setup/enable.
+- [x] Refresh/logout/me.
+- [x] Recovery code regeneration.
+- [x] Cookie policy.
+- [x] CSRF dan exact origin.
+- [x] Fetch Metadata enforcement.
+- [x] Login/admin rate limit.
+- [x] RBAC/permission middleware.
+- [x] Auth activity audit.
+- [x] Security abuse evidence.
+- [x] Walkthrough update C3.
 
 ## C4 Checklist: BFF dan Admin Shell
 

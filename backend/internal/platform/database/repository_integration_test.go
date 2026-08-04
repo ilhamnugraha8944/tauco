@@ -3,6 +3,7 @@ package database
 import (
 	"bytes"
 	"context"
+	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,7 +11,9 @@ import (
 	"image/color"
 	"image/png"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,6 +21,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"gorm.io/gorm"
 
@@ -43,6 +48,7 @@ import (
 	mediaprocessor "github.com/ilhamnugraha8944/tauco/backend/internal/media/processor"
 	mediarepo "github.com/ilhamnugraha8944/tauco/backend/internal/media/repository"
 	mediastorage "github.com/ilhamnugraha8944/tauco/backend/internal/media/storage"
+	"github.com/ilhamnugraha8944/tauco/backend/internal/platform/ratelimit"
 )
 
 const repositoryIntegrationLock int64 = 839_103_221_702
@@ -322,7 +328,7 @@ WHERE slug = 'cross-table-seed-collision'`).Error; err != nil {
 		t.Fatalf("admin GORM pool: %v", err)
 	}
 	defer adminSQL.Close()
-	assertAdminAuthLifecycle(t, ctx, adminGORM)
+	assertAdminAuthLifecycle(t, ctx, adminGORM, migrationGORM)
 
 	pageRepository, err := contentrepo.NewPostgresRepository(runtimeGORM)
 	if err != nil {
@@ -348,7 +354,7 @@ WHERE slug = 'cross-table-seed-collision'`).Error; err != nil {
 	)
 }
 
-func assertAdminAuthLifecycle(t *testing.T, ctx context.Context, db *gorm.DB) {
+func assertAdminAuthLifecycle(t *testing.T, ctx context.Context, db, migrationDB *gorm.DB) {
 	t.Helper()
 	store, err := authrepo.NewPostgres(db)
 	if err != nil {
@@ -362,6 +368,7 @@ func assertAdminAuthLifecycle(t *testing.T, ctx context.Context, db *gorm.DB) {
 	if err != nil {
 		t.Fatalf("NewTokenManager() error = %v", err)
 	}
+	assertJWTRejections(t, tokens, privateKey)
 	box, err := authdomain.NewSecretBox([]byte("0123456789abcdef0123456789abcdef"), "test-key")
 	if err != nil {
 		t.Fatalf("NewSecretBox() error = %v", err)
@@ -393,6 +400,10 @@ func assertAdminAuthLifecycle(t *testing.T, ctx context.Context, db *gorm.DB) {
 	if _, err := service.Login(ctx, email, password, &code, nil, "integration"); !errors.Is(err, authapp.ErrAuthentication) {
 		t.Fatalf("TOTP replay error = %v, want generic authentication error", err)
 	}
+	expiredCode, _ := authdomain.CurrentTOTP(setup.Secret, time.Now().Add(-2*time.Minute))
+	if _, err := service.Login(ctx, email, password, &expiredCode, nil, "integration"); !errors.Is(err, authapp.ErrAuthentication) {
+		t.Fatalf("expired TOTP error = %v, want generic authentication error", err)
+	}
 	recovery := enabled.Codes[0]
 	recovered, err := service.Login(ctx, email, password, nil, &recovery, "integration")
 	if err != nil || recovered.Principal.Level != authapp.LevelMFA {
@@ -414,6 +425,203 @@ func assertAdminAuthLifecycle(t *testing.T, ctx context.Context, db *gorm.DB) {
 	if _, err := service.ValidateAccess(ctx, rotated.Tokens.Access, true); !errors.Is(err, authapp.ErrUnauthorized) {
 		t.Fatalf("reused session access error = %v, want unauthorized", err)
 	}
+	assertAdminAuthHTTP(t, ctx, db, migrationDB, service)
+}
+
+func assertJWTRejections(t *testing.T, manager *authdomain.TokenManager, privateKey *rsa.PrivateKey) {
+	t.Helper()
+	userID, _ := uuid.NewV7()
+	sessionID, _ := uuid.NewV7()
+	now := time.Now()
+	claims := func(issuer string, audience jwt.ClaimStrings, expires time.Time) authdomain.AccessClaims {
+		return authdomain.AccessClaims{SessionID: sessionID.String(), MFA: true, RegisteredClaims: jwt.RegisteredClaims{
+			Issuer: issuer, Subject: userID.String(), Audience: audience, ID: uuid.NewString(),
+			IssuedAt: jwt.NewNumericDate(now), NotBefore: jwt.NewNumericDate(now.Add(-time.Second)), ExpiresAt: jwt.NewNumericDate(expires),
+		}}
+	}
+	sign := func(value authdomain.AccessClaims, typ, kid string, key *rsa.PrivateKey) string {
+		token := jwt.NewWithClaims(jwt.SigningMethodRS256, value)
+		token.Header["typ"] = typ
+		token.Header["kid"] = kid
+		raw, _ := token.SignedString(key)
+		return raw
+	}
+	otherPrivate, _, _ := authdomain.GenerateRSAKeyPair()
+	cases := []string{
+		sign(claims("wrong", jwt.ClaimStrings{"admin"}, now.Add(time.Minute)), "JWT", "test-key", privateKey),
+		sign(claims("integration", jwt.ClaimStrings{"wrong"}, now.Add(time.Minute)), "JWT", "test-key", privateKey),
+		sign(claims("integration", jwt.ClaimStrings{"admin"}, now.Add(time.Minute)), "wrong", "test-key", privateKey),
+		sign(claims("integration", jwt.ClaimStrings{"admin"}, now.Add(time.Minute)), "JWT", "wrong", privateKey),
+		sign(claims("integration", jwt.ClaimStrings{"admin"}, now.Add(time.Minute)), "JWT", "test-key", otherPrivate),
+		sign(claims("integration", jwt.ClaimStrings{"admin"}, now.Add(-time.Minute)), "JWT", "test-key", privateKey),
+	}
+	hs := jwt.NewWithClaims(jwt.SigningMethodHS256, claims("integration", jwt.ClaimStrings{"admin"}, now.Add(time.Minute)))
+	hs.Header["typ"] = "JWT"
+	hs.Header["kid"] = "test-key"
+	rawHS, _ := hs.SignedString([]byte("not-an-rsa-key"))
+	cases = append(cases, rawHS)
+	for index, raw := range cases {
+		if _, err := manager.Verify(raw); err == nil {
+			t.Fatalf("invalid JWT case %d accepted", index)
+		}
+	}
+}
+
+func assertAdminAuthHTTP(t *testing.T, ctx context.Context, db, migrationDB *gorm.DB, service *authapp.Service) {
+	t.Helper()
+	const origin, email, password = "http://admin.local", "api-owner@example.test", "another correct horse battery staple"
+	if err := service.BootstrapAdmin(ctx, email, password); err != nil {
+		t.Fatalf("bootstrap HTTP admin: %v", err)
+	}
+	local, _ := ratelimit.NewLocal(1_000)
+	limiter, _ := ratelimit.New(nil, local)
+	handler, err := api.NewAdminAuthHandler(service, limiter, api.AdminAuthConfig{
+		AllowedOrigins: []string{origin}, RateSecret: []byte("integration-rate-secret-at-least-32-bytes"), SecureCookies: false,
+	})
+	if err != nil {
+		t.Fatalf("NewAdminAuthHandler() error = %v", err)
+	}
+	router := gin.New()
+	handler.Register(router)
+	server := httptest.NewServer(router)
+	defer server.Close()
+	jar, _ := cookiejar.New(nil)
+	client := &http.Client{Jar: jar}
+	do := func(method, path, body, requestOrigin, csrf, fetchSite string) *http.Response {
+		t.Helper()
+		request, requestErr := http.NewRequest(method, server.URL+path, bytes.NewBufferString(body))
+		if requestErr != nil {
+			t.Fatalf("new auth request: %v", requestErr)
+		}
+		if body != "" {
+			request.Header.Set("Content-Type", "application/json")
+		}
+		if requestOrigin != "" {
+			request.Header.Set("Origin", requestOrigin)
+		}
+		if csrf != "" {
+			request.Header.Set("X-CSRF-Token", csrf)
+		}
+		if fetchSite != "" {
+			request.Header.Set("Sec-Fetch-Site", fetchSite)
+		}
+		response, requestErr := client.Do(request)
+		if requestErr != nil {
+			t.Fatalf("auth request: %v", requestErr)
+		}
+		return response
+	}
+	loginBody := `{"email":"` + email + `","password":"` + password + `"}`
+	response := do(http.MethodPost, "/api/v1/admin/auth/login", loginBody, origin, "", "same-origin")
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("login status = %d", response.StatusCode)
+	}
+	var loginResponse api.AdminAuthResponse
+	if err := json.NewDecoder(response.Body).Decode(&loginResponse); err != nil {
+		t.Fatalf("decode login: %v", err)
+	}
+	if len(response.Cookies()) != 3 {
+		t.Fatalf("login cookie count = %d, want 3", len(response.Cookies()))
+	}
+	for _, cookie := range response.Cookies() {
+		if cookie.Path != "/" || cookie.Domain != "" || cookie.SameSite != http.SameSiteStrictMode {
+			t.Fatalf("unsafe cookie attributes: %+v", cookie)
+		}
+		if cookie.Name != "tauco_admin_csrf" && !cookie.HttpOnly {
+			t.Fatalf("auth cookie is not HttpOnly: %s", cookie.Name)
+		}
+		if cookie.Name == "tauco_admin_csrf" && cookie.HttpOnly {
+			t.Fatal("CSRF cookie must be readable by the BFF/browser client")
+		}
+	}
+	response.Body.Close()
+	csrf := authCSRFCookie(t, client, server.URL)
+	response = do(http.MethodPost, "/api/v1/admin/auth/totp/setup", "", origin, csrf, "same-origin")
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("TOTP setup status = %d", response.StatusCode)
+	}
+	var setup api.AdminTotpSetupResponse
+	if err := json.NewDecoder(response.Body).Decode(&setup); err != nil {
+		t.Fatalf("decode TOTP setup: %v", err)
+	}
+	response.Body.Close()
+	code, _ := authdomain.CurrentTOTP(setup.Data.ManualKey, time.Now())
+	response = do(http.MethodPost, "/api/v1/admin/auth/totp/enable", `{"totpCode":"`+code+`"}`, origin, csrf, "same-origin")
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("TOTP enable status = %d", response.StatusCode)
+	}
+	response.Body.Close()
+	response = do(http.MethodGet, "/api/v1/admin/auth/me", "", "", "", "")
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("me status = %d", response.StatusCode)
+	}
+	response.Body.Close()
+	response = do(http.MethodPost, "/api/v1/admin/auth/refresh", "", origin, csrf, "same-origin")
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("refresh status = %d", response.StatusCode)
+	}
+	response.Body.Close()
+	csrf = authCSRFCookie(t, client, server.URL)
+	nextCode, _ := authdomain.CurrentTOTP(setup.Data.ManualKey, time.Now().Add(30*time.Second))
+	response = do(http.MethodPost, "/api/v1/admin/auth/recovery-codes/regenerate", `{"totpCode":"`+nextCode+`"}`, origin, csrf, "same-origin")
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("recovery regeneration status = %d", response.StatusCode)
+	}
+	response.Body.Close()
+	if err := migrationDB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec("SET LOCAL ROLE tauco_migrator").Error; err != nil {
+			return err
+		}
+		return tx.Exec(`DELETE FROM tauco_app.role_permissions WHERE permission_id = (SELECT id FROM tauco_app.permissions WHERE key = 'account.manage')`).Error
+	}); err != nil {
+		t.Fatalf("remove permission fixture: %v", err)
+	}
+	response = do(http.MethodPost, "/api/v1/admin/auth/recovery-codes/regenerate", `{"totpCode":"`+nextCode+`"}`, origin, csrf, "same-origin")
+	if response.StatusCode != http.StatusForbidden {
+		t.Fatalf("RBAC denial status = %d", response.StatusCode)
+	}
+	response.Body.Close()
+	response = do(http.MethodPost, "/api/v1/admin/auth/logout", "", "http://evil.test", csrf, "cross-site")
+	if response.StatusCode != http.StatusForbidden {
+		t.Fatalf("cross-site denial status = %d", response.StatusCode)
+	}
+	response.Body.Close()
+	response = do(http.MethodPost, "/api/v1/admin/auth/logout", "", origin, "", "same-origin")
+	if response.StatusCode != http.StatusForbidden {
+		t.Fatalf("CSRF denial status = %d", response.StatusCode)
+	}
+	response.Body.Close()
+	response = do(http.MethodPost, "/api/v1/admin/auth/logout", "", origin, csrf, "same-origin")
+	if response.StatusCode != http.StatusNoContent {
+		t.Fatalf("logout status = %d", response.StatusCode)
+	}
+	response.Body.Close()
+	for attempt := 1; attempt <= 6; attempt++ {
+		response = do(http.MethodPost, "/api/v1/admin/auth/login", `{"email":"rate@example.test","password":"invalid-password"}`, origin, "", "same-origin")
+		if attempt == 6 && response.StatusCode != http.StatusTooManyRequests {
+			t.Fatalf("login limiter status = %d", response.StatusCode)
+		}
+		response.Body.Close()
+	}
+	var auditCount int64
+	if err := db.Raw(`SELECT count(*) FROM tauco_app.activity_logs WHERE event_type LIKE 'auth.%'`).Scan(&auditCount).Error; err != nil || auditCount < 5 {
+		t.Fatalf("auth audit count = %d, error=%v", auditCount, err)
+	}
+}
+
+func authCSRFCookie(t *testing.T, client *http.Client, rawURL string) string {
+	t.Helper()
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		t.Fatalf("parse server URL: %v", err)
+	}
+	for _, cookie := range client.Jar.Cookies(parsed) {
+		if cookie.Name == "tauco_admin_csrf" {
+			return cookie.Value
+		}
+	}
+	t.Fatal("CSRF cookie not found")
+	return ""
 }
 
 func assertMediaPipeline(t *testing.T, ctx context.Context, runtimeDatabase *gorm.DB) {
