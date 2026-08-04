@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit",
     "test:e2e": "npm run build && node scripts/run-e2e.mjs",
     "test:e2e:ui": "playwright test --ui",
+    "test:admin": "node scripts/run-admin-e2e.mjs",
     "qa:g4:functional": "node scripts/run-e2e.mjs --config=playwright.g4.config.ts tests/e2e/g4-functional.spec.ts --project=chromium-desktop",
     "qa:g4:seo": "node scripts/run-e2e.mjs --config=playwright.g4.config.ts tests/e2e/g4-seo.spec.ts --project=chromium-desktop",
     "qa:g4:form": "node scripts/run-e2e.mjs --config=playwright.g4.config.ts tests/e2e/g4-form.spec.ts --project=chromium-desktop",

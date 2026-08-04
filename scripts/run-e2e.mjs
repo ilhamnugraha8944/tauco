@@ -6,6 +6,7 @@ const externalBaseUrl = process.env.PLAYWRIGHT_BASE_URL;
 const baseUrl = externalBaseUrl ?? "http://localhost:3000";
 const childEnvironment = {
   ...process.env,
+  ADMIN_CMS_ENABLED: process.env.ADMIN_CMS_ENABLED ?? "false",
   NEXT_PUBLIC_SITE_URL:
     process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
 };

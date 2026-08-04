@@ -14,9 +14,9 @@ Dokumentasi struktur dan cara kerja kode tersedia di
 [BACKEND_CODE_DOCUMENTATION.md](./BACKEND_CODE_DOCUMENTATION.md) serta
 [BACKEND_CODE_DOCUMENTATION.pdf](./BACKEND_CODE_DOCUMENTATION.pdf).
 
-**Phase 1C** sedang dikerjakan secara lokal. Gate C0-C3 telah membekukan scope
-serta menambahkan kontrak OpenAPI, migration CMS/auth, immutable revision, dan
-role database admin tanpa mengubah production. Kontrak dan progress ledger tersedia di
+**Phase 1C** sedang dikerjakan secara lokal. Gate C0-C4 telah menambahkan
+fondasi data dan auth, auth API, same-origin BFF, serta shell CMS lokal tanpa
+mengubah production. Kontrak dan progress ledger tersedia di
 [PHASE_1C_PLAN.md](./PHASE_1C_PLAN.md) serta
 [PHASE_1C_WALKTHROUGH.md](./PHASE_1C_WALKTHROUGH.md).
 
@@ -39,7 +39,7 @@ layanan backend. Bukti ada di
 | Go REST API | Phase 1B local complete; public/contact/health/protected metrics aktif lokal |
 | PostgreSQL | Phase 1B local complete; Phase 1C migration v6 dan role admin lulus lokal |
 | Redis | Phase 1B local complete; cache-aside, atomic limiter, fail-open, dan metrics lulus |
-| Admin CMS | Phase 1C C0-C3 complete; C4-C10 pending lokal; auth API aktif lokal |
+| Admin CMS | Phase 1C C0-C4 complete; C5-C10 pending lokal; login/TOTP/shell aktif lokal |
 | Inventory dan order management | Out of scope Phase 1 |
 
 ## Tech stack
@@ -112,12 +112,41 @@ PowerShell Windows dan tidak terhalang execution policy terhadap `npm.ps1`.
 
 Jangan commit `.env.local`.
 
+### Menjalankan login CMS Phase 1C
+
+CMS hanya aktif lokal. Pastikan `.env.local` berisi:
+
+```dotenv
+ADMIN_CMS_ENABLED=true
+ADMIN_API_ORIGIN=http://127.0.0.1:8080
+```
+
+Kemudian gunakan terminal terpisah:
+
+```powershell
+npm.cmd run backend:compose:up
+npm.cmd run backend:migrate:up
+npm.cmd run backend:admin -- bootstrap
+npm.cmd run backend:dev
+```
+
+```powershell
+npm.cmd run dev
+```
+
+Buka `http://localhost:3000/admin/login`, masuk dengan akun bootstrap, lalu
+hubungkan kunci TOTP ke aplikasi autentikator. Command bootstrap cukup sekali
+per akun. Jika akun sudah ada, jalankan backend dan frontend saja. Jangan
+gunakan akun atau key lokal untuk deployment.
+
 ## Environment variables
 
 | Variable | Wajib | Contoh | Keterangan |
 | --- | --- | --- | --- |
 | `NEXT_PUBLIC_SITE_URL` | Ya pada setiap build Netlify | `https://nama-site.netlify.app` | Absolute canonical origin tanpa path dan query |
 | `GOOGLE_SITE_VERIFICATION` | Tidak | Token Search Console | Isi setelah URL-prefix property dibuat |
+| `ADMIN_CMS_ENABLED` | Tidak; default `false` | `true` | Mengaktifkan route CMS hanya untuk development lokal Phase 1C |
+| `ADMIN_API_ORIGIN` | Ya saat CMS aktif | `http://127.0.0.1:8080` | Origin Go API server-only, tanpa path |
 
 Aturan `NEXT_PUBLIC_SITE_URL`:
 
@@ -147,6 +176,7 @@ Jalankan script menggunakan `npm.cmd run <nama>`.
 | `lint` | Menjalankan ESLint |
 | `typecheck` | Memeriksa TypeScript tanpa menulis output |
 | `test:e2e` | Menjalankan Playwright end-to-end test |
+| `test:admin` | Build dan menguji login/TOTP/shell CMS pada fixture HTTP lokal |
 | `test:e2e:ui` | Membuka Playwright UI; jalankan server local secara terpisah |
 | `qa:g4:functional` | Menjalankan Functional QA terhadap Deploy Preview |
 | `qa:g4:seo` | Memeriksa isolasi index preview, canonical, robots, dan sitemap |

@@ -7,7 +7,7 @@
 | Tanggal mulai | 4 Agustus 2026 |
 | Branch | `feature/phase-1c` |
 | Baseline | `520d315` |
-| Status | C0-C3 complete; C4-C10 pending |
+| Status | C0-C4 complete; C5-C10 pending |
 | Production | Tidak berubah |
 
 Dokumen ini menjadi ledger pelaksanaan Phase 1C. Setiap gate diperbarui setelah
@@ -431,18 +431,131 @@ C4: same-origin BFF dan admin shell.
 - [x] Security abuse evidence.
 - [x] Walkthrough update C3.
 
+## Update C4: Same-Origin BFF dan Admin Shell
+
+**Tanggal:** 4 Agustus 2026
+
+**Status:** Complete
+
+### Tujuan
+
+Menyediakan pintu masuk CMS lokal yang aman dan dapat digunakan melalui
+browser, tanpa memindahkan authorization dari Go API dan tanpa membuka route
+admin pada production Phase 1A.
+
+### Perubahan
+
+- Menambahkan feature flag server-only `ADMIN_CMS_ENABLED` dengan default
+  `false`; semua route `/admin` dan `/admin-api` menghasilkan 404 ketika flag
+  tidak aktif.
+- Menambahkan BFF catch-all dengan allowlist path dan method untuk tujuh auth
+  route C3. BFF meneruskan header yang dibutuhkan saja, termasuk cookie,
+  `Set-Cookie`, CSRF, Origin, dan request ID.
+- Menambahkan halaman login, enrollment TOTP, recovery code satu kali, shell
+  navigasi, halaman akun, regenerasi recovery code, dan logout.
+- Menambahkan refresh-and-retry satu kali pada response 401 tanpa menyimpan
+  access atau refresh token di Web Storage.
+- Menambahkan `noindex`, `nofollow`, `noarchive`, `no-store`, batas payload 64
+  KiB, timeout upstream, dan response 502 generik.
+- Menambahkan layout responsive light/dark berbasis preferensi sistem dengan
+  keyboard focus, reduced-motion, native form control, dan Phosphor Icons.
+- Menambahkan suite Playwright C4 berbasis HTTP fixture terpisah. Suite admin
+  dan suite publik memakai konfigurasi/environment yang terpisah.
+
+### Keputusan arsitektur
+
+- Go API tetap menjadi satu-satunya authorization authority; Next.js BFF tidak
+  menafsirkan role atau permission.
+- `ADMIN_API_ORIGIN` bersifat server-only dan tidak memakai prefix
+  `NEXT_PUBLIC_`.
+- BFF tidak menjadi proxy generik. Path dan method di luar kontrak auth C3
+  ditolak sebelum request mencapai backend.
+- UI C4 tidak menambah component library, form library, state library, atau
+  dependency baru.
+- Menu C5-C8 ditampilkan sebagai status belum tersedia, bukan route kosong.
+- CMS lokal memakai visual publik yang sudah ada dan tidak membuat aset brand
+  atau dokumentasi produk baru.
+
+### Command yang dijalankan
+
+```powershell
+npm.cmd run lint
+npm.cmd run typecheck
+npm.cmd run test:admin
+$env:ADMIN_CMS_ENABLED='false'; npm.cmd run build
+npm.cmd run test:e2e
+git diff --check
+```
+
+Production-disabled smoke dijalankan pada build dengan flag `false`:
+
+```text
+GET /             -> 200
+GET /admin/login  -> 404
+```
+
+### Hasil pengujian
+
+```text
+ESLint: PASS
+TypeScript: PASS
+admin production build: PASS
+admin desktop/mobile E2E: 6 passed
+admin axe light/dark: PASS
+BFF unknown path: 404 PASS
+BFF unsupported method: 405 PASS
+production-disabled admin route: 404 PASS
+Phase 1A regression: 79 passed, 13 expected browser-project skips
+```
+
+### Evidence
+
+- Login menghasilkan cookie melalui response upstream dan TOTP enrollment
+  mengarahkan user ke shell hanya setelah faktor kedua aktif.
+- Navigasi langsung ke shell dengan session password-level dikembalikan ke
+  setup TOTP; shell baru terbuka setelah `mfaEnabled` terverifikasi.
+- Recovery code ditampilkan sekali pada enrollment dan dapat diregenerasi dari
+  halaman akun dengan TOTP.
+- Header admin membawa `Cache-Control: private, no-store` dan
+  `X-Robots-Tag: noindex, nofollow, noarchive`; metadata admin juga noindex.
+- Browser desktop dan emulasi Pixel 7 menyelesaikan login, setup, navigation,
+  account, recovery regeneration, serta logout.
+- Axe tidak menemukan pelanggaran WCAG A/AA pada login light/dark maupun shell.
+- Screenshot desktop dan mobile ditinjau; tidak ada overflow, broken image,
+  atau public header/footer di area admin.
+- Build mode default mempertahankan homepage 200 dan menyembunyikan CMS dengan
+  true 404.
+- Seluruh 79 regression test publik tetap lulus dengan CMS disabled.
+- Tidak ada deployment, push, content cutover, contact cutover, atau credential
+  lokal yang masuk Git.
+
+### Known limitations
+
+- C4 hanya menyediakan auth dan shell. Media, editor page/product, inbox, dan
+  activity log mulai C5-C8.
+- E2E frontend memakai fixture HTTP deterministik; behavior auth Go terhadap
+  PostgreSQL/Redis sudah diuji terpisah pada C3.
+- Akun owner lokal tetap harus dibuat melalui CLI dan TOTP harus dihubungkan
+  ke aplikasi autentikator milik owner.
+- HTTPS Secure-cookie dan remote origin belum diuji karena deployment tetap
+  milik Phase 1D.
+
+### Next gate
+
+C5: Media CMS.
+
 ## C4 Checklist: BFF dan Admin Shell
 
-- [ ] `ADMIN_CMS_ENABLED` default false.
-- [ ] Same-origin admin BFF.
-- [ ] Exact path/method allowlist.
-- [ ] Cookie/CSRF/request ID forwarding.
-- [ ] Login dan setup TOTP UI.
-- [ ] Admin layout/navigation/account/logout.
-- [ ] Noindex/no-store.
-- [ ] Production-disabled 404/build.
-- [ ] Responsive/accessibility baseline.
-- [ ] Walkthrough update C4.
+- [x] `ADMIN_CMS_ENABLED` default false.
+- [x] Same-origin admin BFF.
+- [x] Exact path/method allowlist.
+- [x] Cookie/CSRF/request ID forwarding.
+- [x] Login dan setup TOTP UI.
+- [x] Admin layout/navigation/account/logout.
+- [x] Noindex/no-store.
+- [x] Production-disabled 404/build.
+- [x] Responsive/accessibility baseline.
+- [x] Walkthrough update C4.
 
 ## C5 Checklist: Media CMS
 
