@@ -14,7 +14,7 @@ Dokumentasi struktur dan cara kerja kode tersedia di
 [BACKEND_CODE_DOCUMENTATION.md](./BACKEND_CODE_DOCUMENTATION.md) serta
 [BACKEND_CODE_DOCUMENTATION.pdf](./BACKEND_CODE_DOCUMENTATION.pdf).
 
-**Phase 1C** sedang dikerjakan secara lokal. Gate C0-C4 telah menambahkan
+**Phase 1C** sedang dikerjakan secara lokal. Gate C0-C5 telah menambahkan
 fondasi data dan auth, auth API, same-origin BFF, serta shell CMS lokal tanpa
 mengubah production. Kontrak dan progress ledger tersedia di
 [PHASE_1C_PLAN.md](./PHASE_1C_PLAN.md) serta
@@ -39,7 +39,7 @@ layanan backend. Bukti ada di
 | Go REST API | Phase 1B local complete; public/contact/health/protected metrics aktif lokal |
 | PostgreSQL | Phase 1B local complete; Phase 1C migration v6 dan role admin lulus lokal |
 | Redis | Phase 1B local complete; cache-aside, atomic limiter, fail-open, dan metrics lulus |
-| Admin CMS | Phase 1C C0-C4 complete; C5-C10 pending lokal; login/TOTP/shell aktif lokal |
+| Admin CMS | Phase 1C C0-C5 complete; C6-C10 pending lokal; login/TOTP/shell/media aktif lokal |
 | Inventory dan order management | Out of scope Phase 1 |
 
 ## Tech stack

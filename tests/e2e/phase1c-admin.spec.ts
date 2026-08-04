@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { resolve } from "node:path";
 
 test("admin login, TOTP setup, shell, account, and logout", async ({ page }) => {
   const response = await page.goto("/admin/login");
@@ -37,6 +38,18 @@ test("admin login, TOTP setup, shell, account, and logout", async ({ page }) => 
   await page.getByLabel("Kode autentikator").fill("654321");
   await page.getByRole("button", { name: "Buat ulang kode" }).click();
   await expect(page.locator(".admin-recovery-list code")).toHaveCount(10);
+
+  await page.getByRole("link", { name: "Media" }).click();
+  await expect(page.getByRole("heading", { name: "Pustaka media" })).toBeVisible();
+  await page.getByLabel("File gambar").setInputFiles(resolve("public/images/tauco-dish-provisional.webp"));
+  await page.getByLabel("Alt text").fill("Tumis tahu dan sayuran dengan bumbu tauco");
+  await page.getByRole("button", { name: "Upload gambar" }).click();
+  await expect(page.getByText("Upload diterima. Varian WebP diproses oleh worker.")).toBeVisible();
+  await expect(page.locator(".admin-media-card")).toHaveCount(1);
+  await expect(page.locator(".admin-media-card img")).toBeVisible();
+
+  const mediaAccessibility = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+  expect(mediaAccessibility.violations).toEqual([]);
 
   const shellAccessibility = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   expect(shellAccessibility.violations).toEqual([]);

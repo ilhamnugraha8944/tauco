@@ -19,7 +19,7 @@ import { adminAPI, type AdminUser } from "@/features/admin/admin-api";
 const modules = [
   { label: "Konten", href: "/admin/content", icon: Article, available: true },
   { label: "Produk", icon: Package, available: false },
-  { label: "Media", icon: Images, available: false },
+  { label: "Media", href: "/admin/media", icon: Images, available: true },
   { label: "Inbox", icon: EnvelopeSimple, available: false },
   { label: "Aktivitas", icon: ClockCounterClockwise, available: false },
   { label: "Akun", href: "/admin/account", icon: UserCircle, available: true },
@@ -78,7 +78,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
               return (
                 <li key={item.label}>
                   {item.available && item.href ? (
-                    <Link href={item.href} className="admin-nav-link" aria-current={pathname === item.href ? "page" : undefined}>
+                    <Link href={item.href} className="admin-nav-link" aria-current={pathname.startsWith(item.href) ? "page" : undefined}>
                       <Icon size={20} aria-hidden="true" />
                       {item.label}
                     </Link>

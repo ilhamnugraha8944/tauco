@@ -5,7 +5,7 @@ import { getAdminAPIOrigin, isAdminCMSEnabled } from "@/features/admin/config";
 
 export const dynamic = "force-dynamic";
 
-const allowedRoutes = new Map<string, ReadonlySet<string>>([
+const exactRoutes = new Map<string, ReadonlySet<string>>([
   ["auth/login", new Set(["POST"])],
   ["auth/totp/setup", new Set(["POST"])],
   ["auth/totp/enable", new Set(["POST"])],
@@ -15,8 +15,18 @@ const allowedRoutes = new Map<string, ReadonlySet<string>>([
   ["auth/recovery-codes/regenerate", new Set(["POST"])],
 ]);
 
+const dynamicRoutes = [
+  { match: /^media$/, methods: new Set(["GET", "POST"]), target: (path: string) => `/api/v1/admin/${path}` },
+  { match: /^media\/[0-9a-f-]{36}$/, methods: new Set(["GET"]), target: (path: string) => `/api/v1/admin/${path}` },
+  { match: /^media\/[0-9a-f-]{36}\/retry$/, methods: new Set(["POST"]), target: (path: string) => `/api/v1/admin/${path}` },
+  { match: /^public-media\/[0-9a-f-]{36}\/display\.webp$/, methods: new Set(["GET"]), target: (path: string) => `/api/v1/${path.replace("public-media", "media")}` },
+  { match: /^public-media\/[0-9a-f-]{36}\/variants\/(320|640|1280)\.webp$/, methods: new Set(["GET"]), target: (path: string) => `/api/v1/${path.replace("public-media", "media")}` },
+] as const;
+
 const forwardedRequestHeaders = [
   "content-type",
+	"etag",
+	"content-length",
   "cookie",
   "origin",
   "referer",
@@ -64,7 +74,8 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<Respo
   }
 
   const path = (await context.params).path.join("/");
-  const methods = allowedRoutes.get(path);
+  const dynamicRoute = dynamicRoutes.find((route) => route.match.test(path));
+  const methods = exactRoutes.get(path) ?? dynamicRoute?.methods;
 
   if (!methods) {
     notFound();
@@ -77,16 +88,17 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<Respo
     });
   }
 
+  const payloadLimit = path === "media" && request.method === "POST" ? 10 * 1024 * 1024 + 64 * 1024 : 64 * 1024;
   const contentLength = Number(request.headers.get("content-length") ?? "0");
 
-  if (Number.isFinite(contentLength) && contentLength > 64 * 1024) {
-    return problem(413, "PAYLOAD_TOO_LARGE", "Payload admin melebihi batas 64 KiB.");
+  if (Number.isFinite(contentLength) && contentLength > payloadLimit) {
+    return problem(413, "PAYLOAD_TOO_LARGE", "Payload admin melebihi batas yang diizinkan.");
   }
 
   const body = request.method === "GET" ? undefined : await request.arrayBuffer();
 
-  if (body && body.byteLength > 64 * 1024) {
-    return problem(413, "PAYLOAD_TOO_LARGE", "Payload admin melebihi batas 64 KiB.");
+  if (body && body.byteLength > payloadLimit) {
+    return problem(413, "PAYLOAD_TOO_LARGE", "Payload admin melebihi batas yang diizinkan.");
   }
 
   const headers = new Headers();
@@ -99,7 +111,9 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<Respo
     }
   }
 
-  const target = new URL(`/api/v1/admin/${path}`, getAdminAPIOrigin());
+  const targetPath = dynamicRoute?.target(path) ?? `/api/v1/admin/${path}`;
+  const target = new URL(targetPath, getAdminAPIOrigin());
+  target.search = request.nextUrl.search;
 
   try {
     const upstream = await fetch(target, {

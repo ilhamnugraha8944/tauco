@@ -85,6 +85,10 @@ func (Image) Variants(normalized []byte) ([]mediaapp.GeneratedVariant, []int, er
 			targets = append(targets, width)
 		}
 	}
+	if len(targets) == 0 {
+		// Even a source narrower than the smallest preset needs one public WebP.
+		targets = append(targets, bounds.Dx())
+	}
 	type result struct {
 		variant mediaapp.GeneratedVariant
 		err     error

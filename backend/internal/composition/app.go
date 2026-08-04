@@ -23,6 +23,10 @@ import (
 	contentapp "github.com/ilhamnugraha8944/tauco/backend/internal/content/application"
 	contentrepo "github.com/ilhamnugraha8944/tauco/backend/internal/content/repository"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/delivery/api"
+	mediaapp "github.com/ilhamnugraha8944/tauco/backend/internal/media/application"
+	mediaprocessor "github.com/ilhamnugraha8944/tauco/backend/internal/media/processor"
+	mediarepo "github.com/ilhamnugraha8944/tauco/backend/internal/media/repository"
+	mediastorage "github.com/ilhamnugraha8944/tauco/backend/internal/media/storage"
 	platformcache "github.com/ilhamnugraha8944/tauco/backend/internal/platform/cache"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/platform/config"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/platform/database"
@@ -158,6 +162,7 @@ func NewPublicAPI(
 	localLimiter, _ := ratelimit.NewLocal(10_000)
 	limiter, _ := ratelimit.New(redisStore, localLimiter, metrics.ObserveRateLimit)
 	var adminAuthHandler *api.AdminAuthHandler
+	var adminMediaServer *api.AdminMediaServer
 	if options := infrastructure.AdminAuth; options != nil {
 		adminGORM, openErr := database.OpenAdminGORM(ctx, options.Database)
 		if openErr != nil {
@@ -187,6 +192,31 @@ func NewPublicAPI(
 			closeAll()
 			return nil, err
 		}
+		mediaRepository, mediaErr := mediarepo.NewPostgres(adminGORM)
+		if mediaErr != nil {
+			closeAll()
+			return nil, mediaErr
+		}
+		mediaStore, mediaErr := mediastorage.NewLocal(infrastructure.MediaRoot)
+		if mediaErr != nil {
+			closeAll()
+			return nil, mediaErr
+		}
+		mediaIngestor, mediaErr := mediaapp.NewIngestor(mediaRepository, mediaStore, mediaprocessor.Image{})
+		if mediaErr != nil {
+			closeAll()
+			return nil, mediaErr
+		}
+		mediaAdmin, mediaErr := mediaapp.NewAdminService(mediaRepository, cursorCodec)
+		if mediaErr != nil {
+			closeAll()
+			return nil, mediaErr
+		}
+		adminMediaServer, mediaErr = api.NewAdminMediaServer(mediaAdmin, mediaIngestor, mediaStore)
+		if mediaErr != nil {
+			closeAll()
+			return nil, mediaErr
+		}
 	}
 	publicLimit, err := httpmiddleware.RateLimit(limiter, secrets.RateHMAC, httpmiddleware.RatePolicy{
 		Name: "public-read", Limit: 60, Window: time.Minute,
@@ -215,6 +245,7 @@ func NewPublicAPI(
 	}, func(router gin.IRouter) {
 		if adminAuthHandler != nil {
 			adminAuthHandler.Register(router)
+			api.RegisterSafeMediaHandlers(router, adminMediaServer, adminAuthHandler, publicLimit)
 		}
 		api.RegisterSafePublicReadHandlers(
 			router,

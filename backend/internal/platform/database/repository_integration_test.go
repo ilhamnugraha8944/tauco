@@ -344,7 +344,7 @@ WHERE slug = 'cross-table-seed-collision'`).Error; err != nil {
 	assertPublicReadHTTP(t, pageRepository, productRepository)
 	assertContactTransaction(t, ctx, runtimeGORM, migrationGORM)
 	assertDurableJobClaims(t, ctx, runtimeGORM, migrationGORM)
-	assertMediaPipeline(t, ctx, runtimeGORM)
+	assertMediaPipeline(t, ctx, runtimeGORM, adminGORM)
 	assertCatalogPaginationProbe(
 		t,
 		ctx,
@@ -624,7 +624,7 @@ func authCSRFCookie(t *testing.T, client *http.Client, rawURL string) string {
 	return ""
 }
 
-func assertMediaPipeline(t *testing.T, ctx context.Context, runtimeDatabase *gorm.DB) {
+func assertMediaPipeline(t *testing.T, ctx context.Context, runtimeDatabase, adminDatabase *gorm.DB) {
 	t.Helper()
 	store, err := mediastorage.NewLocal(t.TempDir())
 	if err != nil {
@@ -689,7 +689,49 @@ func assertMediaPipeline(t *testing.T, ctx context.Context, runtimeDatabase *gor
 	if err := runtimeDatabase.Raw(`SELECT count(*) FROM tauco_app.media_variants WHERE media_asset_id = ?`, assetID).Scan(&replayVariantCount).Error; err != nil || replayVariantCount != 2 {
 		t.Fatalf("media variants after replay = %d, err=%v", replayVariantCount, err)
 	}
+
+	adminRepository, _ := mediarepo.NewPostgres(adminDatabase)
+	cursorCodec, _ := catalogcursor.NewHMACSHA256(bytes.Repeat([]byte{0x5c}, 32))
+	adminService, _ := mediaapp.NewAdminService(adminRepository, cursorCodec)
+	page, err := adminService.List(ctx, nil, intPointer(1))
+	if err != nil || len(page.Assets) != 1 || page.Assets[0].ID != assetID || len(page.Assets[0].Variants) != 2 {
+		t.Fatalf("admin media list = %+v, err=%v", page, err)
+	}
+	variant, err := adminService.ReadyVariant(ctx, assetID, nil)
+	if err != nil || variant.Width != 640 {
+		t.Fatalf("display variant = %+v, err=%v", variant, err)
+	}
+	if _, err := processor.Normalize([]byte("not-an-image")); err == nil {
+		t.Fatal("invalid image upload unexpectedly accepted")
+	}
+	if _, err := processor.Normalize(make([]byte, mediaapp.MaxUploadBytes+1)); err == nil {
+		t.Fatal("oversized image upload unexpectedly accepted")
+	}
+
+	fixture.SetNRGBA(0, 0, color.NRGBA{R: 1, G: 2, B: 3, A: 255})
+	encoded.Reset()
+	_ = png.Encode(&encoded, fixture)
+	failedID, _, err := ingestor.Ingest(ctx, encoded.Bytes(), "Ilustrasi retry media", false)
+	if err != nil {
+		t.Fatalf("ingest retry media: %v", err)
+	}
+	if err := repository.MarkFailed(ctx, failedID, "VARIANT_PROCESSING_FAILED"); err != nil {
+		t.Fatalf("mark failed media: %v", err)
+	}
+	var actorID string
+	if err := adminDatabase.Raw(`SELECT id::text FROM tauco_app.admin_users ORDER BY created_at LIMIT 1`).Scan(&actorID).Error; err != nil || actorID == "" {
+		t.Fatalf("load admin actor: id=%q err=%v", actorID, err)
+	}
+	retried, err := adminService.Retry(ctx, failedID, actorID)
+	if err != nil || retried.Status != "processing" {
+		t.Fatalf("retry media = %+v, err=%v", retried, err)
+	}
+	if _, err := adminService.Retry(ctx, assetID, actorID); !errors.Is(err, mediaapp.ErrRetryConflict) {
+		t.Fatalf("retry ready media err=%v, want conflict", err)
+	}
 }
+
+func intPointer(value int) *int { return &value }
 
 func assertDurableJobClaims(
 	t *testing.T,

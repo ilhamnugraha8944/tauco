@@ -33,8 +33,8 @@ Delivery dibagi agar website publik dapat diluncurkan lebih cepat:
   gate. Delivery
   dilakukan local-first dalam shadow-mode sehingga production Phase 1A tetap
   memakai konten lokal dan Netlify Forms.
-- **Phase 1C — implementing lokal:** C0-C4 complete. Fondasi data, auth API,
-  same-origin BFF, dan shell CMS tersedia lokal. C5-C10 melanjutkan media,
+- **Phase 1C — implementing lokal:** C0-C5 complete. Fondasi data, auth API,
+  same-origin BFF, shell CMS, dan media CMS tersedia lokal. C6-C10 melanjutkan
   publishing, product, inbox, operations, dan closeout dalam shadow-mode lokal.
 - **Phase 1D — future:** remote deployment, hardening, migration/cutover konten
   lokal dan contact, load/security test, backup, dan operational readiness.
@@ -170,7 +170,7 @@ inbox, dan audit trail.
 | Object storage dan image worker | `IMPLEMENTED-1B-LOCAL` | Local/S3 port, safe image pipeline, dan worker lokal |
 | Admin authentication | `IMPLEMENTING-1C-LOCAL` | C1-C4 complete lokal; password, TOTP, auth API, BFF, dan account shell aktif |
 | CMS homepage/about | `IMPLEMENTING-1C-LOCAL` | C1 revision foundation complete; runtime C6 |
-| Product/media CMS | `IMPLEMENTING-1C-LOCAL` | C1 archive/media relation complete; runtime C5 dan C7 |
+| Product/media CMS | `IMPLEMENTING-1C-LOCAL` | Media runtime C5 complete; product runtime C7 pending |
 | Inbox dan activity log | `IMPLEMENTING-1C-LOCAL` | C1 contract dan privilege foundation complete; runtime C8 |
 | Inventory dan order | `OUT-OF-SCOPE` | Phase 2 |
 
@@ -476,7 +476,7 @@ Jika berpindah ke custom domain:
 ## 11. Backend Architecture — Phase 1B dan 1C
 
 Phase 1B berstatus `IMPLEMENTED-1B-LOCAL`. Phase 1C berstatus
-`IMPLEMENTING-1C-LOCAL`: C0-C4 complete dan runtime C5-C10 masih pending.
+`IMPLEMENTING-1C-LOCAL`: C0-C5 complete dan runtime C6-C10 masih pending.
 Admin CMS tetap bukan dependency runtime Phase 1A.
 
 ### 11.0 Boundary delivery
@@ -575,7 +575,7 @@ OpenAPI menjadi contract dan divalidasi dalam CI.
 
 ### 11.5 Authentication dan authorization
 
-**Status:** `IMPLEMENTING-1C-LOCAL`; C1-C4 complete lokal, termasuk
+**Status:** `IMPLEMENTING-1C-LOCAL`; C1-C5 complete lokal, termasuk
 schema/contract, auth domain, auth API, BFF, dan shell CMS.
 
 - Role aktif Phase 1: `super_admin`; schema tetap siap untuk RBAC.

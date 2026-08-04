@@ -34,7 +34,7 @@ async function send<T>(path: string, init: RequestInit, retry = true): Promise<T
   const headers = new Headers(init.headers);
   const csrf = cookie("tauco_admin_csrf");
 
-  if (init.body) {
+  if (typeof init.body === "string") {
     headers.set("Content-Type", "application/json");
   }
 
@@ -93,4 +93,35 @@ export const adminAPI = {
   logout() {
     return send<void>("auth/logout", { method: "POST" }, false);
   },
+  listMedia() {
+    return send<{ data: AdminMedia[] }>("media?limit=50", { method: "GET" });
+  },
+  getMedia(id: string) {
+    return send<{ data: AdminMedia }>(`media/${id}`, { method: "GET" });
+  },
+  uploadMedia(input: { file: File; altText: string; decorative: boolean }) {
+    const body = new FormData();
+    body.set("file", input.file);
+    body.set("altText", input.altText);
+    body.set("decorative", String(input.decorative));
+    return send<{ data: AdminMedia }>("media", { method: "POST", body });
+  },
+  retryMedia(id: string) {
+    return send<{ data: AdminMedia }>(`media/${id}/retry`, { method: "POST" });
+  },
+};
+
+export type AdminMedia = {
+  id: string;
+  status: "processing" | "ready" | "failed";
+  mimeType: string;
+  width: number;
+  height: number;
+  bytes: number;
+  altText: string;
+  decorative: boolean;
+  lastErrorCode?: string;
+  variants: Array<{ width: number; height: number; bytes: number; url: string }>;
+  createdAt: string;
+  updatedAt: string;
 };

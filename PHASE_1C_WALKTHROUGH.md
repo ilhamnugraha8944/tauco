@@ -7,7 +7,7 @@
 | Tanggal mulai | 4 Agustus 2026 |
 | Branch | `feature/phase-1c` |
 | Baseline | `520d315` |
-| Status | C0-C4 complete; C5-C10 pending |
+| Status | C0-C5 complete; C6-C10 pending |
 | Production | Tidak berubah |
 
 Dokumen ini menjadi ledger pelaksanaan Phase 1C. Setiap gate diperbarui setelah
@@ -557,17 +557,116 @@ C5: Media CMS.
 - [x] Responsive/accessibility baseline.
 - [x] Walkthrough update C4.
 
+## Update C5: Media CMS
+
+**Tanggal:** 4 Agustus 2026
+
+**Status:** Complete
+
+### Tujuan
+
+Menyediakan pustaka media lokal yang aman, asynchronous, dapat dipakai ulang
+oleh editor CMS, dan tidak pernah mengekspos file original melalui route publik.
+
+### Perubahan
+
+- Mengaktifkan list, detail, upload multipart, retry, display, dan variant route
+  dari kontrak C1 dengan auth MFA, RBAC, CSRF, exact Origin, dan rate limit.
+- Memakai kembali normalizer, object store, durable job, worker, serta generator
+  WebP C1/B8; HTTP response upload tidak menunggu resize selesai.
+- Menambahkan query admin dengan cursor HMAC, status, error code, dan varian.
+- Menambahkan public route yang hanya membaca varian dari asset `ready`, membawa
+  ETag, dan tidak memiliki route untuk original.
+- Memperbaiki sumber lebih kecil dari 320px agar tetap menghasilkan satu WebP
+  display pada lebar aslinya tanpa upscaling.
+- Menambahkan BFF allowlist khusus media dengan batas upload 10 MiB, penerusan
+  binary/ETag, serta tetap menolak path lain.
+- Menambahkan UI pustaka media, upload, status polling hanya saat diperlukan,
+  retry eksplisit, empty/error/loading state, dan media picker reusable.
+
+### Keputusan arsitektur
+
+- API Go tetap memegang validasi, authorization, state transition, dan URL
+  publik; Next.js hanya BFF same-origin dan presentation.
+- File diperiksa lewat magic bytes dan full decode. JPEG, PNG, dan WebP statis
+  dinormalisasi menjadi PNG private sebelum worker membuat WebP 320/640/1280.
+- Upload identik menggunakan object key checksum dan tidak membuat job ganda.
+- Retry hanya berlaku untuk status `failed`, mereset durable job secara
+  transaction-safe, dan mencatat actor admin ke activity log.
+- Tidak ada dependency frontend/backend baru untuk C5.
+
+### Command yang dijalankan
+
+```powershell
+npm.cmd run backend:format
+npm.cmd run backend:generate:check
+npm.cmd run backend:test
+npm.cmd run backend:test:integration
+npm.cmd run backend:vet
+npm.cmd run backend:build
+npm.cmd run typecheck
+npm.cmd run lint
+npm.cmd run test:admin
+git diff --check
+```
+
+### Hasil pengujian
+
+```text
+OpenAPI generated drift: PASS
+backend repository/delivery/composition regression: PASS
+PostgreSQL media integration: PASS
+valid image ingest, dedupe, durable job, WebP worker: PASS
+admin list/detail, ready display, failed retry/conflict: PASS
+invalid magic bytes dan payload >10 MiB: REJECTED
+frontend TypeScript/ESLint/build: PASS
+desktop/mobile admin E2E: 6 passed
+media upload, thumbnail, polling state, axe WCAG A/AA: PASS
+go vet dan backend command build: PASS
+```
+
+Windows Application Control kembali memblokir beberapa executable Go temporary;
+runner resmi mengulang package terdampak dari workspace dan seluruh fallback
+berakhir `PASS`.
+
+### Evidence
+
+- Integration database disposable membuktikan satu upload membuat satu asset,
+  satu durable job, varian deterministik, dan activity log idempotent.
+- Replay worker tidak menggandakan varian atau activity log.
+- Admin list hanya memakai pool `tauco_admin_runtime`; worker tetap memakai
+  pool runtime yang terpisah.
+- Asset `processing` atau `failed` menghasilkan 404 pada route display publik.
+- Original tersimpan di object key private dan tidak memiliki HTTP route.
+- E2E desktop dan mobile menyelesaikan login MFA, membuka Media, upload file,
+  melihat thumbnail siap, dan tetap axe-clean.
+- BFF tetap memiliki exact path/method allowlist dan feature flag default false.
+- Tidak ada deploy, push, public content cutover, contact cutover, atau secret
+  lokal yang masuk Git.
+
+### Known limitations
+
+- Pemrosesan asynchronous nyata memerlukan API dan worker berjalan bersamaan.
+- Storage C5 masih filesystem lokal; adapter S3-compatible tetap disiapkan untuk
+  Phase 1D tanpa mengubah use case.
+- Media picker baru dipakai oleh editor mulai C6.
+- Production Phase 1A tetap tidak berubah dan CMS masih shadow-mode lokal.
+
+### Next gate
+
+C6: structured editor, immutable revision, preview, dan publishing Home/About.
+
 ## C5 Checklist: Media CMS
 
-- [ ] Authenticated multipart upload.
-- [ ] Existing image pipeline reused.
-- [ ] Media list/detail/status polling.
-- [ ] Retry failed media.
-- [ ] Media picker.
-- [ ] Ready display/variant route.
-- [ ] Original remains private.
-- [ ] Upload abuse evidence.
-- [ ] Walkthrough update C5.
+- [x] Authenticated multipart upload.
+- [x] Existing image pipeline reused.
+- [x] Media list/detail/status polling.
+- [x] Retry failed media.
+- [x] Media picker.
+- [x] Ready display/variant route.
+- [x] Original remains private.
+- [x] Upload abuse evidence.
+- [x] Walkthrough update C5.
 
 ## C6 Checklist: Homepage dan About CMS
 

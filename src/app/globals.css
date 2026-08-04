@@ -1326,6 +1326,212 @@ figcaption {
 
 }
 
+.admin-kicker {
+  margin: 0 0 0.65rem;
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 780;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.admin-media-page {
+  display: grid;
+  gap: 2rem;
+}
+
+.admin-media-upload {
+  display: grid;
+  grid-template-columns: minmax(12rem, 0.8fr) minmax(15rem, 1fr);
+  gap: 1rem 2rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: clamp(1rem, 3vw, 1.5rem);
+}
+
+.admin-media-upload > div:first-child {
+  grid-row: span 3;
+}
+
+.admin-media-upload h2,
+.admin-section-heading h2,
+.admin-media-library h3 {
+  margin: 0;
+}
+
+.admin-media-upload p,
+.admin-section-heading p {
+  margin: 0.45rem 0 0;
+  color: var(--muted);
+}
+
+.admin-field {
+  display: grid;
+  gap: 0.45rem;
+  font-weight: 680;
+}
+
+.admin-field input[type="text"],
+.admin-field input[type="file"] {
+  min-height: 2.8rem;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--background);
+  color: var(--text);
+  padding: 0.65rem 0.75rem;
+}
+
+.admin-field input:disabled {
+  opacity: 0.55;
+}
+
+.admin-check-field {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-weight: 650;
+}
+
+.admin-check-field input {
+  inline-size: 1.15rem;
+  block-size: 1.15rem;
+}
+
+.admin-media-upload .admin-primary-button {
+  justify-self: start;
+}
+
+.admin-status-message {
+  min-height: 1.5rem;
+  margin: -0.75rem 0;
+  color: var(--muted);
+}
+
+.admin-media-library {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.admin-section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.admin-media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13.5rem, 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-media-card {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.admin-media-preview {
+  display: grid;
+  aspect-ratio: 4 / 3;
+  place-items: center;
+  overflow: hidden;
+  background: var(--surface-strong);
+  color: var(--muted);
+}
+
+.admin-media-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.admin-media-meta {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.9rem;
+}
+
+.admin-media-meta strong {
+  min-height: 2.6em;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+}
+
+.admin-media-meta small,
+.admin-media-meta code {
+  color: var(--muted);
+}
+
+.admin-status {
+  width: fit-content;
+  border-radius: 999px;
+  background: var(--surface-strong);
+  padding: 0.22rem 0.55rem;
+  font-size: 0.7rem;
+  font-weight: 780;
+  text-transform: uppercase;
+}
+
+.admin-status-ready { color: var(--accent); }
+.admin-status-failed { color: var(--error); }
+
+.admin-media-picker {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.admin-media-picker legend {
+  padding-inline: 0.35rem;
+  font-weight: 740;
+}
+
+.admin-media-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 0.75rem;
+}
+
+.admin-media-picker-option {
+  display: grid;
+  gap: 0.5rem;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.55rem;
+}
+
+.admin-media-picker-option:has(input:checked) {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.admin-media-picker-option img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.admin-media-picker-option span {
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+@media (max-width: 767px) {
+  .admin-media-upload { grid-template-columns: 1fr; }
+  .admin-media-upload > div:first-child { grid-row: auto; }
+  .admin-section-heading { align-items: start; flex-direction: column; }
+  .admin-section-heading .admin-secondary-button { width: auto; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
