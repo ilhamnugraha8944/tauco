@@ -49,6 +49,8 @@ func TestMigrationRoundTripAndRuntimePrivileges(t *testing.T) {
 	rotatedMigrationRoleName := "tauco_migrator_rotated_test_" + suffix
 	mainLikeRuntimeRoleName := "tauco_main_runtime_test_" + suffix
 	runtimeRoleName := "tauco_runtime_test_" + suffix
+	mainLikeAdminRoleName := "tauco_main_admin_test_" + suffix
+	adminRoleName := "tauco_admin_test_" + suffix
 	if len(migrationRoleName) > 63 {
 		migrationRoleName = migrationRoleName[:63]
 	}
@@ -61,10 +63,18 @@ func TestMigrationRoundTripAndRuntimePrivileges(t *testing.T) {
 	if len(mainLikeRuntimeRoleName) > 63 {
 		mainLikeRuntimeRoleName = mainLikeRuntimeRoleName[:63]
 	}
+	if len(mainLikeAdminRoleName) > 63 {
+		mainLikeAdminRoleName = mainLikeAdminRoleName[:63]
+	}
+	if len(adminRoleName) > 63 {
+		adminRoleName = adminRoleName[:63]
+	}
 	const migrationPassword = "B3-migration-only-test-password"
 	const rotatedMigrationPassword = "B3-rotated-migration-test-password"
 	const mainLikeRuntimePassword = "B3-main-runtime-only-test-password"
 	const runtimePassword = "B3-runtime-only-test-password"
+	const mainLikeAdminPassword = "C1-main-admin-only-test-password"
+	const adminPassword = "C1-admin-only-test-password"
 
 	mainLikeDatabaseIdentifier := pgx.Identifier{mainLikeDatabaseName}.Sanitize()
 	if _, err := admin.Exec(ctx, "CREATE DATABASE "+mainLikeDatabaseIdentifier); err != nil {
@@ -100,6 +110,14 @@ func TestMigrationRoundTripAndRuntimePrivileges(t *testing.T) {
 			context.Background(),
 			"DROP ROLE IF EXISTS "+pgx.Identifier{mainLikeRuntimeRoleName}.Sanitize(),
 		)
+		_, _ = admin.Exec(
+			context.Background(),
+			"DROP ROLE IF EXISTS "+pgx.Identifier{mainLikeAdminRoleName}.Sanitize(),
+		)
+		_, _ = admin.Exec(
+			context.Background(),
+			"DROP ROLE IF EXISTS "+pgx.Identifier{adminRoleName}.Sanitize(),
+		)
 	}()
 
 	mainLikeBootstrapURL := replaceDatabaseAndUser(
@@ -116,9 +134,17 @@ func TestMigrationRoundTripAndRuntimePrivileges(t *testing.T) {
 		mainLikeRuntimeRoleName,
 		mainLikeRuntimePassword,
 	)
+	mainLikeAdminURL := replaceDatabaseAndUser(
+		t,
+		baseURL,
+		mainLikeDatabaseName,
+		mainLikeAdminRoleName,
+		mainLikeAdminPassword,
+	)
 	mainLikeConfig := MigrationConfig{
 		MigrationURL:   mainLikeBootstrapURL,
 		RuntimeURL:     mainLikeRuntimeURL,
+		AdminURL:       mainLikeAdminURL,
 		BootstrapRoles: true,
 	}
 	if err := BootstrapRoles(ctx, mainLikeConfig); err != nil {
@@ -144,9 +170,17 @@ func TestMigrationRoundTripAndRuntimePrivileges(t *testing.T) {
 		runtimeRoleName,
 		runtimePassword,
 	)
+	adminURL := replaceDatabaseAndUser(
+		t,
+		baseURL,
+		databaseName,
+		adminRoleName,
+		adminPassword,
+	)
 	cfg := MigrationConfig{
 		MigrationURL:   bootstrapURL,
 		RuntimeURL:     runtimeURL,
+		AdminURL:       adminURL,
 		BootstrapRoles: true,
 	}
 	if err := BootstrapRoles(ctx, cfg); err != nil {
@@ -196,7 +230,7 @@ func TestMigrationRoundTripAndRuntimePrivileges(t *testing.T) {
 	if err := migrator.Up(); err != nil {
 		t.Fatalf("migration Up() error = %v", err)
 	}
-	assertMigrationVersion(t, migrator, 4)
+	assertMigrationVersion(t, migrator, 5)
 	if err := BootstrapRoles(ctx, cfg); err != nil {
 		t.Fatalf("post-migration idempotent BootstrapRoles() error = %v", err)
 	}
@@ -238,20 +272,20 @@ func TestMigrationRoundTripAndRuntimePrivileges(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewMigrator(rotated login) error = %v", err)
 	}
-	assertMigrationVersion(t, rotatedMigrator, 4)
+	assertMigrationVersion(t, rotatedMigrator, 5)
 	if err := rotatedMigrator.DownOne(); err != nil {
 		t.Fatalf("rotated migration DownOne() error = %v", err)
 	}
-	assertMigrationVersion(t, rotatedMigrator, 3)
+	assertMigrationVersion(t, rotatedMigrator, 4)
 	if err := rotatedMigrator.Up(); err != nil {
 		t.Fatalf("rotated migration Up() error = %v", err)
 	}
-	assertMigrationVersion(t, rotatedMigrator, 4)
+	assertMigrationVersion(t, rotatedMigrator, 5)
 	if err := rotatedMigrator.Close(); err != nil {
 		t.Fatalf("close rotated migrator: %v", err)
 	}
 
-	assertRoleSecurity(t, ctx, ownerConn, migrationRoleName, runtimeRoleName)
+	assertRoleSecurity(t, ctx, ownerConn, migrationRoleName, runtimeRoleName, adminRoleName)
 	assertSingleMembership(
 		t,
 		ctx,
@@ -259,19 +293,36 @@ func TestMigrationRoundTripAndRuntimePrivileges(t *testing.T) {
 		mainLikeRuntimeRoleName,
 		RuntimeRole,
 	)
-	assertRuntimeDatabaseGrants(
+	assertSingleMembership(
 		t,
 		ctx,
 		ownerConn,
+		mainLikeAdminRoleName,
+		AdminRuntimeRole,
+	)
+	assertAuthorizationDatabaseGrants(
+		t,
+		ctx,
+		ownerConn,
+		RuntimeRole,
 		runtimeRoleName,
 		databaseName,
 	)
-	assertRuntimeDatabaseGrants(
+	assertAuthorizationDatabaseGrants(
 		t,
 		ctx,
 		ownerConn,
+		RuntimeRole,
 		mainLikeRuntimeRoleName,
 		mainLikeDatabaseName,
+	)
+	assertAuthorizationDatabaseGrants(
+		t,
+		ctx,
+		ownerConn,
+		AdminRuntimeRole,
+		adminRoleName,
+		databaseName,
 	)
 	mainLikeRuntimeConn, err := pgx.Connect(ctx, mainLikeRuntimeURL)
 	if err != nil {
@@ -288,6 +339,7 @@ func TestMigrationRoundTripAndRuntimePrivileges(t *testing.T) {
 	mainLikeRuntimeConn.Close(ctx)
 	assertPublishedRevisionIntegrity(t, ctx, ownerConn)
 	assertActivityLogAppendOnly(t, ctx, ownerConn)
+	assertAdminCMSFoundation(t, ctx, ownerConn)
 
 	runtimeConn, err := pgx.Connect(ctx, runtimeURL)
 	if err != nil {
@@ -295,6 +347,13 @@ func TestMigrationRoundTripAndRuntimePrivileges(t *testing.T) {
 	}
 	assertRuntimePrivileges(t, ctx, runtimeConn)
 	runtimeConn.Close(ctx)
+
+	adminConn, err := pgx.Connect(ctx, adminURL)
+	if err != nil {
+		t.Fatalf("connect with admin runtime login: %v", err)
+	}
+	assertAdminPrivileges(t, ctx, adminConn)
+	adminConn.Close(ctx)
 
 	if err := migrator.DownAll(); err != nil {
 		t.Fatalf("migration DownAll() error = %v", err)
@@ -305,7 +364,7 @@ func TestMigrationRoundTripAndRuntimePrivileges(t *testing.T) {
 	if err := migrator.Up(); err != nil {
 		t.Fatalf("second migration Up() error = %v", err)
 	}
-	assertMigrationVersion(t, migrator, 4)
+	assertMigrationVersion(t, migrator, 5)
 	if err := migrator.DownAll(); err != nil {
 		t.Fatalf("second migration DownAll() error = %v", err)
 	}
@@ -343,7 +402,7 @@ WHERE table_schema = 'tauco_app'
 		t.Fatalf("count private app tables: %v", err)
 	}
 	if appCount != 9 {
-		t.Fatalf("private app table count = %d, want 9", appCount)
+		t.Fatalf("Phase 1B private app table count = %d, want 9", appCount)
 	}
 
 	var metadataCount int
@@ -421,14 +480,17 @@ func assertRoleSecurity(
 	conn *pgx.Conn,
 	migrationLogin string,
 	runtimeLogin string,
+	adminLogin string,
 ) {
 	t.Helper()
 
 	for _, roleName := range []string{
 		MigratorRole,
 		RuntimeRole,
+		AdminRuntimeRole,
 		migrationLogin,
 		runtimeLogin,
+		adminLogin,
 	} {
 		var (
 			canLogin    bool
@@ -457,10 +519,10 @@ WHERE rolname = $1`, roleName).Scan(
 		); err != nil {
 			t.Fatalf("inspect role %s: %v", roleName, err)
 		}
-		if (roleName == runtimeLogin || roleName == migrationLogin) && !canLogin {
+		if (roleName == runtimeLogin || roleName == migrationLogin || roleName == adminLogin) && !canLogin {
 			t.Errorf("database login %s cannot login", roleName)
 		}
-		if roleName != runtimeLogin && roleName != migrationLogin && canLogin {
+		if roleName != runtimeLogin && roleName != migrationLogin && roleName != adminLogin && canLogin {
 			t.Errorf("authorization role %s unexpectedly has LOGIN", roleName)
 		}
 		if superuser || createDB || createRole || replication || bypassRLS {
@@ -478,8 +540,8 @@ SELECT member.rolname, granted.rolname, membership.admin_option
 FROM pg_auth_members AS membership
 JOIN pg_roles AS member ON member.oid = membership.member
 JOIN pg_roles AS granted ON granted.oid = membership.roleid
-WHERE member.rolname IN ($1, $2)
-ORDER BY member.rolname, granted.rolname`, migrationLogin, runtimeLogin)
+WHERE member.rolname IN ($1, $2, $3)
+ORDER BY member.rolname, granted.rolname`, migrationLogin, runtimeLogin, adminLogin)
 	if err != nil {
 		t.Fatalf("query database role memberships: %v", err)
 	}
@@ -495,8 +557,8 @@ ORDER BY member.rolname, granted.rolname`, migrationLogin, runtimeLogin)
 	if err := rows.Err(); err != nil {
 		t.Fatalf("iterate database role memberships: %v", err)
 	}
-	if len(memberships) != 2 {
-		t.Fatalf("database login memberships = %+v, want exactly two", memberships)
+	if len(memberships) != 3 {
+		t.Fatalf("database login memberships = %+v, want exactly three", memberships)
 	}
 	for _, value := range memberships {
 		if value.adminOption {
@@ -511,6 +573,10 @@ ORDER BY member.rolname, granted.rolname`, migrationLogin, runtimeLogin)
 			if value.grantedRole != RuntimeRole {
 				t.Errorf("runtime login membership = %+v", value)
 			}
+		case adminLogin:
+			if value.grantedRole != AdminRuntimeRole {
+				t.Errorf("admin login membership = %+v", value)
+			}
 		default:
 			t.Errorf("unexpected membership = %+v", value)
 		}
@@ -521,7 +587,7 @@ ORDER BY member.rolname, granted.rolname`, migrationLogin, runtimeLogin)
 SELECT count(*)
 FROM pg_auth_members AS membership
 JOIN pg_roles AS member ON member.oid = membership.member
-WHERE member.rolname IN ($1, $2)`, MigratorRole, RuntimeRole).Scan(
+WHERE member.rolname IN ($1, $2, $3)`, MigratorRole, RuntimeRole, AdminRuntimeRole).Scan(
 		&nestedAuthorizationMemberships,
 	); err != nil {
 		t.Fatalf("count nested authorization memberships: %v", err)
@@ -534,10 +600,11 @@ WHERE member.rolname IN ($1, $2)`, MigratorRole, RuntimeRole).Scan(
 	}
 }
 
-func assertRuntimeDatabaseGrants(
+func assertAuthorizationDatabaseGrants(
 	t *testing.T,
 	ctx context.Context,
 	conn *pgx.Conn,
+	authorizationRole string,
 	runtimeLogin string,
 	databaseName string,
 ) {
@@ -549,7 +616,7 @@ SELECT count(*)
 FROM pg_database AS database
 CROSS JOIN LATERAL aclexplode(database.datacl) AS acl
 JOIN pg_roles AS role ON role.oid = acl.grantee
-WHERE role.rolname = $1`, RuntimeRole).Scan(&authorizationRoleGrants); err != nil {
+WHERE role.rolname = $1`, authorizationRole).Scan(&authorizationRoleGrants); err != nil {
 		t.Fatalf("count runtime authorization database grants: %v", err)
 	}
 	if authorizationRoleGrants != 0 {
@@ -673,6 +740,128 @@ INSERT INTO tauco_app.contact_messages (
 	if err != nil {
 		t.Fatalf("runtime insert contact message: %v", err)
 	}
+}
+
+func assertAdminPrivileges(t *testing.T, ctx context.Context, conn *pgx.Conn) {
+	t.Helper()
+
+	var searchPath string
+	if err := conn.QueryRow(ctx, "SHOW search_path").Scan(&searchPath); err != nil {
+		t.Fatalf("read admin search_path: %v", err)
+	}
+	if searchPath != "tauco_app, pg_catalog" {
+		t.Fatalf("admin search_path = %q", searchPath)
+	}
+
+	var permissionCount int
+	if err := conn.QueryRow(ctx, "SELECT count(*) FROM tauco_app.permissions").Scan(&permissionCount); err != nil {
+		t.Fatalf("admin SELECT permissions: %v", err)
+	}
+	if permissionCount != 12 {
+		t.Fatalf("admin permission count = %d, want 12", permissionCount)
+	}
+
+	if _, err := conn.Exec(ctx, `
+INSERT INTO tauco_app.admin_users (id, email, password_hash)
+VALUES (
+    '019bfc80-0000-7000-8000-000000009701',
+    'admin-privilege@example.test',
+    '$argon2id$v=19$m=65536,t=3,p=2$abcdefghijklmnop$abcdefghijklmnopabcdefghijklmnopabcdefghijklmnop'
+)`); err != nil {
+		t.Fatalf("admin INSERT own user storage: %v", err)
+	}
+	if _, err := conn.Exec(ctx, `
+UPDATE tauco_app.contact_messages
+SET status = 'read'
+WHERE id = '019bfc80-0000-7000-8000-000000009901'`); err != nil {
+		t.Fatalf("admin UPDATE inbox status: %v", err)
+	}
+
+	assertPostgresCode(t, "admin create table", "42501", func() error {
+		_, err := conn.Exec(ctx, "CREATE TABLE tauco_app.admin_forbidden (id integer)")
+		return err
+	})
+	assertPostgresCode(t, "admin delete inbox", "42501", func() error {
+		_, err := conn.Exec(ctx, "DELETE FROM tauco_app.contact_messages")
+		return err
+	})
+	assertPostgresCode(t, "admin mutate permission catalog", "42501", func() error {
+		_, err := conn.Exec(ctx, `
+INSERT INTO tauco_app.permissions (id, key, description)
+VALUES ('019bfc80-0000-7000-8000-000000009702', 'forbidden.write', 'Forbidden')`)
+		return err
+	})
+}
+
+func assertAdminCMSFoundation(t *testing.T, ctx context.Context, conn *pgx.Conn) {
+	t.Helper()
+
+	var relationCount int
+	if err := conn.QueryRow(ctx, `
+SELECT count(*)
+FROM information_schema.tables
+WHERE table_schema = 'tauco_app'
+  AND table_name IN (
+      'admin_users', 'roles', 'permissions', 'user_roles', 'role_permissions',
+      'admin_sessions', 'admin_refresh_tokens', 'mfa_credentials',
+      'mfa_recovery_codes', 'page_revision_media', 'product_revision_media'
+  )`).Scan(&relationCount); err != nil {
+		t.Fatalf("count C1 foundation tables: %v", err)
+	}
+	if relationCount != 11 {
+		t.Fatalf("C1 foundation table count = %d, want 11", relationCount)
+	}
+
+	var seededPermissionCount int
+	if err := conn.QueryRow(ctx, `
+SELECT count(*)
+FROM tauco_app.role_permissions AS mapping
+JOIN tauco_app.roles AS role ON role.id = mapping.role_id
+WHERE role.key = 'super_admin'`).Scan(&seededPermissionCount); err != nil {
+		t.Fatalf("count seeded super-admin permissions: %v", err)
+	}
+	if seededPermissionCount != 12 {
+		t.Fatalf("super-admin permission count = %d, want 12", seededPermissionCount)
+	}
+
+	if _, err := conn.Exec(ctx, `
+SET ROLE tauco_migrator;
+INSERT INTO tauco_app.admin_users (id, email, password_hash)
+VALUES (
+    '019bfc80-0000-7000-8000-000000009601',
+    'revision-owner@example.test',
+    '$argon2id$v=19$m=65536,t=3,p=2$abcdefghijklmnop$abcdefghijklmnopabcdefghijklmnopabcdefghijklmnop'
+);
+INSERT INTO tauco_app.pages (id, key)
+VALUES ('019bfc80-0000-7000-8000-000000009602', 'products');
+INSERT INTO tauco_app.page_revisions (
+    id, page_id, revision_number, status, schema_version,
+    content_json, content_checksum, created_by
+) VALUES (
+    '019bfc80-0000-7000-8000-000000009603',
+    '019bfc80-0000-7000-8000-000000009602',
+    1, 'draft', 1, '{}'::jsonb, repeat('d', 64),
+    '019bfc80-0000-7000-8000-000000009601'
+);
+RESET ROLE`); err != nil {
+		t.Fatalf("insert C1 immutable revision fixture: %v", err)
+	}
+
+	assertPostgresCode(t, "draft revision update", "55000", func() error {
+		_, err := conn.Exec(ctx, `
+SET ROLE tauco_migrator;
+UPDATE tauco_app.page_revisions
+SET content_json = '{"mutated":true}'::jsonb
+WHERE id = '019bfc80-0000-7000-8000-000000009603'`)
+		return err
+	})
+	assertPostgresCode(t, "draft revision delete", "55000", func() error {
+		_, err := conn.Exec(ctx, `
+SET ROLE tauco_migrator;
+DELETE FROM tauco_app.page_revisions
+WHERE id = '019bfc80-0000-7000-8000-000000009603'`)
+		return err
+	})
 }
 
 func assertPublishedRevisionIntegrity(t *testing.T, ctx context.Context, conn *pgx.Conn) {

@@ -10,16 +10,157 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gin-gonic/gin"
 	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
+
+// Defines values for AdminActivityActorType.
+const (
+	Admin   AdminActivityActorType = "admin"
+	System  AdminActivityActorType = "system"
+	Visitor AdminActivityActorType = "visitor"
+)
+
+// Valid indicates whether the value is a known member of the AdminActivityActorType enum.
+func (e AdminActivityActorType) Valid() bool {
+	switch e {
+	case Admin:
+		return true
+	case System:
+		return true
+	case Visitor:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdminAuthDataStatus.
+const (
+	Authenticated    AdminAuthDataStatus = "authenticated"
+	MfaSetupRequired AdminAuthDataStatus = "mfa_setup_required"
+)
+
+// Valid indicates whether the value is a known member of the AdminAuthDataStatus enum.
+func (e AdminAuthDataStatus) Valid() bool {
+	switch e {
+	case Authenticated:
+		return true
+	case MfaSetupRequired:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdminMediaStatus.
+const (
+	AdminMediaStatusFailed     AdminMediaStatus = "failed"
+	AdminMediaStatusProcessing AdminMediaStatus = "processing"
+	AdminMediaStatusReady      AdminMediaStatus = "ready"
+)
+
+// Valid indicates whether the value is a known member of the AdminMediaStatus enum.
+func (e AdminMediaStatus) Valid() bool {
+	switch e {
+	case AdminMediaStatusFailed:
+		return true
+	case AdminMediaStatusProcessing:
+		return true
+	case AdminMediaStatusReady:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdminPageKey.
+const (
+	AdminPageKeyAbout AdminPageKey = "about"
+	AdminPageKeyHome  AdminPageKey = "home"
+)
+
+// Valid indicates whether the value is a known member of the AdminPageKey enum.
+func (e AdminPageKey) Valid() bool {
+	switch e {
+	case AdminPageKeyAbout:
+		return true
+	case AdminPageKeyHome:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdminRevisionStatus.
+const (
+	AdminRevisionStatusArchived  AdminRevisionStatus = "archived"
+	AdminRevisionStatusDraft     AdminRevisionStatus = "draft"
+	AdminRevisionStatusPublished AdminRevisionStatus = "published"
+)
+
+// Valid indicates whether the value is a known member of the AdminRevisionStatus enum.
+func (e AdminRevisionStatus) Valid() bool {
+	switch e {
+	case AdminRevisionStatusArchived:
+		return true
+	case AdminRevisionStatusDraft:
+		return true
+	case AdminRevisionStatusPublished:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdminRevisionSummaryStatus.
+const (
+	AdminRevisionSummaryStatusArchived  AdminRevisionSummaryStatus = "archived"
+	AdminRevisionSummaryStatusDraft     AdminRevisionSummaryStatus = "draft"
+	AdminRevisionSummaryStatusPublished AdminRevisionSummaryStatus = "published"
+)
+
+// Valid indicates whether the value is a known member of the AdminRevisionSummaryStatus enum.
+func (e AdminRevisionSummaryStatus) Valid() bool {
+	switch e {
+	case AdminRevisionSummaryStatusArchived:
+		return true
+	case AdminRevisionSummaryStatusDraft:
+		return true
+	case AdminRevisionSummaryStatusPublished:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdminUserStatus.
+const (
+	Active   AdminUserStatus = "active"
+	Disabled AdminUserStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the AdminUserStatus enum.
+func (e AdminUserStatus) Valid() bool {
+	switch e {
+	case Active:
+		return true
+	case Disabled:
+		return true
+	default:
+		return false
+	}
+}
 
 // Defines values for ContactMessageRequestPrivacyConsent.
 const (
@@ -66,6 +207,27 @@ const (
 func (e ContactMessageResultStatus) Valid() bool {
 	switch e {
 	case Received:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ContactMessageStatus.
+const (
+	ContactMessageStatusArchived ContactMessageStatus = "archived"
+	ContactMessageStatusRead     ContactMessageStatus = "read"
+	ContactMessageStatusUnread   ContactMessageStatus = "unread"
+)
+
+// Valid indicates whether the value is a known member of the ContactMessageStatus enum.
+func (e ContactMessageStatus) Valid() bool {
+	switch e {
+	case ContactMessageStatusArchived:
+		return true
+	case ContactMessageStatusRead:
+		return true
+	case ContactMessageStatusUnread:
 		return true
 	default:
 		return false
@@ -246,6 +408,114 @@ func (e ResponseMetaApiVersion) Valid() bool {
 	}
 }
 
+// Defines values for PageKeyPath.
+const (
+	PageKeyPathAbout PageKeyPath = "about"
+	PageKeyPathHome  PageKeyPath = "home"
+)
+
+// Valid indicates whether the value is a known member of the PageKeyPath enum.
+func (e PageKeyPath) Valid() bool {
+	switch e {
+	case PageKeyPathAbout:
+		return true
+	case PageKeyPathHome:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdminGetPageParamsKey.
+const (
+	AdminGetPageParamsKeyAbout AdminGetPageParamsKey = "about"
+	AdminGetPageParamsKeyHome  AdminGetPageParamsKey = "home"
+)
+
+// Valid indicates whether the value is a known member of the AdminGetPageParamsKey enum.
+func (e AdminGetPageParamsKey) Valid() bool {
+	switch e {
+	case AdminGetPageParamsKeyAbout:
+		return true
+	case AdminGetPageParamsKeyHome:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdminCreatePageDraftParamsKey.
+const (
+	AdminCreatePageDraftParamsKeyAbout AdminCreatePageDraftParamsKey = "about"
+	AdminCreatePageDraftParamsKeyHome  AdminCreatePageDraftParamsKey = "home"
+)
+
+// Valid indicates whether the value is a known member of the AdminCreatePageDraftParamsKey enum.
+func (e AdminCreatePageDraftParamsKey) Valid() bool {
+	switch e {
+	case AdminCreatePageDraftParamsKeyAbout:
+		return true
+	case AdminCreatePageDraftParamsKeyHome:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdminGetPageRevisionParamsKey.
+const (
+	AdminGetPageRevisionParamsKeyAbout AdminGetPageRevisionParamsKey = "about"
+	AdminGetPageRevisionParamsKeyHome  AdminGetPageRevisionParamsKey = "home"
+)
+
+// Valid indicates whether the value is a known member of the AdminGetPageRevisionParamsKey enum.
+func (e AdminGetPageRevisionParamsKey) Valid() bool {
+	switch e {
+	case AdminGetPageRevisionParamsKeyAbout:
+		return true
+	case AdminGetPageRevisionParamsKeyHome:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdminPublishPageRevisionParamsKey.
+const (
+	AdminPublishPageRevisionParamsKeyAbout AdminPublishPageRevisionParamsKey = "about"
+	AdminPublishPageRevisionParamsKeyHome  AdminPublishPageRevisionParamsKey = "home"
+)
+
+// Valid indicates whether the value is a known member of the AdminPublishPageRevisionParamsKey enum.
+func (e AdminPublishPageRevisionParamsKey) Valid() bool {
+	switch e {
+	case AdminPublishPageRevisionParamsKeyAbout:
+		return true
+	case AdminPublishPageRevisionParamsKeyHome:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdminUnpublishPageParamsKey.
+const (
+	AdminUnpublishPageParamsKeyAbout AdminUnpublishPageParamsKey = "about"
+	AdminUnpublishPageParamsKeyHome  AdminUnpublishPageParamsKey = "home"
+)
+
+// Valid indicates whether the value is a known member of the AdminUnpublishPageParamsKey enum.
+func (e AdminUnpublishPageParamsKey) Valid() bool {
+	switch e {
+	case AdminUnpublishPageParamsKeyAbout:
+		return true
+	case AdminUnpublishPageParamsKeyHome:
+		return true
+	default:
+		return false
+	}
+}
+
 // AboutContent defines model for AboutContent.
 type AboutContent struct {
 	Hero         PageHero          `json:"hero"`
@@ -258,6 +528,302 @@ type AboutContent struct {
 // AboutResponse defines model for AboutResponse.
 type AboutResponse struct {
 	Data AboutContent `json:"data"`
+	Meta ResponseMeta `json:"meta"`
+}
+
+// AdminActivity defines model for AdminActivity.
+type AdminActivity struct {
+	ActorId    *openapi_types.UUID    `json:"actorId,omitempty"`
+	ActorType  AdminActivityActorType `json:"actorType"`
+	CreatedAt  time.Time              `json:"createdAt"`
+	EntityId   *openapi_types.UUID    `json:"entityId,omitempty"`
+	EntityType string                 `json:"entityType"`
+	EventType  string                 `json:"eventType"`
+	Id         openapi_types.UUID     `json:"id"`
+	RequestId  *string                `json:"requestId,omitempty"`
+}
+
+// AdminActivityActorType defines model for AdminActivity.ActorType.
+type AdminActivityActorType string
+
+// AdminActivityListResponse defines model for AdminActivityListResponse.
+type AdminActivityListResponse struct {
+	Data []AdminActivity  `json:"data"`
+	Meta ListResponseMeta `json:"meta"`
+}
+
+// AdminAuthData defines model for AdminAuthData.
+type AdminAuthData struct {
+	ExpiresAt time.Time           `json:"expiresAt"`
+	Status    AdminAuthDataStatus `json:"status"`
+	User      AdminUser           `json:"user"`
+}
+
+// AdminAuthDataStatus defines model for AdminAuthData.Status.
+type AdminAuthDataStatus string
+
+// AdminAuthResponse defines model for AdminAuthResponse.
+type AdminAuthResponse struct {
+	Data AdminAuthData `json:"data"`
+	Meta ResponseMeta  `json:"meta"`
+}
+
+// AdminContactListResponse defines model for AdminContactListResponse.
+type AdminContactListResponse struct {
+	Data []AdminContactMessage `json:"data"`
+	Meta ListResponseMeta      `json:"meta"`
+}
+
+// AdminContactMessage defines model for AdminContactMessage.
+type AdminContactMessage struct {
+	CreatedAt time.Time            `json:"createdAt"`
+	Email     openapi_types.Email  `json:"email"`
+	Id        openapi_types.UUID   `json:"id"`
+	Message   string               `json:"message"`
+	Name      string               `json:"name"`
+	Phone     *string              `json:"phone,omitempty"`
+	Status    ContactMessageStatus `json:"status"`
+	Subject   string               `json:"subject"`
+	UpdatedAt time.Time            `json:"updatedAt"`
+}
+
+// AdminContactResponse defines model for AdminContactResponse.
+type AdminContactResponse struct {
+	Data AdminContactMessage `json:"data"`
+	Meta ResponseMeta        `json:"meta"`
+}
+
+// AdminContactStatusRequest defines model for AdminContactStatusRequest.
+type AdminContactStatusRequest struct {
+	Status ContactMessageStatus `json:"status"`
+}
+
+// AdminLoginRequest defines model for AdminLoginRequest.
+type AdminLoginRequest struct {
+	Email        openapi_types.Email `json:"email"`
+	Password     string              `json:"password"`
+	RecoveryCode *string             `json:"recoveryCode,omitempty"`
+	TotpCode     *string             `json:"totpCode,omitempty"`
+}
+
+// AdminMedia defines model for AdminMedia.
+type AdminMedia struct {
+	AltText       string              `json:"altText"`
+	Bytes         int64               `json:"bytes"`
+	CreatedAt     time.Time           `json:"createdAt"`
+	Decorative    bool                `json:"decorative"`
+	Height        int                 `json:"height"`
+	Id            openapi_types.UUID  `json:"id"`
+	LastErrorCode *string             `json:"lastErrorCode,omitempty"`
+	MimeType      string              `json:"mimeType"`
+	Status        AdminMediaStatus    `json:"status"`
+	UpdatedAt     time.Time           `json:"updatedAt"`
+	Variants      []AdminMediaVariant `json:"variants"`
+	Width         int                 `json:"width"`
+}
+
+// AdminMediaStatus defines model for AdminMedia.Status.
+type AdminMediaStatus string
+
+// AdminMediaListResponse defines model for AdminMediaListResponse.
+type AdminMediaListResponse struct {
+	Data []AdminMedia     `json:"data"`
+	Meta ListResponseMeta `json:"meta"`
+}
+
+// AdminMediaResponse defines model for AdminMediaResponse.
+type AdminMediaResponse struct {
+	Data AdminMedia   `json:"data"`
+	Meta ResponseMeta `json:"meta"`
+}
+
+// AdminMediaUploadRequest defines model for AdminMediaUploadRequest.
+type AdminMediaUploadRequest struct {
+	AltText    string             `json:"altText"`
+	Decorative bool               `json:"decorative"`
+	File       openapi_types.File `json:"file"`
+}
+
+// AdminMediaVariant defines model for AdminMediaVariant.
+type AdminMediaVariant struct {
+	Bytes  int64  `json:"bytes"`
+	Height int    `json:"height"`
+	Url    string `json:"url"`
+	Width  int    `json:"width"`
+}
+
+// AdminPage defines model for AdminPage.
+type AdminPage struct {
+	Id                  openapi_types.UUID  `json:"id"`
+	Key                 AdminPageKey        `json:"key"`
+	LatestRevision      AdminRevision       `json:"latestRevision"`
+	PublishedRevisionId *openapi_types.UUID `json:"publishedRevisionId"`
+
+	// Revisions Latest 100 immutable revisions ordered newest first.
+	Revisions []AdminRevisionSummary `json:"revisions"`
+	UpdatedAt time.Time              `json:"updatedAt"`
+}
+
+// AdminPageKey defines model for AdminPage.Key.
+type AdminPageKey string
+
+// AdminPageContent defines model for AdminPageContent.
+type AdminPageContent struct {
+	union json.RawMessage
+}
+
+// AdminPageDraftRequest defines model for AdminPageDraftRequest.
+type AdminPageDraftRequest struct {
+	BaseRevisionId openapi_types.UUID `json:"baseRevisionId"`
+	Content        AdminPageContent   `json:"content"`
+}
+
+// AdminPageResponse defines model for AdminPageResponse.
+type AdminPageResponse struct {
+	Data AdminPage    `json:"data"`
+	Meta ResponseMeta `json:"meta"`
+}
+
+// AdminProduct defines model for AdminProduct.
+type AdminProduct struct {
+	ArchivedAt          *time.Time          `json:"archivedAt"`
+	Id                  openapi_types.UUID  `json:"id"`
+	PublishedRevisionId *openapi_types.UUID `json:"publishedRevisionId"`
+
+	// Revisions Latest 100 immutable revisions ordered newest first.
+	Revisions []AdminRevisionSummary `json:"revisions"`
+	Sku       *string                `json:"sku,omitempty"`
+
+	// Slug Example: tauco-cap-badak
+	Slug      Slug      `json:"slug"`
+	SortOrder int       `json:"sortOrder"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// AdminProductContent defines model for AdminProductContent.
+type AdminProductContent = ProductDetail
+
+// AdminProductCreateRequest defines model for AdminProductCreateRequest.
+type AdminProductCreateRequest struct {
+	Sku *string `json:"sku,omitempty"`
+
+	// Slug Example: tauco-cap-badak
+	Slug      Slug `json:"slug"`
+	SortOrder int  `json:"sortOrder"`
+}
+
+// AdminProductDraftRequest defines model for AdminProductDraftRequest.
+type AdminProductDraftRequest struct {
+	BaseRevisionId openapi_types.UUID  `json:"baseRevisionId"`
+	Content        AdminProductContent `json:"content"`
+}
+
+// AdminProductListResponse defines model for AdminProductListResponse.
+type AdminProductListResponse struct {
+	Data []AdminProduct   `json:"data"`
+	Meta ListResponseMeta `json:"meta"`
+}
+
+// AdminProductResponse defines model for AdminProductResponse.
+type AdminProductResponse struct {
+	Data AdminProduct `json:"data"`
+	Meta ResponseMeta `json:"meta"`
+}
+
+// AdminProductUpdateRequest defines model for AdminProductUpdateRequest.
+type AdminProductUpdateRequest struct {
+	Sku *string `json:"sku,omitempty"`
+
+	// Slug Example: tauco-cap-badak
+	Slug      *Slug `json:"slug,omitempty"`
+	SortOrder *int  `json:"sortOrder,omitempty"`
+}
+
+// AdminRecoveryCodesData defines model for AdminRecoveryCodesData.
+type AdminRecoveryCodesData struct {
+	Codes []string `json:"codes"`
+}
+
+// AdminRecoveryCodesResponse defines model for AdminRecoveryCodesResponse.
+type AdminRecoveryCodesResponse struct {
+	Data AdminRecoveryCodesData `json:"data"`
+	Meta ResponseMeta           `json:"meta"`
+}
+
+// AdminRevision defines model for AdminRevision.
+type AdminRevision struct {
+	Content        AdminRevisionContent `json:"content"`
+	CreatedAt      time.Time            `json:"createdAt"`
+	CreatedBy      *openapi_types.UUID  `json:"createdBy"`
+	Id             openapi_types.UUID   `json:"id"`
+	OwnerId        openapi_types.UUID   `json:"ownerId"`
+	PublishedAt    *time.Time           `json:"publishedAt,omitempty"`
+	RevisionNumber int                  `json:"revisionNumber"`
+	SchemaVersion  int                  `json:"schemaVersion"`
+	Status         AdminRevisionStatus  `json:"status"`
+}
+
+// AdminRevisionStatus defines model for AdminRevision.Status.
+type AdminRevisionStatus string
+
+// AdminRevisionContent defines model for AdminRevisionContent.
+type AdminRevisionContent struct {
+	union json.RawMessage
+}
+
+// AdminRevisionResponse defines model for AdminRevisionResponse.
+type AdminRevisionResponse struct {
+	Data AdminRevision `json:"data"`
+	Meta ResponseMeta  `json:"meta"`
+}
+
+// AdminRevisionSummary defines model for AdminRevisionSummary.
+type AdminRevisionSummary struct {
+	CreatedAt      time.Time                  `json:"createdAt"`
+	CreatedBy      *openapi_types.UUID        `json:"createdBy"`
+	Id             openapi_types.UUID         `json:"id"`
+	PublishedAt    *time.Time                 `json:"publishedAt"`
+	RevisionNumber int                        `json:"revisionNumber"`
+	Status         AdminRevisionSummaryStatus `json:"status"`
+}
+
+// AdminRevisionSummaryStatus defines model for AdminRevisionSummary.Status.
+type AdminRevisionSummaryStatus string
+
+// AdminTotpCodeRequest defines model for AdminTotpCodeRequest.
+type AdminTotpCodeRequest struct {
+	TotpCode string `json:"totpCode"`
+}
+
+// AdminTotpSetupData defines model for AdminTotpSetupData.
+type AdminTotpSetupData struct {
+	ExpiresAt  time.Time `json:"expiresAt"`
+	ManualKey  string    `json:"manualKey"`
+	OtpauthUri string    `json:"otpauthUri"`
+}
+
+// AdminTotpSetupResponse defines model for AdminTotpSetupResponse.
+type AdminTotpSetupResponse struct {
+	Data AdminTotpSetupData `json:"data"`
+	Meta ResponseMeta       `json:"meta"`
+}
+
+// AdminUser defines model for AdminUser.
+type AdminUser struct {
+	Email       openapi_types.Email `json:"email"`
+	Id          openapi_types.UUID  `json:"id"`
+	MfaEnabled  bool                `json:"mfaEnabled"`
+	Permissions []string            `json:"permissions"`
+	Roles       []string            `json:"roles"`
+	Status      AdminUserStatus     `json:"status"`
+}
+
+// AdminUserStatus defines model for AdminUser.Status.
+type AdminUserStatus string
+
+// AdminUserResponse defines model for AdminUserResponse.
+type AdminUserResponse struct {
+	Data AdminUser    `json:"data"`
 	Meta ResponseMeta `json:"meta"`
 }
 
@@ -296,6 +862,9 @@ type ContactMessageResult struct {
 
 // ContactMessageResultStatus defines model for ContactMessageResult.Status.
 type ContactMessageResultStatus string
+
+// ContactMessageStatus defines model for ContactMessageStatus.
+type ContactMessageStatus string
 
 // ContentPreview defines model for ContentPreview.
 type ContentPreview struct {
@@ -607,11 +1176,20 @@ type ValidationError struct {
 	Message string `json:"message"`
 }
 
+// ContactStatus defines model for ContactStatus.
+type ContactStatus = ContactMessageStatus
+
 // Cursor defines model for Cursor.
 type Cursor = string
 
+// EntityID defines model for EntityID.
+type EntityID = openapi_types.UUID
+
 // IdempotencyKey defines model for IdempotencyKey.
 type IdempotencyKey = string
+
+// IfMatch defines model for IfMatch.
+type IfMatch = string
 
 // IfNoneMatch defines model for IfNoneMatch.
 type IfNoneMatch = string
@@ -619,14 +1197,74 @@ type IfNoneMatch = string
 // Limit defines model for Limit.
 type Limit = int32
 
+// MediaWidth defines model for MediaWidth.
+type MediaWidth = int
+
+// PageKeyPath defines model for PageKeyPath.
+type PageKeyPath string
+
 // ProductSlug Example: tauco-cap-badak
 type ProductSlug = Slug
+
+// RevisionID defines model for RevisionID.
+type RevisionID = openapi_types.UUID
 
 // XRequestID Example: 98a70ee8a919423b883c23ea275d468a
 type XRequestID = RequestID
 
+// AdminActivityListOK defines model for AdminActivityListOK.
+type AdminActivityListOK = AdminActivityListResponse
+
+// AdminAuthOK defines model for AdminAuthOK.
+type AdminAuthOK = AdminAuthResponse
+
+// AdminContactListOK defines model for AdminContactListOK.
+type AdminContactListOK = AdminContactListResponse
+
+// AdminContactOK defines model for AdminContactOK.
+type AdminContactOK = AdminContactResponse
+
+// AdminMediaAccepted defines model for AdminMediaAccepted.
+type AdminMediaAccepted = AdminMediaResponse
+
+// AdminMediaListOK defines model for AdminMediaListOK.
+type AdminMediaListOK = AdminMediaListResponse
+
+// AdminMediaOK defines model for AdminMediaOK.
+type AdminMediaOK = AdminMediaResponse
+
+// AdminPageOK defines model for AdminPageOK.
+type AdminPageOK = AdminPageResponse
+
+// AdminProductCreated defines model for AdminProductCreated.
+type AdminProductCreated = AdminProductResponse
+
+// AdminProductListOK defines model for AdminProductListOK.
+type AdminProductListOK = AdminProductListResponse
+
+// AdminProductOK defines model for AdminProductOK.
+type AdminProductOK = AdminProductResponse
+
+// AdminRecoveryCodesOK defines model for AdminRecoveryCodesOK.
+type AdminRecoveryCodesOK = AdminRecoveryCodesResponse
+
+// AdminRevisionCreated defines model for AdminRevisionCreated.
+type AdminRevisionCreated = AdminRevisionResponse
+
+// AdminRevisionOK defines model for AdminRevisionOK.
+type AdminRevisionOK = AdminRevisionResponse
+
+// AdminTotpSetupOK defines model for AdminTotpSetupOK.
+type AdminTotpSetupOK = AdminTotpSetupResponse
+
+// AdminUserOK defines model for AdminUserOK.
+type AdminUserOK = AdminUserResponse
+
 // BadRequest defines model for BadRequest.
 type BadRequest = Problem
+
+// Conflict defines model for Conflict.
+type Conflict = Problem
 
 // Forbidden defines model for Forbidden.
 type Forbidden = Problem
@@ -637,8 +1275,14 @@ type IdempotencyConflict = Problem
 // InternalServerError defines model for InternalServerError.
 type InternalServerError = Problem
 
+// NotFound defines model for NotFound.
+type NotFound = Problem
+
 // PayloadTooLarge defines model for PayloadTooLarge.
 type PayloadTooLarge = Problem
+
+// PreconditionFailed defines model for PreconditionFailed.
+type PreconditionFailed = Problem
 
 // ProductListBadRequest defines model for ProductListBadRequest.
 type ProductListBadRequest = Problem
@@ -671,6 +1315,290 @@ type GetAboutParams struct {
 	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
 }
 
+// AdminListActivityLogsParams defines parameters for AdminListActivityLogs.
+type AdminListActivityLogsParams struct {
+	// Cursor Opaque base64url cursor signed with HMAC and bound to the current
+	// version, filters, query hash, sort position, and product identifier.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit Maximum number of products in this page.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+}
+
+// AdminLoginParams defines parameters for AdminLogin.
+type AdminLoginParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+}
+
+// AdminLogoutParams defines parameters for AdminLogout.
+type AdminLogoutParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+}
+
+// AdminGetMeParams defines parameters for AdminGetMe.
+type AdminGetMeParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+}
+
+// AdminRegenerateRecoveryCodesParams defines parameters for AdminRegenerateRecoveryCodes.
+type AdminRegenerateRecoveryCodesParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+}
+
+// AdminRefreshSessionParams defines parameters for AdminRefreshSession.
+type AdminRefreshSessionParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+}
+
+// AdminEnableTotpParams defines parameters for AdminEnableTotp.
+type AdminEnableTotpParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+}
+
+// AdminSetupTotpParams defines parameters for AdminSetupTotp.
+type AdminSetupTotpParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+}
+
+// AdminListContactMessagesParams defines parameters for AdminListContactMessages.
+type AdminListContactMessagesParams struct {
+	// Cursor Opaque base64url cursor signed with HMAC and bound to the current
+	// version, filters, query hash, sort position, and product identifier.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit Maximum number of products in this page.
+	Limit  *Limit         `form:"limit,omitempty" json:"limit,omitempty"`
+	Status *ContactStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+}
+
+// AdminGetContactMessageParams defines parameters for AdminGetContactMessage.
+type AdminGetContactMessageParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+}
+
+// AdminUpdateContactMessageStatusParams defines parameters for AdminUpdateContactMessageStatus.
+type AdminUpdateContactMessageStatusParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+
+	// IfMatch Strong ETag for optimistic concurrency control.
+	IfMatch IfMatch `json:"If-Match"`
+}
+
+// AdminListMediaParams defines parameters for AdminListMedia.
+type AdminListMediaParams struct {
+	// Cursor Opaque base64url cursor signed with HMAC and bound to the current
+	// version, filters, query hash, sort position, and product identifier.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit Maximum number of products in this page.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+}
+
+// AdminUploadMediaParams defines parameters for AdminUploadMedia.
+type AdminUploadMediaParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+}
+
+// AdminGetMediaParams defines parameters for AdminGetMedia.
+type AdminGetMediaParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+}
+
+// AdminRetryMediaParams defines parameters for AdminRetryMedia.
+type AdminRetryMediaParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+}
+
+// AdminGetPageParams defines parameters for AdminGetPage.
+type AdminGetPageParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+}
+
+// AdminGetPageParamsKey defines parameters for AdminGetPage.
+type AdminGetPageParamsKey string
+
+// AdminCreatePageDraftParams defines parameters for AdminCreatePageDraft.
+type AdminCreatePageDraftParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+
+	// IfMatch Strong ETag for optimistic concurrency control.
+	IfMatch IfMatch `json:"If-Match"`
+}
+
+// AdminCreatePageDraftParamsKey defines parameters for AdminCreatePageDraft.
+type AdminCreatePageDraftParamsKey string
+
+// AdminGetPageRevisionParams defines parameters for AdminGetPageRevision.
+type AdminGetPageRevisionParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+}
+
+// AdminGetPageRevisionParamsKey defines parameters for AdminGetPageRevision.
+type AdminGetPageRevisionParamsKey string
+
+// AdminPublishPageRevisionParams defines parameters for AdminPublishPageRevision.
+type AdminPublishPageRevisionParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+
+	// IfMatch Strong ETag for optimistic concurrency control.
+	IfMatch IfMatch `json:"If-Match"`
+}
+
+// AdminPublishPageRevisionParamsKey defines parameters for AdminPublishPageRevision.
+type AdminPublishPageRevisionParamsKey string
+
+// AdminUnpublishPageParams defines parameters for AdminUnpublishPage.
+type AdminUnpublishPageParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+
+	// IfMatch Strong ETag for optimistic concurrency control.
+	IfMatch IfMatch `json:"If-Match"`
+}
+
+// AdminUnpublishPageParamsKey defines parameters for AdminUnpublishPage.
+type AdminUnpublishPageParamsKey string
+
+// AdminListProductsParams defines parameters for AdminListProducts.
+type AdminListProductsParams struct {
+	// Cursor Opaque base64url cursor signed with HMAC and bound to the current
+	// version, filters, query hash, sort position, and product identifier.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit Maximum number of products in this page.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+}
+
+// AdminCreateProductParams defines parameters for AdminCreateProduct.
+type AdminCreateProductParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+}
+
+// AdminGetProductParams defines parameters for AdminGetProduct.
+type AdminGetProductParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+}
+
+// AdminUpdateProductParams defines parameters for AdminUpdateProduct.
+type AdminUpdateProductParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+
+	// IfMatch Strong ETag for optimistic concurrency control.
+	IfMatch IfMatch `json:"If-Match"`
+}
+
+// AdminArchiveProductParams defines parameters for AdminArchiveProduct.
+type AdminArchiveProductParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+
+	// IfMatch Strong ETag for optimistic concurrency control.
+	IfMatch IfMatch `json:"If-Match"`
+}
+
+// AdminCreateProductDraftParams defines parameters for AdminCreateProductDraft.
+type AdminCreateProductDraftParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+
+	// IfMatch Strong ETag for optimistic concurrency control.
+	IfMatch IfMatch `json:"If-Match"`
+}
+
+// AdminGetProductRevisionParams defines parameters for AdminGetProductRevision.
+type AdminGetProductRevisionParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+}
+
+// AdminPublishProductRevisionParams defines parameters for AdminPublishProductRevision.
+type AdminPublishProductRevisionParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+
+	// IfMatch Strong ETag for optimistic concurrency control.
+	IfMatch IfMatch `json:"If-Match"`
+}
+
+// AdminUnarchiveProductParams defines parameters for AdminUnarchiveProduct.
+type AdminUnarchiveProductParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+
+	// IfMatch Strong ETag for optimistic concurrency control.
+	IfMatch IfMatch `json:"If-Match"`
+}
+
+// AdminUnpublishProductParams defines parameters for AdminUnpublishProduct.
+type AdminUnpublishProductParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+
+	// IfMatch Strong ETag for optimistic concurrency control.
+	IfMatch IfMatch `json:"If-Match"`
+}
+
 // CreateContactMessageParams defines parameters for CreateContactMessage.
 type CreateContactMessageParams struct {
 	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
@@ -683,6 +1611,26 @@ type CreateContactMessageParams struct {
 
 // GetHomeParams defines parameters for GetHome.
 type GetHomeParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+
+	// IfNoneMatch ETag validator returned by a prior successful content read.
+	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
+}
+
+// GetMediaDisplayParams defines parameters for GetMediaDisplay.
+type GetMediaDisplayParams struct {
+	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
+	// by the server.
+	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
+
+	// IfNoneMatch ETag validator returned by a prior successful content read.
+	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
+}
+
+// GetMediaVariantParams defines parameters for GetMediaVariant.
+type GetMediaVariantParams struct {
 	// XRequestID Optional caller-provided trace identifier. Invalid values are replaced
 	// by the server.
 	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
@@ -749,8 +1697,185 @@ type GetMetricsParams struct {
 	XRequestID *XRequestID `json:"X-Request-ID,omitempty"`
 }
 
+// AdminLoginJSONRequestBody defines body for AdminLogin for application/json ContentType.
+type AdminLoginJSONRequestBody = AdminLoginRequest
+
+// AdminRegenerateRecoveryCodesJSONRequestBody defines body for AdminRegenerateRecoveryCodes for application/json ContentType.
+type AdminRegenerateRecoveryCodesJSONRequestBody = AdminTotpCodeRequest
+
+// AdminEnableTotpJSONRequestBody defines body for AdminEnableTotp for application/json ContentType.
+type AdminEnableTotpJSONRequestBody = AdminTotpCodeRequest
+
+// AdminUpdateContactMessageStatusJSONRequestBody defines body for AdminUpdateContactMessageStatus for application/json ContentType.
+type AdminUpdateContactMessageStatusJSONRequestBody = AdminContactStatusRequest
+
+// AdminUploadMediaMultipartRequestBody defines body for AdminUploadMedia for multipart/form-data ContentType.
+type AdminUploadMediaMultipartRequestBody = AdminMediaUploadRequest
+
+// AdminCreatePageDraftJSONRequestBody defines body for AdminCreatePageDraft for application/json ContentType.
+type AdminCreatePageDraftJSONRequestBody = AdminPageDraftRequest
+
+// AdminCreateProductJSONRequestBody defines body for AdminCreateProduct for application/json ContentType.
+type AdminCreateProductJSONRequestBody = AdminProductCreateRequest
+
+// AdminUpdateProductJSONRequestBody defines body for AdminUpdateProduct for application/json ContentType.
+type AdminUpdateProductJSONRequestBody = AdminProductUpdateRequest
+
+// AdminCreateProductDraftJSONRequestBody defines body for AdminCreateProductDraft for application/json ContentType.
+type AdminCreateProductDraftJSONRequestBody = AdminProductDraftRequest
+
 // CreateContactMessageJSONRequestBody defines body for CreateContactMessage for application/json ContentType.
 type CreateContactMessageJSONRequestBody = ContactMessageRequest
+
+// AsHomeContent returns the union data inside the AdminPageContent as a HomeContent
+func (t AdminPageContent) AsHomeContent() (HomeContent, error) {
+	var body HomeContent
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromHomeContent overwrites any union data inside the AdminPageContent as the provided HomeContent
+func (t *AdminPageContent) FromHomeContent(v HomeContent) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeHomeContent performs a merge with any union data inside the AdminPageContent, using the provided HomeContent
+func (t *AdminPageContent) MergeHomeContent(v HomeContent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsAboutContent returns the union data inside the AdminPageContent as a AboutContent
+func (t AdminPageContent) AsAboutContent() (AboutContent, error) {
+	var body AboutContent
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromAboutContent overwrites any union data inside the AdminPageContent as the provided AboutContent
+func (t *AdminPageContent) FromAboutContent(v AboutContent) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeAboutContent performs a merge with any union data inside the AdminPageContent, using the provided AboutContent
+func (t *AdminPageContent) MergeAboutContent(v AboutContent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t AdminPageContent) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *AdminPageContent) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsHomeContent returns the union data inside the AdminRevisionContent as a HomeContent
+func (t AdminRevisionContent) AsHomeContent() (HomeContent, error) {
+	var body HomeContent
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromHomeContent overwrites any union data inside the AdminRevisionContent as the provided HomeContent
+func (t *AdminRevisionContent) FromHomeContent(v HomeContent) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeHomeContent performs a merge with any union data inside the AdminRevisionContent, using the provided HomeContent
+func (t *AdminRevisionContent) MergeHomeContent(v HomeContent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsAboutContent returns the union data inside the AdminRevisionContent as a AboutContent
+func (t AdminRevisionContent) AsAboutContent() (AboutContent, error) {
+	var body AboutContent
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromAboutContent overwrites any union data inside the AdminRevisionContent as the provided AboutContent
+func (t *AdminRevisionContent) FromAboutContent(v AboutContent) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeAboutContent performs a merge with any union data inside the AdminRevisionContent, using the provided AboutContent
+func (t *AdminRevisionContent) MergeAboutContent(v AboutContent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsProductDetail returns the union data inside the AdminRevisionContent as a ProductDetail
+func (t AdminRevisionContent) AsProductDetail() (ProductDetail, error) {
+	var body ProductDetail
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromProductDetail overwrites any union data inside the AdminRevisionContent as the provided ProductDetail
+func (t *AdminRevisionContent) FromProductDetail(v ProductDetail) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeProductDetail performs a merge with any union data inside the AdminRevisionContent, using the provided ProductDetail
+func (t *AdminRevisionContent) MergeProductDetail(v ProductDetail) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t AdminRevisionContent) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *AdminRevisionContent) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
 
 // AsInformativeImageAsset returns the union data inside the ImageAsset as a InformativeImageAsset
 func (t ImageAsset) AsInformativeImageAsset() (InformativeImageAsset, error) {
@@ -819,12 +1944,108 @@ type ServerInterface interface {
 	// GetAbout Get published about-page content
 	// (GET /api/v1/about)
 	GetAbout(c *gin.Context, params GetAboutParams)
+	// AdminListActivityLogs List append-only administration activity
+	// (GET /api/v1/admin/activity-logs)
+	AdminListActivityLogs(c *gin.Context, params AdminListActivityLogsParams)
+	// AdminLogin Authenticate an admin with password and mandatory second factor
+	// (POST /api/v1/admin/auth/login)
+	AdminLogin(c *gin.Context, params AdminLoginParams)
+	// AdminLogout Revoke the current admin session
+	// (POST /api/v1/admin/auth/logout)
+	AdminLogout(c *gin.Context, params AdminLogoutParams)
+	// AdminGetMe Get the authenticated admin and effective permissions
+	// (GET /api/v1/admin/auth/me)
+	AdminGetMe(c *gin.Context, params AdminGetMeParams)
+	// AdminRegenerateRecoveryCodes Replace all unused recovery codes after TOTP confirmation
+	// (POST /api/v1/admin/auth/recovery-codes/regenerate)
+	AdminRegenerateRecoveryCodes(c *gin.Context, params AdminRegenerateRecoveryCodesParams)
+	// AdminRefreshSession Rotate the refresh token and access session
+	// (POST /api/v1/admin/auth/refresh)
+	AdminRefreshSession(c *gin.Context, params AdminRefreshSessionParams)
+	// AdminEnableTotp Confirm TOTP enrollment and return one-time recovery codes
+	// (POST /api/v1/admin/auth/totp/enable)
+	AdminEnableTotp(c *gin.Context, params AdminEnableTotpParams)
+	// AdminSetupTotp Start mandatory TOTP enrollment
+	// (POST /api/v1/admin/auth/totp/setup)
+	AdminSetupTotp(c *gin.Context, params AdminSetupTotpParams)
+	// AdminListContactMessages List contact messages without exposing retention internals
+	// (GET /api/v1/admin/contact-messages)
+	AdminListContactMessages(c *gin.Context, params AdminListContactMessagesParams)
+	// AdminGetContactMessage Read one contact message
+	// (GET /api/v1/admin/contact-messages/{id})
+	AdminGetContactMessage(c *gin.Context, id EntityID, params AdminGetContactMessageParams)
+	// AdminUpdateContactMessageStatus Change contact message workflow status
+	// (PATCH /api/v1/admin/contact-messages/{id}/status)
+	AdminUpdateContactMessageStatus(c *gin.Context, id EntityID, params AdminUpdateContactMessageStatusParams)
+	// AdminListMedia List media assets by processing state
+	// (GET /api/v1/admin/media)
+	AdminListMedia(c *gin.Context, params AdminListMediaParams)
+	// AdminUploadMedia Upload one image for asynchronous processing
+	// (POST /api/v1/admin/media)
+	AdminUploadMedia(c *gin.Context, params AdminUploadMediaParams)
+	// AdminGetMedia Get media processing state and variants
+	// (GET /api/v1/admin/media/{id})
+	AdminGetMedia(c *gin.Context, id EntityID, params AdminGetMediaParams)
+	// AdminRetryMedia Retry processing a failed media asset
+	// (POST /api/v1/admin/media/{id}/retry)
+	AdminRetryMedia(c *gin.Context, id EntityID, params AdminRetryMediaParams)
+	// AdminGetPage Get Home or About with its revision pointers
+	// (GET /api/v1/admin/pages/{key})
+	AdminGetPage(c *gin.Context, key AdminGetPageParamsKey, params AdminGetPageParams)
+	// AdminCreatePageDraft Save an immutable Home or About draft revision
+	// (POST /api/v1/admin/pages/{key}/drafts)
+	AdminCreatePageDraft(c *gin.Context, key AdminCreatePageDraftParamsKey, params AdminCreatePageDraftParams)
+	// AdminGetPageRevision Get one immutable page revision
+	// (GET /api/v1/admin/pages/{key}/revisions/{revisionId})
+	AdminGetPageRevision(c *gin.Context, key AdminGetPageRevisionParamsKey, revisionId RevisionID, params AdminGetPageRevisionParams)
+	// AdminPublishPageRevision Publish a new immutable snapshot from a page revision
+	// (POST /api/v1/admin/pages/{key}/revisions/{revisionId}/publish)
+	AdminPublishPageRevision(c *gin.Context, key AdminPublishPageRevisionParamsKey, revisionId RevisionID, params AdminPublishPageRevisionParams)
+	// AdminUnpublishPage Clear a page public pointer without deleting revisions
+	// (POST /api/v1/admin/pages/{key}/unpublish)
+	AdminUnpublishPage(c *gin.Context, key AdminUnpublishPageParamsKey, params AdminUnpublishPageParams)
+	// AdminListProducts List products including unpublished and archived records
+	// (GET /api/v1/admin/products)
+	AdminListProducts(c *gin.Context, params AdminListProductsParams)
+	// AdminCreateProduct Create an unpublished product shell
+	// (POST /api/v1/admin/products)
+	AdminCreateProduct(c *gin.Context, params AdminCreateProductParams)
+	// AdminGetProduct Get one product and its revision pointers
+	// (GET /api/v1/admin/products/{id})
+	AdminGetProduct(c *gin.Context, id EntityID, params AdminGetProductParams)
+	// AdminUpdateProduct Update product identity and ordering fields
+	// (PATCH /api/v1/admin/products/{id})
+	AdminUpdateProduct(c *gin.Context, id EntityID, params AdminUpdateProductParams)
+	// AdminArchiveProduct Archive an unpublished product without deleting history
+	// (POST /api/v1/admin/products/{id}/archive)
+	AdminArchiveProduct(c *gin.Context, id EntityID, params AdminArchiveProductParams)
+	// AdminCreateProductDraft Save an immutable product draft revision
+	// (POST /api/v1/admin/products/{id}/drafts)
+	AdminCreateProductDraft(c *gin.Context, id EntityID, params AdminCreateProductDraftParams)
+	// AdminGetProductRevision Get one immutable product revision
+	// (GET /api/v1/admin/products/{id}/revisions/{revisionId})
+	AdminGetProductRevision(c *gin.Context, id EntityID, revisionId RevisionID, params AdminGetProductRevisionParams)
+	// AdminPublishProductRevision Publish a new immutable snapshot from a product revision
+	// (POST /api/v1/admin/products/{id}/revisions/{revisionId}/publish)
+	AdminPublishProductRevision(c *gin.Context, id EntityID, revisionId RevisionID, params AdminPublishProductRevisionParams)
+	// AdminUnarchiveProduct Restore an archived product
+	// (POST /api/v1/admin/products/{id}/unarchive)
+	AdminUnarchiveProduct(c *gin.Context, id EntityID, params AdminUnarchiveProductParams)
+	// AdminUnpublishProduct Clear the product public pointer
+	// (POST /api/v1/admin/products/{id}/unpublish)
+	AdminUnpublishProduct(c *gin.Context, id EntityID, params AdminUnpublishProductParams)
 	// CreateContactMessage Submit a visitor contact message
 	// (POST /api/v1/contact-messages)
 	CreateContactMessage(c *gin.Context, params CreateContactMessageParams)
 	// GetHome Get published homepage content
 	// (GET /api/v1/home)
 	GetHome(c *gin.Context, params GetHomeParams)
+	// GetMediaDisplay Get the ready display media variant
+	// (GET /api/v1/media/{id}/display.webp)
+	GetMediaDisplay(c *gin.Context, id EntityID, params GetMediaDisplayParams)
+	// GetMediaVariant Get one ready WebP width variant
+	// (GET /api/v1/media/{id}/variants/{width}.webp)
+	GetMediaVariant(c *gin.Context, id EntityID, width MediaWidth, params GetMediaVariantParams)
 	// ListProducts List published products
 	// (GET /api/v1/products)
 	ListProducts(c *gin.Context, params ListProductsParams)
@@ -911,6 +2132,1687 @@ func (siw *ServerInterfaceWrapper) GetAbout(c *gin.Context) {
 	}
 
 	siw.Handler.GetAbout(c, params)
+}
+
+// AdminListActivityLogs operation middleware
+func (siw *ServerInterfaceWrapper) AdminListActivityLogs(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminListActivityLogsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", c.Request.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter cursor: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", c.Request.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter limit: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminListActivityLogs(c, params)
+}
+
+// AdminLogin operation middleware
+func (siw *ServerInterfaceWrapper) AdminLogin(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminLoginParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminLogin(c, params)
+}
+
+// AdminLogout operation middleware
+func (siw *ServerInterfaceWrapper) AdminLogout(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminLogoutParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminLogout(c, params)
+}
+
+// AdminGetMe operation middleware
+func (siw *ServerInterfaceWrapper) AdminGetMe(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminGetMeParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminGetMe(c, params)
+}
+
+// AdminRegenerateRecoveryCodes operation middleware
+func (siw *ServerInterfaceWrapper) AdminRegenerateRecoveryCodes(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminRegenerateRecoveryCodesParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminRegenerateRecoveryCodes(c, params)
+}
+
+// AdminRefreshSession operation middleware
+func (siw *ServerInterfaceWrapper) AdminRefreshSession(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminRefreshSessionParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminRefreshSession(c, params)
+}
+
+// AdminEnableTotp operation middleware
+func (siw *ServerInterfaceWrapper) AdminEnableTotp(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminEnableTotpParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminEnableTotp(c, params)
+}
+
+// AdminSetupTotp operation middleware
+func (siw *ServerInterfaceWrapper) AdminSetupTotp(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminSetupTotpParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminSetupTotp(c, params)
+}
+
+// AdminListContactMessages operation middleware
+func (siw *ServerInterfaceWrapper) AdminListContactMessages(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminListContactMessagesParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", c.Request.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter cursor: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", c.Request.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter limit: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", c.Request.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter status: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminListContactMessages(c, params)
+}
+
+// AdminGetContactMessage operation middleware
+func (siw *ServerInterfaceWrapper) AdminGetContactMessage(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id EntityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminGetContactMessageParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminGetContactMessage(c, id, params)
+}
+
+// AdminUpdateContactMessageStatus operation middleware
+func (siw *ServerInterfaceWrapper) AdminUpdateContactMessageStatus(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id EntityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminUpdateContactMessageStatusParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for If-Match, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter If-Match: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		siw.ErrorHandler(c, fmt.Errorf("Header parameter If-Match is required, but not found"), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminUpdateContactMessageStatus(c, id, params)
+}
+
+// AdminListMedia operation middleware
+func (siw *ServerInterfaceWrapper) AdminListMedia(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminListMediaParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", c.Request.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter cursor: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", c.Request.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter limit: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminListMedia(c, params)
+}
+
+// AdminUploadMedia operation middleware
+func (siw *ServerInterfaceWrapper) AdminUploadMedia(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminUploadMediaParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminUploadMedia(c, params)
+}
+
+// AdminGetMedia operation middleware
+func (siw *ServerInterfaceWrapper) AdminGetMedia(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id EntityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminGetMediaParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminGetMedia(c, id, params)
+}
+
+// AdminRetryMedia operation middleware
+func (siw *ServerInterfaceWrapper) AdminRetryMedia(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id EntityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminRetryMediaParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminRetryMedia(c, id, params)
+}
+
+// AdminGetPage operation middleware
+func (siw *ServerInterfaceWrapper) AdminGetPage(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "key" -------------
+	var key AdminGetPageParamsKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "key", c.Param("key"), &key, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter key: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminGetPageParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminGetPage(c, key, params)
+}
+
+// AdminCreatePageDraft operation middleware
+func (siw *ServerInterfaceWrapper) AdminCreatePageDraft(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "key" -------------
+	var key AdminCreatePageDraftParamsKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "key", c.Param("key"), &key, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter key: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminCreatePageDraftParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for If-Match, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter If-Match: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		siw.ErrorHandler(c, fmt.Errorf("Header parameter If-Match is required, but not found"), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminCreatePageDraft(c, key, params)
+}
+
+// AdminGetPageRevision operation middleware
+func (siw *ServerInterfaceWrapper) AdminGetPageRevision(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "key" -------------
+	var key AdminGetPageRevisionParamsKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "key", c.Param("key"), &key, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter key: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "revisionId" -------------
+	var revisionId RevisionID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "revisionId", c.Param("revisionId"), &revisionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter revisionId: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminGetPageRevisionParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminGetPageRevision(c, key, revisionId, params)
+}
+
+// AdminPublishPageRevision operation middleware
+func (siw *ServerInterfaceWrapper) AdminPublishPageRevision(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "key" -------------
+	var key AdminPublishPageRevisionParamsKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "key", c.Param("key"), &key, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter key: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "revisionId" -------------
+	var revisionId RevisionID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "revisionId", c.Param("revisionId"), &revisionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter revisionId: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminPublishPageRevisionParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for If-Match, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter If-Match: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		siw.ErrorHandler(c, fmt.Errorf("Header parameter If-Match is required, but not found"), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminPublishPageRevision(c, key, revisionId, params)
+}
+
+// AdminUnpublishPage operation middleware
+func (siw *ServerInterfaceWrapper) AdminUnpublishPage(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "key" -------------
+	var key AdminUnpublishPageParamsKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "key", c.Param("key"), &key, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter key: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminUnpublishPageParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for If-Match, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter If-Match: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		siw.ErrorHandler(c, fmt.Errorf("Header parameter If-Match is required, but not found"), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminUnpublishPage(c, key, params)
+}
+
+// AdminListProducts operation middleware
+func (siw *ServerInterfaceWrapper) AdminListProducts(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminListProductsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", c.Request.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter cursor: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", c.Request.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter limit: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminListProducts(c, params)
+}
+
+// AdminCreateProduct operation middleware
+func (siw *ServerInterfaceWrapper) AdminCreateProduct(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminCreateProductParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminCreateProduct(c, params)
+}
+
+// AdminGetProduct operation middleware
+func (siw *ServerInterfaceWrapper) AdminGetProduct(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id EntityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminGetProductParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminGetProduct(c, id, params)
+}
+
+// AdminUpdateProduct operation middleware
+func (siw *ServerInterfaceWrapper) AdminUpdateProduct(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id EntityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminUpdateProductParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for If-Match, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter If-Match: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		siw.ErrorHandler(c, fmt.Errorf("Header parameter If-Match is required, but not found"), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminUpdateProduct(c, id, params)
+}
+
+// AdminArchiveProduct operation middleware
+func (siw *ServerInterfaceWrapper) AdminArchiveProduct(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id EntityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminArchiveProductParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for If-Match, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter If-Match: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		siw.ErrorHandler(c, fmt.Errorf("Header parameter If-Match is required, but not found"), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminArchiveProduct(c, id, params)
+}
+
+// AdminCreateProductDraft operation middleware
+func (siw *ServerInterfaceWrapper) AdminCreateProductDraft(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id EntityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminCreateProductDraftParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for If-Match, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter If-Match: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		siw.ErrorHandler(c, fmt.Errorf("Header parameter If-Match is required, but not found"), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminCreateProductDraft(c, id, params)
+}
+
+// AdminGetProductRevision operation middleware
+func (siw *ServerInterfaceWrapper) AdminGetProductRevision(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id EntityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "revisionId" -------------
+	var revisionId RevisionID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "revisionId", c.Param("revisionId"), &revisionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter revisionId: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminGetProductRevisionParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminGetProductRevision(c, id, revisionId, params)
+}
+
+// AdminPublishProductRevision operation middleware
+func (siw *ServerInterfaceWrapper) AdminPublishProductRevision(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id EntityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "revisionId" -------------
+	var revisionId RevisionID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "revisionId", c.Param("revisionId"), &revisionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter revisionId: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminPublishProductRevisionParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for If-Match, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter If-Match: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		siw.ErrorHandler(c, fmt.Errorf("Header parameter If-Match is required, but not found"), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminPublishProductRevision(c, id, revisionId, params)
+}
+
+// AdminUnarchiveProduct operation middleware
+func (siw *ServerInterfaceWrapper) AdminUnarchiveProduct(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id EntityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminUnarchiveProductParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for If-Match, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter If-Match: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		siw.ErrorHandler(c, fmt.Errorf("Header parameter If-Match is required, but not found"), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminUnarchiveProduct(c, id, params)
+}
+
+// AdminUnpublishProduct operation middleware
+func (siw *ServerInterfaceWrapper) AdminUnpublishProduct(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id EntityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AdminUnpublishProductParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for If-Match, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter If-Match: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		siw.ErrorHandler(c, fmt.Errorf("Header parameter If-Match is required, but not found"), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AdminUnpublishProduct(c, id, params)
 }
 
 // CreateContactMessage operation middleware
@@ -1032,6 +3934,151 @@ func (siw *ServerInterfaceWrapper) GetHome(c *gin.Context) {
 	}
 
 	siw.Handler.GetHome(c, params)
+}
+
+// GetMediaDisplay operation middleware
+func (siw *ServerInterfaceWrapper) GetMediaDisplay(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id EntityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetMediaDisplayParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	// ------------- Optional header parameter "If-None-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-None-Match")]; found {
+		var IfNoneMatch IfNoneMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for If-None-Match, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-None-Match", valueList[0], &IfNoneMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter If-None-Match: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.IfNoneMatch = &IfNoneMatch
+
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetMediaDisplay(c, id, params)
+}
+
+// GetMediaVariant operation middleware
+func (siw *ServerInterfaceWrapper) GetMediaVariant(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id EntityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "width" -------------
+	var width MediaWidth
+
+	err = runtime.BindStyledParameterWithOptions("simple", "width", c.Param("width"), &width, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter width: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetMediaVariantParams
+
+	headers := c.Request.Header
+
+	// ------------- Optional header parameter "X-Request-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Request-ID")]; found {
+		var XRequestID XRequestID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for X-Request-ID, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Request-ID", valueList[0], &XRequestID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter X-Request-ID: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.XRequestID = &XRequestID
+
+	}
+
+	// ------------- Optional header parameter "If-None-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-None-Match")]; found {
+		var IfNoneMatch IfNoneMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandler(c, fmt.Errorf("Expected one value for If-None-Match, got %d", n), http.StatusBadRequest)
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-None-Match", valueList[0], &IfNoneMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter If-None-Match: %w", err), http.StatusBadRequest)
+			return
+		}
+
+		params.IfNoneMatch = &IfNoneMatch
+
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetMediaVariant(c, id, width, params)
 }
 
 // ListProducts operation middleware
@@ -1389,9 +4436,215 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/api/v1/products", wrapper.ListProducts)
 	router.GET(options.BaseURL+"/api/v1/products/:slug", wrapper.GetProductBySlug)
 	router.POST(options.BaseURL+"/api/v1/contact-messages", wrapper.CreateContactMessage)
+	router.POST(options.BaseURL+"/api/v1/admin/auth/login", wrapper.AdminLogin)
+	router.POST(options.BaseURL+"/api/v1/admin/auth/totp/setup", wrapper.AdminSetupTotp)
+	router.POST(options.BaseURL+"/api/v1/admin/auth/totp/enable", wrapper.AdminEnableTotp)
+	router.POST(options.BaseURL+"/api/v1/admin/auth/refresh", wrapper.AdminRefreshSession)
+	router.POST(options.BaseURL+"/api/v1/admin/auth/logout", wrapper.AdminLogout)
+	router.GET(options.BaseURL+"/api/v1/admin/auth/me", wrapper.AdminGetMe)
+	router.POST(options.BaseURL+"/api/v1/admin/auth/recovery-codes/regenerate", wrapper.AdminRegenerateRecoveryCodes)
+	router.GET(options.BaseURL+"/api/v1/admin/pages/:key", wrapper.AdminGetPage)
+	router.POST(options.BaseURL+"/api/v1/admin/pages/:key/drafts", wrapper.AdminCreatePageDraft)
+	router.GET(options.BaseURL+"/api/v1/admin/pages/:key/revisions/:revisionId", wrapper.AdminGetPageRevision)
+	router.POST(options.BaseURL+"/api/v1/admin/pages/:key/revisions/:revisionId/publish", wrapper.AdminPublishPageRevision)
+	router.POST(options.BaseURL+"/api/v1/admin/pages/:key/unpublish", wrapper.AdminUnpublishPage)
+	router.GET(options.BaseURL+"/api/v1/admin/products", wrapper.AdminListProducts)
+	router.POST(options.BaseURL+"/api/v1/admin/products", wrapper.AdminCreateProduct)
+	router.GET(options.BaseURL+"/api/v1/admin/products/:id", wrapper.AdminGetProduct)
+	router.PATCH(options.BaseURL+"/api/v1/admin/products/:id", wrapper.AdminUpdateProduct)
+	router.POST(options.BaseURL+"/api/v1/admin/products/:id/drafts", wrapper.AdminCreateProductDraft)
+	router.GET(options.BaseURL+"/api/v1/admin/products/:id/revisions/:revisionId", wrapper.AdminGetProductRevision)
+	router.POST(options.BaseURL+"/api/v1/admin/products/:id/revisions/:revisionId/publish", wrapper.AdminPublishProductRevision)
+	router.POST(options.BaseURL+"/api/v1/admin/products/:id/unpublish", wrapper.AdminUnpublishProduct)
+	router.POST(options.BaseURL+"/api/v1/admin/products/:id/archive", wrapper.AdminArchiveProduct)
+	router.POST(options.BaseURL+"/api/v1/admin/products/:id/unarchive", wrapper.AdminUnarchiveProduct)
+	router.GET(options.BaseURL+"/api/v1/admin/media", wrapper.AdminListMedia)
+	router.POST(options.BaseURL+"/api/v1/admin/media", wrapper.AdminUploadMedia)
+	router.GET(options.BaseURL+"/api/v1/admin/media/:id", wrapper.AdminGetMedia)
+	router.POST(options.BaseURL+"/api/v1/admin/media/:id/retry", wrapper.AdminRetryMedia)
+	router.GET(options.BaseURL+"/api/v1/media/:id/display.webp", wrapper.GetMediaDisplay)
+	router.GET(options.BaseURL+"/api/v1/media/:id/variants/:width.webp", wrapper.GetMediaVariant)
+	router.GET(options.BaseURL+"/api/v1/admin/contact-messages", wrapper.AdminListContactMessages)
+	router.GET(options.BaseURL+"/api/v1/admin/contact-messages/:id", wrapper.AdminGetContactMessage)
+	router.PATCH(options.BaseURL+"/api/v1/admin/contact-messages/:id/status", wrapper.AdminUpdateContactMessageStatus)
+	router.GET(options.BaseURL+"/api/v1/admin/activity-logs", wrapper.AdminListActivityLogs)
 	router.GET(options.BaseURL+"/health/live", wrapper.GetLiveness)
 	router.GET(options.BaseURL+"/health/ready", wrapper.GetReadiness)
 	router.GET(options.BaseURL+"/internal/metrics", wrapper.GetMetrics)
+}
+
+type AdminActivityListOKResponseHeaders struct {
+	CacheControl string
+	XRequestID   RequestID
+}
+type AdminActivityListOKJSONResponse struct {
+	Body AdminActivityListResponse
+
+	Headers AdminActivityListOKResponseHeaders
+}
+
+type AdminAuthOKResponseHeaders struct {
+	CacheControl string
+	XRequestID   RequestID
+}
+type AdminAuthOKJSONResponse struct {
+	Body AdminAuthResponse
+
+	Headers AdminAuthOKResponseHeaders
+}
+
+type AdminContactListOKResponseHeaders struct {
+	CacheControl string
+	XRequestID   RequestID
+}
+type AdminContactListOKJSONResponse struct {
+	Body AdminContactListResponse
+
+	Headers AdminContactListOKResponseHeaders
+}
+
+type AdminContactOKResponseHeaders struct {
+	CacheControl string
+	ETag         string
+	XRequestID   RequestID
+}
+type AdminContactOKJSONResponse struct {
+	Body AdminContactResponse
+
+	Headers AdminContactOKResponseHeaders
+}
+
+type AdminMediaAcceptedResponseHeaders struct {
+	CacheControl string
+	XRequestID   RequestID
+}
+type AdminMediaAcceptedJSONResponse struct {
+	Body AdminMediaResponse
+
+	Headers AdminMediaAcceptedResponseHeaders
+}
+
+type AdminMediaListOKResponseHeaders struct {
+	CacheControl string
+	XRequestID   RequestID
+}
+type AdminMediaListOKJSONResponse struct {
+	Body AdminMediaListResponse
+
+	Headers AdminMediaListOKResponseHeaders
+}
+
+type AdminMediaOKResponseHeaders struct {
+	CacheControl string
+	XRequestID   RequestID
+}
+type AdminMediaOKJSONResponse struct {
+	Body AdminMediaResponse
+
+	Headers AdminMediaOKResponseHeaders
+}
+
+type AdminNoContentResponseHeaders struct {
+	CacheControl string
+	XRequestID   RequestID
+}
+type AdminNoContentResponse struct {
+	Headers AdminNoContentResponseHeaders
+}
+
+type AdminPageOKResponseHeaders struct {
+	CacheControl string
+	ETag         string
+	XRequestID   RequestID
+}
+type AdminPageOKJSONResponse struct {
+	Body AdminPageResponse
+
+	Headers AdminPageOKResponseHeaders
+}
+
+type AdminProductCreatedResponseHeaders struct {
+	CacheControl string
+	ETag         string
+	XRequestID   RequestID
+}
+type AdminProductCreatedJSONResponse struct {
+	Body AdminProductResponse
+
+	Headers AdminProductCreatedResponseHeaders
+}
+
+type AdminProductListOKResponseHeaders struct {
+	CacheControl string
+	XRequestID   RequestID
+}
+type AdminProductListOKJSONResponse struct {
+	Body AdminProductListResponse
+
+	Headers AdminProductListOKResponseHeaders
+}
+
+type AdminProductOKResponseHeaders struct {
+	CacheControl string
+	ETag         string
+	XRequestID   RequestID
+}
+type AdminProductOKJSONResponse struct {
+	Body AdminProductResponse
+
+	Headers AdminProductOKResponseHeaders
+}
+
+type AdminRecoveryCodesOKResponseHeaders struct {
+	CacheControl string
+	XRequestID   RequestID
+}
+type AdminRecoveryCodesOKJSONResponse struct {
+	Body AdminRecoveryCodesResponse
+
+	Headers AdminRecoveryCodesOKResponseHeaders
+}
+
+type AdminRevisionCreatedResponseHeaders struct {
+	CacheControl string
+	ETag         string
+	XRequestID   RequestID
+}
+type AdminRevisionCreatedJSONResponse struct {
+	Body AdminRevisionResponse
+
+	Headers AdminRevisionCreatedResponseHeaders
+}
+
+type AdminRevisionOKResponseHeaders struct {
+	CacheControl string
+	ETag         string
+	XRequestID   RequestID
+}
+type AdminRevisionOKJSONResponse struct {
+	Body AdminRevisionResponse
+
+	Headers AdminRevisionOKResponseHeaders
+}
+
+type AdminTotpSetupOKResponseHeaders struct {
+	CacheControl string
+	XRequestID   RequestID
+}
+type AdminTotpSetupOKJSONResponse struct {
+	Body AdminTotpSetupResponse
+
+	Headers AdminTotpSetupOKResponseHeaders
+}
+
+type AdminUserOKResponseHeaders struct {
+	CacheControl string
+	XRequestID   RequestID
+}
+type AdminUserOKJSONResponse struct {
+	Body AdminUserResponse
+
+	Headers AdminUserOKResponseHeaders
 }
 
 type BadRequestResponseHeaders struct {
@@ -1402,6 +4655,16 @@ type BadRequestApplicationProblemPlusJSONResponse struct {
 	Body Problem
 
 	Headers BadRequestResponseHeaders
+}
+
+type ConflictResponseHeaders struct {
+	CacheControl string
+	XRequestID   RequestID
+}
+type ConflictApplicationProblemPlusJSONResponse struct {
+	Body Problem
+
+	Headers ConflictResponseHeaders
 }
 
 type ForbiddenResponseHeaders struct {
@@ -1434,6 +4697,28 @@ type InternalServerErrorApplicationProblemPlusJSONResponse struct {
 	Headers InternalServerErrorResponseHeaders
 }
 
+type MediaBinaryOKResponseHeaders struct {
+	CacheControl string
+	ETag         string
+	XRequestID   RequestID
+}
+type MediaBinaryOKImagewebpResponse struct {
+	Body io.Reader
+
+	Headers       MediaBinaryOKResponseHeaders
+	ContentLength int64
+}
+
+type NotFoundResponseHeaders struct {
+	CacheControl string
+	XRequestID   RequestID
+}
+type NotFoundApplicationProblemPlusJSONResponse struct {
+	Body Problem
+
+	Headers NotFoundResponseHeaders
+}
+
 type NotModifiedResponseHeaders struct {
 	CacheControl string
 	ETag         string
@@ -1451,6 +4736,16 @@ type PayloadTooLargeApplicationProblemPlusJSONResponse struct {
 	Body Problem
 
 	Headers PayloadTooLargeResponseHeaders
+}
+
+type PreconditionFailedResponseHeaders struct {
+	CacheControl string
+	XRequestID   RequestID
+}
+type PreconditionFailedApplicationProblemPlusJSONResponse struct {
+	Body Problem
+
+	Headers PreconditionFailedResponseHeaders
 }
 
 type ProductListBadRequestResponseHeaders struct {
@@ -1640,6 +4935,3792 @@ func (response GetAbout503ApplicationProblemPlusJSONResponse) VisitGetAboutRespo
 	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
 	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
 	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminListActivityLogsRequestObject struct {
+	Params AdminListActivityLogsParams
+}
+
+type AdminListActivityLogsResponseObject interface {
+	VisitAdminListActivityLogsResponse(w http.ResponseWriter) error
+}
+
+type AdminListActivityLogs200JSONResponse struct {
+	AdminActivityListOKJSONResponse
+}
+
+func (response AdminListActivityLogs200JSONResponse) VisitAdminListActivityLogsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminListActivityLogs400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response AdminListActivityLogs400ApplicationProblemPlusJSONResponse) VisitAdminListActivityLogsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminListActivityLogs401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminListActivityLogs401ApplicationProblemPlusJSONResponse) VisitAdminListActivityLogsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminListActivityLogs403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminListActivityLogs403ApplicationProblemPlusJSONResponse) VisitAdminListActivityLogsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminListActivityLogs500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminListActivityLogs500ApplicationProblemPlusJSONResponse) VisitAdminListActivityLogsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminLoginRequestObject struct {
+	Params AdminLoginParams
+	Body   *AdminLoginJSONRequestBody
+}
+
+type AdminLoginResponseObject interface {
+	VisitAdminLoginResponse(w http.ResponseWriter) error
+}
+
+type AdminLogin200JSONResponse struct{ AdminAuthOKJSONResponse }
+
+func (response AdminLogin200JSONResponse) VisitAdminLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminLogin400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response AdminLogin400ApplicationProblemPlusJSONResponse) VisitAdminLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminLogin401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminLogin401ApplicationProblemPlusJSONResponse) VisitAdminLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminLogin422ApplicationProblemPlusJSONResponse struct {
+	ValidationFailedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminLogin422ApplicationProblemPlusJSONResponse) VisitAdminLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminLogin429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response AdminLogin429ApplicationProblemPlusJSONResponse) VisitAdminLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminLogin500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminLogin500ApplicationProblemPlusJSONResponse) VisitAdminLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminLogoutRequestObject struct {
+	Params AdminLogoutParams
+}
+
+type AdminLogoutResponseObject interface {
+	VisitAdminLogoutResponse(w http.ResponseWriter) error
+}
+
+type AdminLogout204Response = AdminNoContentResponse
+
+func (response AdminLogout204Response) VisitAdminLogoutResponse(w http.ResponseWriter) error {
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(204)
+	return nil
+}
+
+type AdminLogout401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminLogout401ApplicationProblemPlusJSONResponse) VisitAdminLogoutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminLogout403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminLogout403ApplicationProblemPlusJSONResponse) VisitAdminLogoutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminLogout500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminLogout500ApplicationProblemPlusJSONResponse) VisitAdminLogoutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetMeRequestObject struct {
+	Params AdminGetMeParams
+}
+
+type AdminGetMeResponseObject interface {
+	VisitAdminGetMeResponse(w http.ResponseWriter) error
+}
+
+type AdminGetMe200JSONResponse struct{ AdminUserOKJSONResponse }
+
+func (response AdminGetMe200JSONResponse) VisitAdminGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetMe401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetMe401ApplicationProblemPlusJSONResponse) VisitAdminGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetMe403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetMe403ApplicationProblemPlusJSONResponse) VisitAdminGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetMe500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetMe500ApplicationProblemPlusJSONResponse) VisitAdminGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminRegenerateRecoveryCodesRequestObject struct {
+	Params AdminRegenerateRecoveryCodesParams
+	Body   *AdminRegenerateRecoveryCodesJSONRequestBody
+}
+
+type AdminRegenerateRecoveryCodesResponseObject interface {
+	VisitAdminRegenerateRecoveryCodesResponse(w http.ResponseWriter) error
+}
+
+type AdminRegenerateRecoveryCodes200JSONResponse struct {
+	AdminRecoveryCodesOKJSONResponse
+}
+
+func (response AdminRegenerateRecoveryCodes200JSONResponse) VisitAdminRegenerateRecoveryCodesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminRegenerateRecoveryCodes400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response AdminRegenerateRecoveryCodes400ApplicationProblemPlusJSONResponse) VisitAdminRegenerateRecoveryCodesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminRegenerateRecoveryCodes401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminRegenerateRecoveryCodes401ApplicationProblemPlusJSONResponse) VisitAdminRegenerateRecoveryCodesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminRegenerateRecoveryCodes403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminRegenerateRecoveryCodes403ApplicationProblemPlusJSONResponse) VisitAdminRegenerateRecoveryCodesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminRegenerateRecoveryCodes422ApplicationProblemPlusJSONResponse struct {
+	ValidationFailedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminRegenerateRecoveryCodes422ApplicationProblemPlusJSONResponse) VisitAdminRegenerateRecoveryCodesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminRegenerateRecoveryCodes429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response AdminRegenerateRecoveryCodes429ApplicationProblemPlusJSONResponse) VisitAdminRegenerateRecoveryCodesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminRegenerateRecoveryCodes500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminRegenerateRecoveryCodes500ApplicationProblemPlusJSONResponse) VisitAdminRegenerateRecoveryCodesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminRefreshSessionRequestObject struct {
+	Params AdminRefreshSessionParams
+}
+
+type AdminRefreshSessionResponseObject interface {
+	VisitAdminRefreshSessionResponse(w http.ResponseWriter) error
+}
+
+type AdminRefreshSession200JSONResponse struct{ AdminAuthOKJSONResponse }
+
+func (response AdminRefreshSession200JSONResponse) VisitAdminRefreshSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminRefreshSession401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminRefreshSession401ApplicationProblemPlusJSONResponse) VisitAdminRefreshSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminRefreshSession403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminRefreshSession403ApplicationProblemPlusJSONResponse) VisitAdminRefreshSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminRefreshSession409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response AdminRefreshSession409ApplicationProblemPlusJSONResponse) VisitAdminRefreshSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminRefreshSession429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response AdminRefreshSession429ApplicationProblemPlusJSONResponse) VisitAdminRefreshSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminRefreshSession500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminRefreshSession500ApplicationProblemPlusJSONResponse) VisitAdminRefreshSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminEnableTotpRequestObject struct {
+	Params AdminEnableTotpParams
+	Body   *AdminEnableTotpJSONRequestBody
+}
+
+type AdminEnableTotpResponseObject interface {
+	VisitAdminEnableTotpResponse(w http.ResponseWriter) error
+}
+
+type AdminEnableTotp200JSONResponse struct {
+	AdminRecoveryCodesOKJSONResponse
+}
+
+func (response AdminEnableTotp200JSONResponse) VisitAdminEnableTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminEnableTotp400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response AdminEnableTotp400ApplicationProblemPlusJSONResponse) VisitAdminEnableTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminEnableTotp401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminEnableTotp401ApplicationProblemPlusJSONResponse) VisitAdminEnableTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminEnableTotp403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminEnableTotp403ApplicationProblemPlusJSONResponse) VisitAdminEnableTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminEnableTotp409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response AdminEnableTotp409ApplicationProblemPlusJSONResponse) VisitAdminEnableTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminEnableTotp422ApplicationProblemPlusJSONResponse struct {
+	ValidationFailedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminEnableTotp422ApplicationProblemPlusJSONResponse) VisitAdminEnableTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminEnableTotp429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response AdminEnableTotp429ApplicationProblemPlusJSONResponse) VisitAdminEnableTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminEnableTotp500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminEnableTotp500ApplicationProblemPlusJSONResponse) VisitAdminEnableTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminSetupTotpRequestObject struct {
+	Params AdminSetupTotpParams
+}
+
+type AdminSetupTotpResponseObject interface {
+	VisitAdminSetupTotpResponse(w http.ResponseWriter) error
+}
+
+type AdminSetupTotp200JSONResponse struct{ AdminTotpSetupOKJSONResponse }
+
+func (response AdminSetupTotp200JSONResponse) VisitAdminSetupTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminSetupTotp401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminSetupTotp401ApplicationProblemPlusJSONResponse) VisitAdminSetupTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminSetupTotp403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminSetupTotp403ApplicationProblemPlusJSONResponse) VisitAdminSetupTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminSetupTotp409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response AdminSetupTotp409ApplicationProblemPlusJSONResponse) VisitAdminSetupTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminSetupTotp429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response AdminSetupTotp429ApplicationProblemPlusJSONResponse) VisitAdminSetupTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminSetupTotp500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminSetupTotp500ApplicationProblemPlusJSONResponse) VisitAdminSetupTotpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminListContactMessagesRequestObject struct {
+	Params AdminListContactMessagesParams
+}
+
+type AdminListContactMessagesResponseObject interface {
+	VisitAdminListContactMessagesResponse(w http.ResponseWriter) error
+}
+
+type AdminListContactMessages200JSONResponse struct{ AdminContactListOKJSONResponse }
+
+func (response AdminListContactMessages200JSONResponse) VisitAdminListContactMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminListContactMessages400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response AdminListContactMessages400ApplicationProblemPlusJSONResponse) VisitAdminListContactMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminListContactMessages401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminListContactMessages401ApplicationProblemPlusJSONResponse) VisitAdminListContactMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminListContactMessages403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminListContactMessages403ApplicationProblemPlusJSONResponse) VisitAdminListContactMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminListContactMessages500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminListContactMessages500ApplicationProblemPlusJSONResponse) VisitAdminListContactMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetContactMessageRequestObject struct {
+	Id     EntityID `json:"id"`
+	Params AdminGetContactMessageParams
+}
+
+type AdminGetContactMessageResponseObject interface {
+	VisitAdminGetContactMessageResponse(w http.ResponseWriter) error
+}
+
+type AdminGetContactMessage200JSONResponse struct{ AdminContactOKJSONResponse }
+
+func (response AdminGetContactMessage200JSONResponse) VisitAdminGetContactMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetContactMessage400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetContactMessage400ApplicationProblemPlusJSONResponse) VisitAdminGetContactMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetContactMessage401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetContactMessage401ApplicationProblemPlusJSONResponse) VisitAdminGetContactMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetContactMessage403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetContactMessage403ApplicationProblemPlusJSONResponse) VisitAdminGetContactMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetContactMessage404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetContactMessage404ApplicationProblemPlusJSONResponse) VisitAdminGetContactMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetContactMessage500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetContactMessage500ApplicationProblemPlusJSONResponse) VisitAdminGetContactMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUpdateContactMessageStatusRequestObject struct {
+	Id     EntityID `json:"id"`
+	Params AdminUpdateContactMessageStatusParams
+	Body   *AdminUpdateContactMessageStatusJSONRequestBody
+}
+
+type AdminUpdateContactMessageStatusResponseObject interface {
+	VisitAdminUpdateContactMessageStatusResponse(w http.ResponseWriter) error
+}
+
+type AdminUpdateContactMessageStatus200JSONResponse struct{ AdminContactOKJSONResponse }
+
+func (response AdminUpdateContactMessageStatus200JSONResponse) VisitAdminUpdateContactMessageStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUpdateContactMessageStatus400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUpdateContactMessageStatus400ApplicationProblemPlusJSONResponse) VisitAdminUpdateContactMessageStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUpdateContactMessageStatus401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUpdateContactMessageStatus401ApplicationProblemPlusJSONResponse) VisitAdminUpdateContactMessageStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUpdateContactMessageStatus403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUpdateContactMessageStatus403ApplicationProblemPlusJSONResponse) VisitAdminUpdateContactMessageStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUpdateContactMessageStatus404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUpdateContactMessageStatus404ApplicationProblemPlusJSONResponse) VisitAdminUpdateContactMessageStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUpdateContactMessageStatus412ApplicationProblemPlusJSONResponse struct {
+	PreconditionFailedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUpdateContactMessageStatus412ApplicationProblemPlusJSONResponse) VisitAdminUpdateContactMessageStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUpdateContactMessageStatus422ApplicationProblemPlusJSONResponse struct {
+	ValidationFailedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUpdateContactMessageStatus422ApplicationProblemPlusJSONResponse) VisitAdminUpdateContactMessageStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUpdateContactMessageStatus500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUpdateContactMessageStatus500ApplicationProblemPlusJSONResponse) VisitAdminUpdateContactMessageStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminListMediaRequestObject struct {
+	Params AdminListMediaParams
+}
+
+type AdminListMediaResponseObject interface {
+	VisitAdminListMediaResponse(w http.ResponseWriter) error
+}
+
+type AdminListMedia200JSONResponse struct{ AdminMediaListOKJSONResponse }
+
+func (response AdminListMedia200JSONResponse) VisitAdminListMediaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminListMedia400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response AdminListMedia400ApplicationProblemPlusJSONResponse) VisitAdminListMediaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminListMedia401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminListMedia401ApplicationProblemPlusJSONResponse) VisitAdminListMediaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminListMedia403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminListMedia403ApplicationProblemPlusJSONResponse) VisitAdminListMediaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminListMedia500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminListMedia500ApplicationProblemPlusJSONResponse) VisitAdminListMediaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUploadMediaRequestObject struct {
+	Params AdminUploadMediaParams
+	Body   *multipart.Reader
+}
+
+type AdminUploadMediaResponseObject interface {
+	VisitAdminUploadMediaResponse(w http.ResponseWriter) error
+}
+
+type AdminUploadMedia202JSONResponse struct{ AdminMediaAcceptedJSONResponse }
+
+func (response AdminUploadMedia202JSONResponse) VisitAdminUploadMediaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUploadMedia400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUploadMedia400ApplicationProblemPlusJSONResponse) VisitAdminUploadMediaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUploadMedia401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUploadMedia401ApplicationProblemPlusJSONResponse) VisitAdminUploadMediaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUploadMedia403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUploadMedia403ApplicationProblemPlusJSONResponse) VisitAdminUploadMediaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUploadMedia413ApplicationProblemPlusJSONResponse struct {
+	PayloadTooLargeApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUploadMedia413ApplicationProblemPlusJSONResponse) VisitAdminUploadMediaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUploadMedia415ApplicationProblemPlusJSONResponse struct {
+	UnsupportedMediaTypeApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUploadMedia415ApplicationProblemPlusJSONResponse) VisitAdminUploadMediaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUploadMedia422ApplicationProblemPlusJSONResponse struct {
+	ValidationFailedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUploadMedia422ApplicationProblemPlusJSONResponse) VisitAdminUploadMediaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUploadMedia500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUploadMedia500ApplicationProblemPlusJSONResponse) VisitAdminUploadMediaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetMediaRequestObject struct {
+	Id     EntityID `json:"id"`
+	Params AdminGetMediaParams
+}
+
+type AdminGetMediaResponseObject interface {
+	VisitAdminGetMediaResponse(w http.ResponseWriter) error
+}
+
+type AdminGetMedia200JSONResponse struct{ AdminMediaOKJSONResponse }
+
+func (response AdminGetMedia200JSONResponse) VisitAdminGetMediaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetMedia400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetMedia400ApplicationProblemPlusJSONResponse) VisitAdminGetMediaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetMedia401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetMedia401ApplicationProblemPlusJSONResponse) VisitAdminGetMediaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetMedia403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetMedia403ApplicationProblemPlusJSONResponse) VisitAdminGetMediaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetMedia404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetMedia404ApplicationProblemPlusJSONResponse) VisitAdminGetMediaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetMedia500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetMedia500ApplicationProblemPlusJSONResponse) VisitAdminGetMediaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminRetryMediaRequestObject struct {
+	Id     EntityID `json:"id"`
+	Params AdminRetryMediaParams
+}
+
+type AdminRetryMediaResponseObject interface {
+	VisitAdminRetryMediaResponse(w http.ResponseWriter) error
+}
+
+type AdminRetryMedia202JSONResponse struct{ AdminMediaAcceptedJSONResponse }
+
+func (response AdminRetryMedia202JSONResponse) VisitAdminRetryMediaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminRetryMedia401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminRetryMedia401ApplicationProblemPlusJSONResponse) VisitAdminRetryMediaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminRetryMedia403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminRetryMedia403ApplicationProblemPlusJSONResponse) VisitAdminRetryMediaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminRetryMedia404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AdminRetryMedia404ApplicationProblemPlusJSONResponse) VisitAdminRetryMediaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminRetryMedia409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response AdminRetryMedia409ApplicationProblemPlusJSONResponse) VisitAdminRetryMediaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminRetryMedia500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminRetryMedia500ApplicationProblemPlusJSONResponse) VisitAdminRetryMediaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetPageRequestObject struct {
+	Key    AdminGetPageParamsKey `json:"key"`
+	Params AdminGetPageParams
+}
+
+type AdminGetPageResponseObject interface {
+	VisitAdminGetPageResponse(w http.ResponseWriter) error
+}
+
+type AdminGetPage200JSONResponse struct{ AdminPageOKJSONResponse }
+
+func (response AdminGetPage200JSONResponse) VisitAdminGetPageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetPage400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetPage400ApplicationProblemPlusJSONResponse) VisitAdminGetPageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetPage401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetPage401ApplicationProblemPlusJSONResponse) VisitAdminGetPageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetPage403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetPage403ApplicationProblemPlusJSONResponse) VisitAdminGetPageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetPage404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetPage404ApplicationProblemPlusJSONResponse) VisitAdminGetPageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetPage500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetPage500ApplicationProblemPlusJSONResponse) VisitAdminGetPageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminCreatePageDraftRequestObject struct {
+	Key    AdminCreatePageDraftParamsKey `json:"key"`
+	Params AdminCreatePageDraftParams
+	Body   *AdminCreatePageDraftJSONRequestBody
+}
+
+type AdminCreatePageDraftResponseObject interface {
+	VisitAdminCreatePageDraftResponse(w http.ResponseWriter) error
+}
+
+type AdminCreatePageDraft201JSONResponse struct {
+	AdminRevisionCreatedJSONResponse
+}
+
+func (response AdminCreatePageDraft201JSONResponse) VisitAdminCreatePageDraftResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminCreatePageDraft400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response AdminCreatePageDraft400ApplicationProblemPlusJSONResponse) VisitAdminCreatePageDraftResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminCreatePageDraft401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminCreatePageDraft401ApplicationProblemPlusJSONResponse) VisitAdminCreatePageDraftResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminCreatePageDraft403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminCreatePageDraft403ApplicationProblemPlusJSONResponse) VisitAdminCreatePageDraftResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminCreatePageDraft404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AdminCreatePageDraft404ApplicationProblemPlusJSONResponse) VisitAdminCreatePageDraftResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminCreatePageDraft412ApplicationProblemPlusJSONResponse struct {
+	PreconditionFailedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminCreatePageDraft412ApplicationProblemPlusJSONResponse) VisitAdminCreatePageDraftResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminCreatePageDraft422ApplicationProblemPlusJSONResponse struct {
+	ValidationFailedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminCreatePageDraft422ApplicationProblemPlusJSONResponse) VisitAdminCreatePageDraftResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminCreatePageDraft500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminCreatePageDraft500ApplicationProblemPlusJSONResponse) VisitAdminCreatePageDraftResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetPageRevisionRequestObject struct {
+	Key        AdminGetPageRevisionParamsKey `json:"key"`
+	RevisionId RevisionID                    `json:"revisionId"`
+	Params     AdminGetPageRevisionParams
+}
+
+type AdminGetPageRevisionResponseObject interface {
+	VisitAdminGetPageRevisionResponse(w http.ResponseWriter) error
+}
+
+type AdminGetPageRevision200JSONResponse struct{ AdminRevisionOKJSONResponse }
+
+func (response AdminGetPageRevision200JSONResponse) VisitAdminGetPageRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetPageRevision400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetPageRevision400ApplicationProblemPlusJSONResponse) VisitAdminGetPageRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetPageRevision401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetPageRevision401ApplicationProblemPlusJSONResponse) VisitAdminGetPageRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetPageRevision403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetPageRevision403ApplicationProblemPlusJSONResponse) VisitAdminGetPageRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetPageRevision404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetPageRevision404ApplicationProblemPlusJSONResponse) VisitAdminGetPageRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetPageRevision500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetPageRevision500ApplicationProblemPlusJSONResponse) VisitAdminGetPageRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminPublishPageRevisionRequestObject struct {
+	Key        AdminPublishPageRevisionParamsKey `json:"key"`
+	RevisionId RevisionID                        `json:"revisionId"`
+	Params     AdminPublishPageRevisionParams
+}
+
+type AdminPublishPageRevisionResponseObject interface {
+	VisitAdminPublishPageRevisionResponse(w http.ResponseWriter) error
+}
+
+type AdminPublishPageRevision200JSONResponse struct{ AdminRevisionOKJSONResponse }
+
+func (response AdminPublishPageRevision200JSONResponse) VisitAdminPublishPageRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminPublishPageRevision400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response AdminPublishPageRevision400ApplicationProblemPlusJSONResponse) VisitAdminPublishPageRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminPublishPageRevision401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminPublishPageRevision401ApplicationProblemPlusJSONResponse) VisitAdminPublishPageRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminPublishPageRevision403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminPublishPageRevision403ApplicationProblemPlusJSONResponse) VisitAdminPublishPageRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminPublishPageRevision404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AdminPublishPageRevision404ApplicationProblemPlusJSONResponse) VisitAdminPublishPageRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminPublishPageRevision409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response AdminPublishPageRevision409ApplicationProblemPlusJSONResponse) VisitAdminPublishPageRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminPublishPageRevision412ApplicationProblemPlusJSONResponse struct {
+	PreconditionFailedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminPublishPageRevision412ApplicationProblemPlusJSONResponse) VisitAdminPublishPageRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminPublishPageRevision422ApplicationProblemPlusJSONResponse struct {
+	ValidationFailedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminPublishPageRevision422ApplicationProblemPlusJSONResponse) VisitAdminPublishPageRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminPublishPageRevision500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminPublishPageRevision500ApplicationProblemPlusJSONResponse) VisitAdminPublishPageRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUnpublishPageRequestObject struct {
+	Key    AdminUnpublishPageParamsKey `json:"key"`
+	Params AdminUnpublishPageParams
+}
+
+type AdminUnpublishPageResponseObject interface {
+	VisitAdminUnpublishPageResponse(w http.ResponseWriter) error
+}
+
+type AdminUnpublishPage204Response = AdminNoContentResponse
+
+func (response AdminUnpublishPage204Response) VisitAdminUnpublishPageResponse(w http.ResponseWriter) error {
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(204)
+	return nil
+}
+
+type AdminUnpublishPage401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUnpublishPage401ApplicationProblemPlusJSONResponse) VisitAdminUnpublishPageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUnpublishPage403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUnpublishPage403ApplicationProblemPlusJSONResponse) VisitAdminUnpublishPageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUnpublishPage404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUnpublishPage404ApplicationProblemPlusJSONResponse) VisitAdminUnpublishPageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUnpublishPage412ApplicationProblemPlusJSONResponse struct {
+	PreconditionFailedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUnpublishPage412ApplicationProblemPlusJSONResponse) VisitAdminUnpublishPageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUnpublishPage500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUnpublishPage500ApplicationProblemPlusJSONResponse) VisitAdminUnpublishPageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminListProductsRequestObject struct {
+	Params AdminListProductsParams
+}
+
+type AdminListProductsResponseObject interface {
+	VisitAdminListProductsResponse(w http.ResponseWriter) error
+}
+
+type AdminListProducts200JSONResponse struct{ AdminProductListOKJSONResponse }
+
+func (response AdminListProducts200JSONResponse) VisitAdminListProductsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminListProducts400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response AdminListProducts400ApplicationProblemPlusJSONResponse) VisitAdminListProductsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminListProducts401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminListProducts401ApplicationProblemPlusJSONResponse) VisitAdminListProductsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminListProducts403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminListProducts403ApplicationProblemPlusJSONResponse) VisitAdminListProductsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminListProducts500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminListProducts500ApplicationProblemPlusJSONResponse) VisitAdminListProductsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminCreateProductRequestObject struct {
+	Params AdminCreateProductParams
+	Body   *AdminCreateProductJSONRequestBody
+}
+
+type AdminCreateProductResponseObject interface {
+	VisitAdminCreateProductResponse(w http.ResponseWriter) error
+}
+
+type AdminCreateProduct201JSONResponse struct {
+	AdminProductCreatedJSONResponse
+}
+
+func (response AdminCreateProduct201JSONResponse) VisitAdminCreateProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminCreateProduct400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response AdminCreateProduct400ApplicationProblemPlusJSONResponse) VisitAdminCreateProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminCreateProduct401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminCreateProduct401ApplicationProblemPlusJSONResponse) VisitAdminCreateProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminCreateProduct403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminCreateProduct403ApplicationProblemPlusJSONResponse) VisitAdminCreateProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminCreateProduct409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response AdminCreateProduct409ApplicationProblemPlusJSONResponse) VisitAdminCreateProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminCreateProduct422ApplicationProblemPlusJSONResponse struct {
+	ValidationFailedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminCreateProduct422ApplicationProblemPlusJSONResponse) VisitAdminCreateProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminCreateProduct500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminCreateProduct500ApplicationProblemPlusJSONResponse) VisitAdminCreateProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetProductRequestObject struct {
+	Id     EntityID `json:"id"`
+	Params AdminGetProductParams
+}
+
+type AdminGetProductResponseObject interface {
+	VisitAdminGetProductResponse(w http.ResponseWriter) error
+}
+
+type AdminGetProduct200JSONResponse struct{ AdminProductOKJSONResponse }
+
+func (response AdminGetProduct200JSONResponse) VisitAdminGetProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetProduct400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetProduct400ApplicationProblemPlusJSONResponse) VisitAdminGetProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetProduct401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetProduct401ApplicationProblemPlusJSONResponse) VisitAdminGetProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetProduct403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetProduct403ApplicationProblemPlusJSONResponse) VisitAdminGetProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetProduct404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetProduct404ApplicationProblemPlusJSONResponse) VisitAdminGetProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetProduct500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetProduct500ApplicationProblemPlusJSONResponse) VisitAdminGetProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUpdateProductRequestObject struct {
+	Id     EntityID `json:"id"`
+	Params AdminUpdateProductParams
+	Body   *AdminUpdateProductJSONRequestBody
+}
+
+type AdminUpdateProductResponseObject interface {
+	VisitAdminUpdateProductResponse(w http.ResponseWriter) error
+}
+
+type AdminUpdateProduct200JSONResponse struct{ AdminProductOKJSONResponse }
+
+func (response AdminUpdateProduct200JSONResponse) VisitAdminUpdateProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUpdateProduct400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUpdateProduct400ApplicationProblemPlusJSONResponse) VisitAdminUpdateProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUpdateProduct401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUpdateProduct401ApplicationProblemPlusJSONResponse) VisitAdminUpdateProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUpdateProduct403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUpdateProduct403ApplicationProblemPlusJSONResponse) VisitAdminUpdateProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUpdateProduct404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUpdateProduct404ApplicationProblemPlusJSONResponse) VisitAdminUpdateProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUpdateProduct409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUpdateProduct409ApplicationProblemPlusJSONResponse) VisitAdminUpdateProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUpdateProduct412ApplicationProblemPlusJSONResponse struct {
+	PreconditionFailedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUpdateProduct412ApplicationProblemPlusJSONResponse) VisitAdminUpdateProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUpdateProduct422ApplicationProblemPlusJSONResponse struct {
+	ValidationFailedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUpdateProduct422ApplicationProblemPlusJSONResponse) VisitAdminUpdateProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUpdateProduct500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUpdateProduct500ApplicationProblemPlusJSONResponse) VisitAdminUpdateProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminArchiveProductRequestObject struct {
+	Id     EntityID `json:"id"`
+	Params AdminArchiveProductParams
+}
+
+type AdminArchiveProductResponseObject interface {
+	VisitAdminArchiveProductResponse(w http.ResponseWriter) error
+}
+
+type AdminArchiveProduct204Response = AdminNoContentResponse
+
+func (response AdminArchiveProduct204Response) VisitAdminArchiveProductResponse(w http.ResponseWriter) error {
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(204)
+	return nil
+}
+
+type AdminArchiveProduct401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminArchiveProduct401ApplicationProblemPlusJSONResponse) VisitAdminArchiveProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminArchiveProduct403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminArchiveProduct403ApplicationProblemPlusJSONResponse) VisitAdminArchiveProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminArchiveProduct404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AdminArchiveProduct404ApplicationProblemPlusJSONResponse) VisitAdminArchiveProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminArchiveProduct409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response AdminArchiveProduct409ApplicationProblemPlusJSONResponse) VisitAdminArchiveProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminArchiveProduct412ApplicationProblemPlusJSONResponse struct {
+	PreconditionFailedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminArchiveProduct412ApplicationProblemPlusJSONResponse) VisitAdminArchiveProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminArchiveProduct500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminArchiveProduct500ApplicationProblemPlusJSONResponse) VisitAdminArchiveProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminCreateProductDraftRequestObject struct {
+	Id     EntityID `json:"id"`
+	Params AdminCreateProductDraftParams
+	Body   *AdminCreateProductDraftJSONRequestBody
+}
+
+type AdminCreateProductDraftResponseObject interface {
+	VisitAdminCreateProductDraftResponse(w http.ResponseWriter) error
+}
+
+type AdminCreateProductDraft201JSONResponse struct {
+	AdminRevisionCreatedJSONResponse
+}
+
+func (response AdminCreateProductDraft201JSONResponse) VisitAdminCreateProductDraftResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminCreateProductDraft400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response AdminCreateProductDraft400ApplicationProblemPlusJSONResponse) VisitAdminCreateProductDraftResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminCreateProductDraft401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminCreateProductDraft401ApplicationProblemPlusJSONResponse) VisitAdminCreateProductDraftResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminCreateProductDraft403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminCreateProductDraft403ApplicationProblemPlusJSONResponse) VisitAdminCreateProductDraftResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminCreateProductDraft404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AdminCreateProductDraft404ApplicationProblemPlusJSONResponse) VisitAdminCreateProductDraftResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminCreateProductDraft412ApplicationProblemPlusJSONResponse struct {
+	PreconditionFailedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminCreateProductDraft412ApplicationProblemPlusJSONResponse) VisitAdminCreateProductDraftResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminCreateProductDraft422ApplicationProblemPlusJSONResponse struct {
+	ValidationFailedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminCreateProductDraft422ApplicationProblemPlusJSONResponse) VisitAdminCreateProductDraftResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminCreateProductDraft500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminCreateProductDraft500ApplicationProblemPlusJSONResponse) VisitAdminCreateProductDraftResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetProductRevisionRequestObject struct {
+	Id         EntityID   `json:"id"`
+	RevisionId RevisionID `json:"revisionId"`
+	Params     AdminGetProductRevisionParams
+}
+
+type AdminGetProductRevisionResponseObject interface {
+	VisitAdminGetProductRevisionResponse(w http.ResponseWriter) error
+}
+
+type AdminGetProductRevision200JSONResponse struct{ AdminRevisionOKJSONResponse }
+
+func (response AdminGetProductRevision200JSONResponse) VisitAdminGetProductRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetProductRevision400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetProductRevision400ApplicationProblemPlusJSONResponse) VisitAdminGetProductRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetProductRevision401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetProductRevision401ApplicationProblemPlusJSONResponse) VisitAdminGetProductRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetProductRevision403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetProductRevision403ApplicationProblemPlusJSONResponse) VisitAdminGetProductRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetProductRevision404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetProductRevision404ApplicationProblemPlusJSONResponse) VisitAdminGetProductRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminGetProductRevision500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminGetProductRevision500ApplicationProblemPlusJSONResponse) VisitAdminGetProductRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminPublishProductRevisionRequestObject struct {
+	Id         EntityID   `json:"id"`
+	RevisionId RevisionID `json:"revisionId"`
+	Params     AdminPublishProductRevisionParams
+}
+
+type AdminPublishProductRevisionResponseObject interface {
+	VisitAdminPublishProductRevisionResponse(w http.ResponseWriter) error
+}
+
+type AdminPublishProductRevision200JSONResponse struct{ AdminRevisionOKJSONResponse }
+
+func (response AdminPublishProductRevision200JSONResponse) VisitAdminPublishProductRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminPublishProductRevision400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response AdminPublishProductRevision400ApplicationProblemPlusJSONResponse) VisitAdminPublishProductRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminPublishProductRevision401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminPublishProductRevision401ApplicationProblemPlusJSONResponse) VisitAdminPublishProductRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminPublishProductRevision403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminPublishProductRevision403ApplicationProblemPlusJSONResponse) VisitAdminPublishProductRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminPublishProductRevision404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AdminPublishProductRevision404ApplicationProblemPlusJSONResponse) VisitAdminPublishProductRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminPublishProductRevision409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response AdminPublishProductRevision409ApplicationProblemPlusJSONResponse) VisitAdminPublishProductRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminPublishProductRevision412ApplicationProblemPlusJSONResponse struct {
+	PreconditionFailedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminPublishProductRevision412ApplicationProblemPlusJSONResponse) VisitAdminPublishProductRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminPublishProductRevision422ApplicationProblemPlusJSONResponse struct {
+	ValidationFailedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminPublishProductRevision422ApplicationProblemPlusJSONResponse) VisitAdminPublishProductRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminPublishProductRevision500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminPublishProductRevision500ApplicationProblemPlusJSONResponse) VisitAdminPublishProductRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUnarchiveProductRequestObject struct {
+	Id     EntityID `json:"id"`
+	Params AdminUnarchiveProductParams
+}
+
+type AdminUnarchiveProductResponseObject interface {
+	VisitAdminUnarchiveProductResponse(w http.ResponseWriter) error
+}
+
+type AdminUnarchiveProduct204Response = AdminNoContentResponse
+
+func (response AdminUnarchiveProduct204Response) VisitAdminUnarchiveProductResponse(w http.ResponseWriter) error {
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(204)
+	return nil
+}
+
+type AdminUnarchiveProduct401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUnarchiveProduct401ApplicationProblemPlusJSONResponse) VisitAdminUnarchiveProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUnarchiveProduct403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUnarchiveProduct403ApplicationProblemPlusJSONResponse) VisitAdminUnarchiveProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUnarchiveProduct404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUnarchiveProduct404ApplicationProblemPlusJSONResponse) VisitAdminUnarchiveProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUnarchiveProduct412ApplicationProblemPlusJSONResponse struct {
+	PreconditionFailedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUnarchiveProduct412ApplicationProblemPlusJSONResponse) VisitAdminUnarchiveProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUnarchiveProduct500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUnarchiveProduct500ApplicationProblemPlusJSONResponse) VisitAdminUnarchiveProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUnpublishProductRequestObject struct {
+	Id     EntityID `json:"id"`
+	Params AdminUnpublishProductParams
+}
+
+type AdminUnpublishProductResponseObject interface {
+	VisitAdminUnpublishProductResponse(w http.ResponseWriter) error
+}
+
+type AdminUnpublishProduct204Response = AdminNoContentResponse
+
+func (response AdminUnpublishProduct204Response) VisitAdminUnpublishProductResponse(w http.ResponseWriter) error {
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(204)
+	return nil
+}
+
+type AdminUnpublishProduct401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUnpublishProduct401ApplicationProblemPlusJSONResponse) VisitAdminUnpublishProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUnpublishProduct403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUnpublishProduct403ApplicationProblemPlusJSONResponse) VisitAdminUnpublishProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUnpublishProduct404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUnpublishProduct404ApplicationProblemPlusJSONResponse) VisitAdminUnpublishProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUnpublishProduct412ApplicationProblemPlusJSONResponse struct {
+	PreconditionFailedApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUnpublishProduct412ApplicationProblemPlusJSONResponse) VisitAdminUnpublishProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AdminUnpublishProduct500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AdminUnpublishProduct500ApplicationProblemPlusJSONResponse) VisitAdminUnpublishProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1941,6 +9022,231 @@ func (response GetHome503ApplicationProblemPlusJSONResponse) VisitGetHomeRespons
 	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
 	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
 	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMediaDisplayRequestObject struct {
+	Id     EntityID `json:"id"`
+	Params GetMediaDisplayParams
+}
+
+type GetMediaDisplayResponseObject interface {
+	VisitGetMediaDisplayResponse(w http.ResponseWriter) error
+}
+
+type GetMediaDisplay200ImagewebpResponse struct{ MediaBinaryOKImagewebpResponse }
+
+func (response GetMediaDisplay200ImagewebpResponse) VisitGetMediaDisplayResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "image/webp")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type GetMediaDisplay304Response = NotModifiedResponse
+
+func (response GetMediaDisplay304Response) VisitGetMediaDisplayResponse(w http.ResponseWriter) error {
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(304)
+	return nil
+}
+
+type GetMediaDisplay400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response GetMediaDisplay400ApplicationProblemPlusJSONResponse) VisitGetMediaDisplayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMediaDisplay404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetMediaDisplay404ApplicationProblemPlusJSONResponse) VisitGetMediaDisplayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMediaDisplay429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response GetMediaDisplay429ApplicationProblemPlusJSONResponse) VisitGetMediaDisplayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMediaDisplay500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetMediaDisplay500ApplicationProblemPlusJSONResponse) VisitGetMediaDisplayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMediaVariantRequestObject struct {
+	Id     EntityID   `json:"id"`
+	Width  MediaWidth `json:"width"`
+	Params GetMediaVariantParams
+}
+
+type GetMediaVariantResponseObject interface {
+	VisitGetMediaVariantResponse(w http.ResponseWriter) error
+}
+
+type GetMediaVariant200ImagewebpResponse struct{ MediaBinaryOKImagewebpResponse }
+
+func (response GetMediaVariant200ImagewebpResponse) VisitGetMediaVariantResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "image/webp")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type GetMediaVariant304Response = NotModifiedResponse
+
+func (response GetMediaVariant304Response) VisitGetMediaVariantResponse(w http.ResponseWriter) error {
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("ETag", fmt.Sprint(response.Headers.ETag))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(304)
+	return nil
+}
+
+type GetMediaVariant400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response GetMediaVariant400ApplicationProblemPlusJSONResponse) VisitGetMediaVariantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMediaVariant404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetMediaVariant404ApplicationProblemPlusJSONResponse) VisitGetMediaVariantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMediaVariant429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response GetMediaVariant429ApplicationProblemPlusJSONResponse) VisitGetMediaVariantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMediaVariant500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetMediaVariant500ApplicationProblemPlusJSONResponse) VisitGetMediaVariantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("X-Request-ID", fmt.Sprint(response.Headers.XRequestID))
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -2510,12 +9816,108 @@ type StrictServerInterface interface {
 	// GetAbout Get published about-page content
 	// (GET /api/v1/about)
 	GetAbout(ctx context.Context, request GetAboutRequestObject) (GetAboutResponseObject, error)
+	// AdminListActivityLogs List append-only administration activity
+	// (GET /api/v1/admin/activity-logs)
+	AdminListActivityLogs(ctx context.Context, request AdminListActivityLogsRequestObject) (AdminListActivityLogsResponseObject, error)
+	// AdminLogin Authenticate an admin with password and mandatory second factor
+	// (POST /api/v1/admin/auth/login)
+	AdminLogin(ctx context.Context, request AdminLoginRequestObject) (AdminLoginResponseObject, error)
+	// AdminLogout Revoke the current admin session
+	// (POST /api/v1/admin/auth/logout)
+	AdminLogout(ctx context.Context, request AdminLogoutRequestObject) (AdminLogoutResponseObject, error)
+	// AdminGetMe Get the authenticated admin and effective permissions
+	// (GET /api/v1/admin/auth/me)
+	AdminGetMe(ctx context.Context, request AdminGetMeRequestObject) (AdminGetMeResponseObject, error)
+	// AdminRegenerateRecoveryCodes Replace all unused recovery codes after TOTP confirmation
+	// (POST /api/v1/admin/auth/recovery-codes/regenerate)
+	AdminRegenerateRecoveryCodes(ctx context.Context, request AdminRegenerateRecoveryCodesRequestObject) (AdminRegenerateRecoveryCodesResponseObject, error)
+	// AdminRefreshSession Rotate the refresh token and access session
+	// (POST /api/v1/admin/auth/refresh)
+	AdminRefreshSession(ctx context.Context, request AdminRefreshSessionRequestObject) (AdminRefreshSessionResponseObject, error)
+	// AdminEnableTotp Confirm TOTP enrollment and return one-time recovery codes
+	// (POST /api/v1/admin/auth/totp/enable)
+	AdminEnableTotp(ctx context.Context, request AdminEnableTotpRequestObject) (AdminEnableTotpResponseObject, error)
+	// AdminSetupTotp Start mandatory TOTP enrollment
+	// (POST /api/v1/admin/auth/totp/setup)
+	AdminSetupTotp(ctx context.Context, request AdminSetupTotpRequestObject) (AdminSetupTotpResponseObject, error)
+	// AdminListContactMessages List contact messages without exposing retention internals
+	// (GET /api/v1/admin/contact-messages)
+	AdminListContactMessages(ctx context.Context, request AdminListContactMessagesRequestObject) (AdminListContactMessagesResponseObject, error)
+	// AdminGetContactMessage Read one contact message
+	// (GET /api/v1/admin/contact-messages/{id})
+	AdminGetContactMessage(ctx context.Context, request AdminGetContactMessageRequestObject) (AdminGetContactMessageResponseObject, error)
+	// AdminUpdateContactMessageStatus Change contact message workflow status
+	// (PATCH /api/v1/admin/contact-messages/{id}/status)
+	AdminUpdateContactMessageStatus(ctx context.Context, request AdminUpdateContactMessageStatusRequestObject) (AdminUpdateContactMessageStatusResponseObject, error)
+	// AdminListMedia List media assets by processing state
+	// (GET /api/v1/admin/media)
+	AdminListMedia(ctx context.Context, request AdminListMediaRequestObject) (AdminListMediaResponseObject, error)
+	// AdminUploadMedia Upload one image for asynchronous processing
+	// (POST /api/v1/admin/media)
+	AdminUploadMedia(ctx context.Context, request AdminUploadMediaRequestObject) (AdminUploadMediaResponseObject, error)
+	// AdminGetMedia Get media processing state and variants
+	// (GET /api/v1/admin/media/{id})
+	AdminGetMedia(ctx context.Context, request AdminGetMediaRequestObject) (AdminGetMediaResponseObject, error)
+	// AdminRetryMedia Retry processing a failed media asset
+	// (POST /api/v1/admin/media/{id}/retry)
+	AdminRetryMedia(ctx context.Context, request AdminRetryMediaRequestObject) (AdminRetryMediaResponseObject, error)
+	// AdminGetPage Get Home or About with its revision pointers
+	// (GET /api/v1/admin/pages/{key})
+	AdminGetPage(ctx context.Context, request AdminGetPageRequestObject) (AdminGetPageResponseObject, error)
+	// AdminCreatePageDraft Save an immutable Home or About draft revision
+	// (POST /api/v1/admin/pages/{key}/drafts)
+	AdminCreatePageDraft(ctx context.Context, request AdminCreatePageDraftRequestObject) (AdminCreatePageDraftResponseObject, error)
+	// AdminGetPageRevision Get one immutable page revision
+	// (GET /api/v1/admin/pages/{key}/revisions/{revisionId})
+	AdminGetPageRevision(ctx context.Context, request AdminGetPageRevisionRequestObject) (AdminGetPageRevisionResponseObject, error)
+	// AdminPublishPageRevision Publish a new immutable snapshot from a page revision
+	// (POST /api/v1/admin/pages/{key}/revisions/{revisionId}/publish)
+	AdminPublishPageRevision(ctx context.Context, request AdminPublishPageRevisionRequestObject) (AdminPublishPageRevisionResponseObject, error)
+	// AdminUnpublishPage Clear a page public pointer without deleting revisions
+	// (POST /api/v1/admin/pages/{key}/unpublish)
+	AdminUnpublishPage(ctx context.Context, request AdminUnpublishPageRequestObject) (AdminUnpublishPageResponseObject, error)
+	// AdminListProducts List products including unpublished and archived records
+	// (GET /api/v1/admin/products)
+	AdminListProducts(ctx context.Context, request AdminListProductsRequestObject) (AdminListProductsResponseObject, error)
+	// AdminCreateProduct Create an unpublished product shell
+	// (POST /api/v1/admin/products)
+	AdminCreateProduct(ctx context.Context, request AdminCreateProductRequestObject) (AdminCreateProductResponseObject, error)
+	// AdminGetProduct Get one product and its revision pointers
+	// (GET /api/v1/admin/products/{id})
+	AdminGetProduct(ctx context.Context, request AdminGetProductRequestObject) (AdminGetProductResponseObject, error)
+	// AdminUpdateProduct Update product identity and ordering fields
+	// (PATCH /api/v1/admin/products/{id})
+	AdminUpdateProduct(ctx context.Context, request AdminUpdateProductRequestObject) (AdminUpdateProductResponseObject, error)
+	// AdminArchiveProduct Archive an unpublished product without deleting history
+	// (POST /api/v1/admin/products/{id}/archive)
+	AdminArchiveProduct(ctx context.Context, request AdminArchiveProductRequestObject) (AdminArchiveProductResponseObject, error)
+	// AdminCreateProductDraft Save an immutable product draft revision
+	// (POST /api/v1/admin/products/{id}/drafts)
+	AdminCreateProductDraft(ctx context.Context, request AdminCreateProductDraftRequestObject) (AdminCreateProductDraftResponseObject, error)
+	// AdminGetProductRevision Get one immutable product revision
+	// (GET /api/v1/admin/products/{id}/revisions/{revisionId})
+	AdminGetProductRevision(ctx context.Context, request AdminGetProductRevisionRequestObject) (AdminGetProductRevisionResponseObject, error)
+	// AdminPublishProductRevision Publish a new immutable snapshot from a product revision
+	// (POST /api/v1/admin/products/{id}/revisions/{revisionId}/publish)
+	AdminPublishProductRevision(ctx context.Context, request AdminPublishProductRevisionRequestObject) (AdminPublishProductRevisionResponseObject, error)
+	// AdminUnarchiveProduct Restore an archived product
+	// (POST /api/v1/admin/products/{id}/unarchive)
+	AdminUnarchiveProduct(ctx context.Context, request AdminUnarchiveProductRequestObject) (AdminUnarchiveProductResponseObject, error)
+	// AdminUnpublishProduct Clear the product public pointer
+	// (POST /api/v1/admin/products/{id}/unpublish)
+	AdminUnpublishProduct(ctx context.Context, request AdminUnpublishProductRequestObject) (AdminUnpublishProductResponseObject, error)
 	// CreateContactMessage Submit a visitor contact message
 	// (POST /api/v1/contact-messages)
 	CreateContactMessage(ctx context.Context, request CreateContactMessageRequestObject) (CreateContactMessageResponseObject, error)
 	// GetHome Get published homepage content
 	// (GET /api/v1/home)
 	GetHome(ctx context.Context, request GetHomeRequestObject) (GetHomeResponseObject, error)
+	// GetMediaDisplay Get the ready display media variant
+	// (GET /api/v1/media/{id}/display.webp)
+	GetMediaDisplay(ctx context.Context, request GetMediaDisplayRequestObject) (GetMediaDisplayResponseObject, error)
+	// GetMediaVariant Get one ready WebP width variant
+	// (GET /api/v1/media/{id}/variants/{width}.webp)
+	GetMediaVariant(ctx context.Context, request GetMediaVariantRequestObject) (GetMediaVariantResponseObject, error)
 	// ListProducts List published products
 	// (GET /api/v1/products)
 	ListProducts(ctx context.Context, request ListProductsRequestObject) (ListProductsResponseObject, error)
@@ -2619,6 +10021,870 @@ func (sh *strictHandler) GetAbout(ctx *gin.Context, params GetAboutParams) {
 	}
 }
 
+// AdminListActivityLogs operation middleware
+func (sh *strictHandler) AdminListActivityLogs(ctx *gin.Context, params AdminListActivityLogsParams) {
+	var request AdminListActivityLogsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminListActivityLogs(ctx, request.(AdminListActivityLogsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminListActivityLogs")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminListActivityLogsResponseObject); ok {
+		if err := validResponse.VisitAdminListActivityLogsResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminLogin operation middleware
+func (sh *strictHandler) AdminLogin(ctx *gin.Context, params AdminLoginParams) {
+	var request AdminLoginRequestObject
+
+	request.Params = params
+
+	var body AdminLoginJSONRequestBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(ctx, err)
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminLogin(ctx, request.(AdminLoginRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminLogin")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminLoginResponseObject); ok {
+		if err := validResponse.VisitAdminLoginResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminLogout operation middleware
+func (sh *strictHandler) AdminLogout(ctx *gin.Context, params AdminLogoutParams) {
+	var request AdminLogoutRequestObject
+
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminLogout(ctx, request.(AdminLogoutRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminLogout")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminLogoutResponseObject); ok {
+		if err := validResponse.VisitAdminLogoutResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminGetMe operation middleware
+func (sh *strictHandler) AdminGetMe(ctx *gin.Context, params AdminGetMeParams) {
+	var request AdminGetMeRequestObject
+
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminGetMe(ctx, request.(AdminGetMeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminGetMe")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminGetMeResponseObject); ok {
+		if err := validResponse.VisitAdminGetMeResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminRegenerateRecoveryCodes operation middleware
+func (sh *strictHandler) AdminRegenerateRecoveryCodes(ctx *gin.Context, params AdminRegenerateRecoveryCodesParams) {
+	var request AdminRegenerateRecoveryCodesRequestObject
+
+	request.Params = params
+
+	var body AdminRegenerateRecoveryCodesJSONRequestBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(ctx, err)
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminRegenerateRecoveryCodes(ctx, request.(AdminRegenerateRecoveryCodesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminRegenerateRecoveryCodes")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminRegenerateRecoveryCodesResponseObject); ok {
+		if err := validResponse.VisitAdminRegenerateRecoveryCodesResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminRefreshSession operation middleware
+func (sh *strictHandler) AdminRefreshSession(ctx *gin.Context, params AdminRefreshSessionParams) {
+	var request AdminRefreshSessionRequestObject
+
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminRefreshSession(ctx, request.(AdminRefreshSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminRefreshSession")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminRefreshSessionResponseObject); ok {
+		if err := validResponse.VisitAdminRefreshSessionResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminEnableTotp operation middleware
+func (sh *strictHandler) AdminEnableTotp(ctx *gin.Context, params AdminEnableTotpParams) {
+	var request AdminEnableTotpRequestObject
+
+	request.Params = params
+
+	var body AdminEnableTotpJSONRequestBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(ctx, err)
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminEnableTotp(ctx, request.(AdminEnableTotpRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminEnableTotp")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminEnableTotpResponseObject); ok {
+		if err := validResponse.VisitAdminEnableTotpResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminSetupTotp operation middleware
+func (sh *strictHandler) AdminSetupTotp(ctx *gin.Context, params AdminSetupTotpParams) {
+	var request AdminSetupTotpRequestObject
+
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminSetupTotp(ctx, request.(AdminSetupTotpRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminSetupTotp")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminSetupTotpResponseObject); ok {
+		if err := validResponse.VisitAdminSetupTotpResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminListContactMessages operation middleware
+func (sh *strictHandler) AdminListContactMessages(ctx *gin.Context, params AdminListContactMessagesParams) {
+	var request AdminListContactMessagesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminListContactMessages(ctx, request.(AdminListContactMessagesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminListContactMessages")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminListContactMessagesResponseObject); ok {
+		if err := validResponse.VisitAdminListContactMessagesResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminGetContactMessage operation middleware
+func (sh *strictHandler) AdminGetContactMessage(ctx *gin.Context, id EntityID, params AdminGetContactMessageParams) {
+	var request AdminGetContactMessageRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminGetContactMessage(ctx, request.(AdminGetContactMessageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminGetContactMessage")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminGetContactMessageResponseObject); ok {
+		if err := validResponse.VisitAdminGetContactMessageResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminUpdateContactMessageStatus operation middleware
+func (sh *strictHandler) AdminUpdateContactMessageStatus(ctx *gin.Context, id EntityID, params AdminUpdateContactMessageStatusParams) {
+	var request AdminUpdateContactMessageStatusRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body AdminUpdateContactMessageStatusJSONRequestBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(ctx, err)
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminUpdateContactMessageStatus(ctx, request.(AdminUpdateContactMessageStatusRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminUpdateContactMessageStatus")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminUpdateContactMessageStatusResponseObject); ok {
+		if err := validResponse.VisitAdminUpdateContactMessageStatusResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminListMedia operation middleware
+func (sh *strictHandler) AdminListMedia(ctx *gin.Context, params AdminListMediaParams) {
+	var request AdminListMediaRequestObject
+
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminListMedia(ctx, request.(AdminListMediaRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminListMedia")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminListMediaResponseObject); ok {
+		if err := validResponse.VisitAdminListMediaResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminUploadMedia operation middleware
+func (sh *strictHandler) AdminUploadMedia(ctx *gin.Context, params AdminUploadMediaParams) {
+	var request AdminUploadMediaRequestObject
+
+	request.Params = params
+
+	if reader, err := ctx.Request.MultipartReader(); err != nil {
+		sh.options.RequestErrorHandlerFunc(ctx, err)
+		return
+	} else {
+		request.Body = reader
+	}
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminUploadMedia(ctx, request.(AdminUploadMediaRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminUploadMedia")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminUploadMediaResponseObject); ok {
+		if err := validResponse.VisitAdminUploadMediaResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminGetMedia operation middleware
+func (sh *strictHandler) AdminGetMedia(ctx *gin.Context, id EntityID, params AdminGetMediaParams) {
+	var request AdminGetMediaRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminGetMedia(ctx, request.(AdminGetMediaRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminGetMedia")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminGetMediaResponseObject); ok {
+		if err := validResponse.VisitAdminGetMediaResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminRetryMedia operation middleware
+func (sh *strictHandler) AdminRetryMedia(ctx *gin.Context, id EntityID, params AdminRetryMediaParams) {
+	var request AdminRetryMediaRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminRetryMedia(ctx, request.(AdminRetryMediaRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminRetryMedia")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminRetryMediaResponseObject); ok {
+		if err := validResponse.VisitAdminRetryMediaResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminGetPage operation middleware
+func (sh *strictHandler) AdminGetPage(ctx *gin.Context, key AdminGetPageParamsKey, params AdminGetPageParams) {
+	var request AdminGetPageRequestObject
+
+	request.Key = key
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminGetPage(ctx, request.(AdminGetPageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminGetPage")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminGetPageResponseObject); ok {
+		if err := validResponse.VisitAdminGetPageResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminCreatePageDraft operation middleware
+func (sh *strictHandler) AdminCreatePageDraft(ctx *gin.Context, key AdminCreatePageDraftParamsKey, params AdminCreatePageDraftParams) {
+	var request AdminCreatePageDraftRequestObject
+
+	request.Key = key
+	request.Params = params
+
+	var body AdminCreatePageDraftJSONRequestBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(ctx, err)
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminCreatePageDraft(ctx, request.(AdminCreatePageDraftRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminCreatePageDraft")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminCreatePageDraftResponseObject); ok {
+		if err := validResponse.VisitAdminCreatePageDraftResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminGetPageRevision operation middleware
+func (sh *strictHandler) AdminGetPageRevision(ctx *gin.Context, key AdminGetPageRevisionParamsKey, revisionId RevisionID, params AdminGetPageRevisionParams) {
+	var request AdminGetPageRevisionRequestObject
+
+	request.Key = key
+	request.RevisionId = revisionId
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminGetPageRevision(ctx, request.(AdminGetPageRevisionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminGetPageRevision")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminGetPageRevisionResponseObject); ok {
+		if err := validResponse.VisitAdminGetPageRevisionResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminPublishPageRevision operation middleware
+func (sh *strictHandler) AdminPublishPageRevision(ctx *gin.Context, key AdminPublishPageRevisionParamsKey, revisionId RevisionID, params AdminPublishPageRevisionParams) {
+	var request AdminPublishPageRevisionRequestObject
+
+	request.Key = key
+	request.RevisionId = revisionId
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminPublishPageRevision(ctx, request.(AdminPublishPageRevisionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminPublishPageRevision")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminPublishPageRevisionResponseObject); ok {
+		if err := validResponse.VisitAdminPublishPageRevisionResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminUnpublishPage operation middleware
+func (sh *strictHandler) AdminUnpublishPage(ctx *gin.Context, key AdminUnpublishPageParamsKey, params AdminUnpublishPageParams) {
+	var request AdminUnpublishPageRequestObject
+
+	request.Key = key
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminUnpublishPage(ctx, request.(AdminUnpublishPageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminUnpublishPage")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminUnpublishPageResponseObject); ok {
+		if err := validResponse.VisitAdminUnpublishPageResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminListProducts operation middleware
+func (sh *strictHandler) AdminListProducts(ctx *gin.Context, params AdminListProductsParams) {
+	var request AdminListProductsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminListProducts(ctx, request.(AdminListProductsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminListProducts")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminListProductsResponseObject); ok {
+		if err := validResponse.VisitAdminListProductsResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminCreateProduct operation middleware
+func (sh *strictHandler) AdminCreateProduct(ctx *gin.Context, params AdminCreateProductParams) {
+	var request AdminCreateProductRequestObject
+
+	request.Params = params
+
+	var body AdminCreateProductJSONRequestBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(ctx, err)
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminCreateProduct(ctx, request.(AdminCreateProductRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminCreateProduct")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminCreateProductResponseObject); ok {
+		if err := validResponse.VisitAdminCreateProductResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminGetProduct operation middleware
+func (sh *strictHandler) AdminGetProduct(ctx *gin.Context, id EntityID, params AdminGetProductParams) {
+	var request AdminGetProductRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminGetProduct(ctx, request.(AdminGetProductRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminGetProduct")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminGetProductResponseObject); ok {
+		if err := validResponse.VisitAdminGetProductResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminUpdateProduct operation middleware
+func (sh *strictHandler) AdminUpdateProduct(ctx *gin.Context, id EntityID, params AdminUpdateProductParams) {
+	var request AdminUpdateProductRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body AdminUpdateProductJSONRequestBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(ctx, err)
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminUpdateProduct(ctx, request.(AdminUpdateProductRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminUpdateProduct")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminUpdateProductResponseObject); ok {
+		if err := validResponse.VisitAdminUpdateProductResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminArchiveProduct operation middleware
+func (sh *strictHandler) AdminArchiveProduct(ctx *gin.Context, id EntityID, params AdminArchiveProductParams) {
+	var request AdminArchiveProductRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminArchiveProduct(ctx, request.(AdminArchiveProductRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminArchiveProduct")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminArchiveProductResponseObject); ok {
+		if err := validResponse.VisitAdminArchiveProductResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminCreateProductDraft operation middleware
+func (sh *strictHandler) AdminCreateProductDraft(ctx *gin.Context, id EntityID, params AdminCreateProductDraftParams) {
+	var request AdminCreateProductDraftRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body AdminCreateProductDraftJSONRequestBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(ctx, err)
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminCreateProductDraft(ctx, request.(AdminCreateProductDraftRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminCreateProductDraft")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminCreateProductDraftResponseObject); ok {
+		if err := validResponse.VisitAdminCreateProductDraftResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminGetProductRevision operation middleware
+func (sh *strictHandler) AdminGetProductRevision(ctx *gin.Context, id EntityID, revisionId RevisionID, params AdminGetProductRevisionParams) {
+	var request AdminGetProductRevisionRequestObject
+
+	request.Id = id
+	request.RevisionId = revisionId
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminGetProductRevision(ctx, request.(AdminGetProductRevisionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminGetProductRevision")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminGetProductRevisionResponseObject); ok {
+		if err := validResponse.VisitAdminGetProductRevisionResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminPublishProductRevision operation middleware
+func (sh *strictHandler) AdminPublishProductRevision(ctx *gin.Context, id EntityID, revisionId RevisionID, params AdminPublishProductRevisionParams) {
+	var request AdminPublishProductRevisionRequestObject
+
+	request.Id = id
+	request.RevisionId = revisionId
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminPublishProductRevision(ctx, request.(AdminPublishProductRevisionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminPublishProductRevision")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminPublishProductRevisionResponseObject); ok {
+		if err := validResponse.VisitAdminPublishProductRevisionResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminUnarchiveProduct operation middleware
+func (sh *strictHandler) AdminUnarchiveProduct(ctx *gin.Context, id EntityID, params AdminUnarchiveProductParams) {
+	var request AdminUnarchiveProductRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminUnarchiveProduct(ctx, request.(AdminUnarchiveProductRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminUnarchiveProduct")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminUnarchiveProductResponseObject); ok {
+		if err := validResponse.VisitAdminUnarchiveProductResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AdminUnpublishProduct operation middleware
+func (sh *strictHandler) AdminUnpublishProduct(ctx *gin.Context, id EntityID, params AdminUnpublishProductParams) {
+	var request AdminUnpublishProductRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AdminUnpublishProduct(ctx, request.(AdminUnpublishProductRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AdminUnpublishProduct")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(AdminUnpublishProductResponseObject); ok {
+		if err := validResponse.VisitAdminUnpublishProductResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // CreateContactMessage operation middleware
 func (sh *strictHandler) CreateContactMessage(ctx *gin.Context, params CreateContactMessageParams) {
 	var request CreateContactMessageRequestObject
@@ -2671,6 +10937,61 @@ func (sh *strictHandler) GetHome(ctx *gin.Context, params GetHomeParams) {
 		sh.options.HandlerErrorFunc(ctx, err)
 	} else if validResponse, ok := response.(GetHomeResponseObject); ok {
 		if err := validResponse.VisitGetHomeResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetMediaDisplay operation middleware
+func (sh *strictHandler) GetMediaDisplay(ctx *gin.Context, id EntityID, params GetMediaDisplayParams) {
+	var request GetMediaDisplayRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMediaDisplay(ctx, request.(GetMediaDisplayRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMediaDisplay")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(GetMediaDisplayResponseObject); ok {
+		if err := validResponse.VisitGetMediaDisplayResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetMediaVariant operation middleware
+func (sh *strictHandler) GetMediaVariant(ctx *gin.Context, id EntityID, width MediaWidth, params GetMediaVariantParams) {
+	var request GetMediaVariantRequestObject
+
+	request.Id = id
+	request.Width = width
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMediaVariant(ctx, request.(GetMediaVariantRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMediaVariant")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(GetMediaVariantResponseObject); ok {
+		if err := validResponse.VisitGetMediaVariantResponse(ctx.Writer); err != nil {
 			sh.options.ResponseErrorHandlerFunc(ctx, err)
 		}
 	} else if response != nil {
@@ -2840,159 +11161,229 @@ func (sh *strictHandler) GetMetrics(ctx *gin.Context, params GetMetricsParams) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"AP//",
+	"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",
+	"pG8vbv//AAAA//8=",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

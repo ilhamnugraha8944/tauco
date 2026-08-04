@@ -7,7 +7,7 @@
 | Tanggal mulai | 4 Agustus 2026 |
 | Branch | `feature/phase-1c` |
 | Baseline | `520d315` |
-| Status | C0 complete; C1-C10 pending |
+| Status | C0-C1 complete; C2-C10 pending |
 | Production | Tidak berubah |
 
 Dokumen ini menjadi ledger pelaksanaan Phase 1C. Setiap gate diperbarui setelah
@@ -122,19 +122,122 @@ C1: OpenAPI dan database foundation.
 - [x] Final document/link/diff verification.
 - [x] Commit C0.
 
+## Update C1: OpenAPI dan Database Foundation
+
+**Tanggal:** 4 Agustus 2026
+
+**Status:** Complete
+
+### Tujuan
+
+Membuat kontrak API admin dan fondasi data/security CMS yang dapat dipakai gate
+C2-C8 tanpa mengaktifkan route admin, mengubah frontend, atau menyentuh
+production Phase 1A.
+
+### Perubahan
+
+- OpenAPI v1.1 memuat auth, Home/About, product, media, inbox, activity log,
+  public ready-media path, cursor pagination, RFC7807, CSRF, dan `If-Match`.
+- Generated Go contract diregenerasi secara deterministik.
+- Migration `000005_admin_cms_foundation` menambah admin user, RBAC, session,
+  refresh-token hash, encrypted TOTP storage, recovery-code hash, dan index.
+- Menambah `page_revision_media`, `product_revision_media`, serta
+  `products.archived_at`.
+- Semua page/product revision dan revision-media link immutable setelah insert.
+- Menambah NOLOGIN role `tauco_admin_runtime` dan login lokal terpisah
+  `tauco_admin_local` melalui `ADMIN_DATABASE_URL`.
+- Integration suite memeriksa migration up/down/up, schema, revision
+  immutability, role membership, dan privilege publik/admin.
+- Dokumentasi status Phase 1C dan setup backend diperbarui.
+
+### Keputusan arsitektur
+
+- C1 hanya contract dan persistence foundation; generated admin handler tidak
+  diregistrasikan ke Gin.
+- Public runtime tetap memakai `tauco_runtime`; CMS kelak memakai
+  `tauco_admin_runtime`; migrator tetap satu-satunya schema owner.
+- Password hanya menerima hash Argon2id. Refresh token, CSRF token, dan recovery
+  code hanya disimpan sebagai hash. TOTP secret disimpan sebagai ciphertext,
+  nonce, dan key identifier.
+- Recovery-code regeneration memakai `revoked_at`, bukan hard delete.
+- Publish kelak membuat immutable published snapshot dan mengubah pointer;
+  revision draft yang sudah tersimpan tidak di-update menjadi published.
+- `/tauco` tetap read-only dan tidak memiliki route admin.
+
+### Command yang dijalankan
+
+```powershell
+docker compose -f backend/compose.yaml up -d --wait
+npm.cmd run backend:generate
+go test ./internal/delivery/api -run "TestEmbeddedOpenAPIContract|TestAdminOpenAPISecurityAndConcurrencyContract|TestOpenAPIOperationRequirements" -count=1
+npm.cmd run backend:test
+npm.cmd run backend:test:integration
+npm.cmd run backend:migrate:down
+npm.cmd run backend:migrate:up
+npm.cmd run backend:migrate:version
+npm.cmd run backend:generate:check
+npm.cmd run backend:vet
+npm.cmd run backend:build
+git diff --check
+```
+
+### Hasil pengujian
+
+```text
+OpenAPI validation + admin security contract: PASS
+generated OpenAPI artifact reproducible: PASS
+backend regression suite: PASS
+fresh database integration dan migration round-trip: PASS
+public/admin database privilege matrix: PASS
+local migration: version=5 dirty=false
+go vet: PASS
+backend cmd build: PASS
+```
+
+Windows Application Control memblokir satu executable test temporary pada run
+awal. Runner repository otomatis mengulang package tersebut dari workspace;
+hasil fallback `internal/architecture` adalah PASS.
+
+### Evidence
+
+- Kontrak memiliki 41 operasi unik dan operation ID unik.
+- Semua admin operation selain login memerlukan cookie auth; seluruh unsafe
+  operation juga memerlukan CSRF.
+- Mutation yang rawan lost update mewajibkan strong `If-Match`.
+- Fresh DB test memverifikasi 11 tabel C1, 12 permission `super_admin`, role
+  terpisah, draft immutability, serta penolakan DDL/hard delete admin.
+- Migration lokal final berada pada v5 dan tidak dirty.
+- Integration test memastikan admin login dan public media C1 masih `404` pada
+  runtime Phase 1B karena handler belum diregistrasikan.
+- File `backend/.env` lokal diperbarui tetapi tetap ignored dan tidak masuk Git.
+- Tidak ada unit-test file baru; evidence memakai contract dan integration test.
+- Production adapter, Netlify Forms, canonical, sitemap, dan deploy tidak diubah.
+
+### Known limitations
+
+- Belum ada Argon2/JWT/TOTP implementation atau bootstrap admin CLI; itu C2.
+- Belum ada auth middleware atau handler admin aktif; itu C3.
+- Belum ada BFF, UI CMS, upload handler, editor, inbox UI, atau cutover.
+- OpenAPI public media path baru merupakan contract dan belum diregistrasikan.
+- Password dan secret contoh di `.env.example` hanya untuk loopback lokal.
+
+### Next gate
+
+C2: auth domain dan CLI.
+
 ## C1 Checklist: OpenAPI dan Database Foundation
 
-- [ ] Admin OpenAPI paths dan schemas.
-- [ ] Auth/RBAC/session/MFA migration.
-- [ ] Admin DB authorization role.
-- [ ] Revision-media relationship.
-- [ ] Product archive field.
-- [ ] Revision immutability enforcement.
-- [ ] Migration up/down.
-- [ ] Fresh database integration.
-- [ ] Privilege matrix.
-- [ ] OpenAPI drift check.
-- [ ] Walkthrough update C1.
+- [x] Admin OpenAPI paths dan schemas.
+- [x] Auth/RBAC/session/MFA migration.
+- [x] Admin DB authorization role.
+- [x] Revision-media relationship.
+- [x] Product archive field.
+- [x] Revision immutability enforcement.
+- [x] Migration up/down.
+- [x] Fresh database integration.
+- [x] Privilege matrix.
+- [x] OpenAPI drift check.
+- [x] Walkthrough update C1.
 
 ## C2 Checklist: Auth Domain dan CLI
 

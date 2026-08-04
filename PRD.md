@@ -33,7 +33,7 @@ Delivery dibagi agar website publik dapat diluncurkan lebih cepat:
   gate. Delivery
   dilakukan local-first dalam shadow-mode sehingga production Phase 1A tetap
   memakai konten lokal dan Netlify Forms.
-- **Phase 1C — implementing lokal:** C0 scope freeze complete. C1-C10 akan
+- **Phase 1C — implementing lokal:** C0-C1 complete. C2-C10 akan
   membangun Admin CMS, authentication, publishing workflow, product/media
   management, inbox, dan activity log dalam shadow-mode lokal.
 - **Phase 1D — future:** remote deployment, hardening, migration/cutover konten
@@ -48,8 +48,8 @@ Label status dalam dokumen ini:
 - `IMPLEMENTED-1B-LOCAL`: gate B0-B10 selesai dan tercatat pada
   `PHASE_1B_PLAN.md`, `PHASE_1B_WALKTHROUGH.md`, serta
   `PHASE_1B_QUALITY_REPORT.md`; belum dideploy.
-- `IMPLEMENTING-1C-LOCAL`: scope dan kontrak C0 telah dibekukan pada
-  `PHASE_1C_PLAN.md` serta `PHASE_1C_WALKTHROUGH.md`; runtime C1-C10 belum
+- `IMPLEMENTING-1C-LOCAL`: scope C0 serta kontrak dan database foundation C1
+  telah selesai pada `PHASE_1C_PLAN.md` serta `PHASE_1C_WALKTHROUGH.md`; runtime C2-C10 belum
   selesai dan belum dideploy.
 - `PLANNED`: desain target yang belum diimplementasikan pada Phase 1A.
 - `OUT-OF-SCOPE`: bukan bagian delivery Phase 1.
@@ -165,13 +165,13 @@ inbox, dan audit trail.
 | Technical SEO | `IMPLEMENTED-1A` | Metadata, canonical, sitemap, robots, JSON-LD |
 | Responsive dan accessibility baseline | `IMPLEMENTED-1A` | Semantic HTML dan keyboard flow |
 | REST API Go | `IMPLEMENTED-1B-LOCAL` | Public/contact/health/metrics dan quality gate complete lokal |
-| PostgreSQL/Supabase | `IMPLEMENTED-1B-LOCAL` | Migration v4, repository, durable jobs, retention, dan integration lokal |
+| PostgreSQL/Supabase | `IMPLEMENTING-1C-LOCAL` | Phase 1B complete; migration v5 auth/RBAC/session/MFA dan role admin lulus lokal |
 | Redis/Upstash | `IMPLEMENTED-1B-LOCAL` | Cache, rate limit, fail-open, dan integration lokal |
 | Object storage dan image worker | `IMPLEMENTED-1B-LOCAL` | Local/S3 port, safe image pipeline, dan worker lokal |
-| Admin authentication | `IMPLEMENTING-1C-LOCAL` | C0 scope frozen; runtime mulai C1 |
-| CMS homepage/about | `IMPLEMENTING-1C-LOCAL` | C0 scope frozen; runtime C6 |
-| Product/media CMS | `IMPLEMENTING-1C-LOCAL` | C0 scope frozen; runtime C5 dan C7 |
-| Inbox dan activity log | `IMPLEMENTING-1C-LOCAL` | C0 scope frozen; runtime C8 |
+| Admin authentication | `IMPLEMENTING-1C-LOCAL` | C1 schema dan contract complete; runtime C2-C3 |
+| CMS homepage/about | `IMPLEMENTING-1C-LOCAL` | C1 revision foundation complete; runtime C6 |
+| Product/media CMS | `IMPLEMENTING-1C-LOCAL` | C1 archive/media relation complete; runtime C5 dan C7 |
+| Inbox dan activity log | `IMPLEMENTING-1C-LOCAL` | C1 contract dan privilege foundation complete; runtime C8 |
 | Inventory dan order | `OUT-OF-SCOPE` | Phase 2 |
 
 ## 6. Functional Requirements — Phase 1A
@@ -476,7 +476,7 @@ Jika berpindah ke custom domain:
 ## 11. Backend Architecture — Phase 1B dan 1C
 
 Phase 1B berstatus `IMPLEMENTED-1B-LOCAL`. Phase 1C berstatus
-`IMPLEMENTING-1C-LOCAL`: C0 scope freeze complete dan runtime C1-C10 masih
+`IMPLEMENTING-1C-LOCAL`: C0-C1 complete dan runtime C2-C10 masih
 pending. Admin CMS tetap bukan dependency runtime Phase 1A.
 
 ### 11.0 Boundary delivery
@@ -561,7 +561,7 @@ menggunakan opaque cursor.
 
 ### 11.4 Admin REST API
 
-**Status:** `IMPLEMENTING-1C-LOCAL`; C0 scope frozen, runtime C1-C9 pending.
+**Status:** `IMPLEMENTING-1C-LOCAL`; C1 OpenAPI complete, runtime C2-C9 pending.
 
 - login, refresh, logout, current user;
 - setup/enable TOTP serta recovery/reset melalui CLI;
@@ -575,7 +575,7 @@ OpenAPI menjadi contract dan divalidasi dalam CI.
 
 ### 11.5 Authentication dan authorization
 
-**Status:** `IMPLEMENTING-1C-LOCAL`; C0 scope frozen, runtime C1-C4 pending.
+**Status:** `IMPLEMENTING-1C-LOCAL`; C1 schema/contract complete, runtime C2-C4 pending.
 
 - Role aktif Phase 1: `super_admin`; schema tetap siap untuk RBAC.
 - Tidak ada public registration.
@@ -592,7 +592,7 @@ OpenAPI menjadi contract dan divalidasi dalam CI.
 
 ### 11.6 Content publishing
 
-**Status:** schema foundation pada Phase 1B; C0 scope frozen; runtime
+**Status:** revision dan admin schema foundation C1 complete; runtime
 publishing dijadwalkan C6-C9.
 
 - Homepage dan About merupakan singleton content.

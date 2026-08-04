@@ -43,6 +43,8 @@ func TestEmbeddedMigrationSetIsPairedAndContiguous(t *testing.T) {
 		"000003_integrity_triggers.up.sql",
 		"000004_media_worker_permissions.down.sql",
 		"000004_media_worker_permissions.up.sql",
+		"000005_admin_cms_foundation.down.sql",
+		"000005_admin_cms_foundation.up.sql",
 	}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("embedded migration names = %v, want %v", names, want)

@@ -1,6 +1,7 @@
 # Tauco Cap Badak Backend
 
-Backend Phase 1B adalah public REST API berbasis Go. Implementasi berjalan
+Backend Phase 1B adalah public REST API berbasis Go. Gate C1 menambahkan
+kontrak dan database foundation CMS secara lokal tanpa mengaktifkan route admin. Implementasi berjalan
 local-first dan shadow-mode: website production tetap membaca konten lokal serta
 tetap mengirim form kontak melalui Netlify Forms sampai ada gate cutover
 tersendiri.
@@ -98,13 +99,15 @@ Port dapat diganti melalui `TAUCO_POSTGRES_PORT` dan `TAUCO_REDIS_PORT` di
 
 ## Database dan deterministic seed B3
 
-B3 memakai schema privat `tauco_app` dan tiga identitas PostgreSQL yang
+B3/C1 memakai schema privat `tauco_app` dan identitas PostgreSQL yang
 berbeda:
 
 - login Compose `tauco_app` hanya untuk bootstrap/migration lokal;
 - authorization role `tauco_migrator` menjadi stable schema owner;
 - login `tauco_app_runtime` hanya mewarisi least-privilege
   `tauco_runtime`.
+- login `tauco_admin_local` hanya mewarisi least-privilege
+  `tauco_admin_runtime`; kredensial ini tidak dipakai public API.
 
 Runtime tidak dapat membuat schema/table, memakai temporary table, atau menulis
 page/product revision. Migration SQL selalu versioned; GORM `AutoMigrate`
@@ -125,7 +128,8 @@ npm.cmd run backend:migrate:up
 npm.cmd run backend:migrate:version
 ```
 
-Hasil version yang diharapkan adalah `version=4 dirty=false`. Import konten
+Pada branch Phase 1C, hasil version yang diharapkan adalah
+`version=5 dirty=false`. Import konten
 Phase 1A:
 
 ```powershell
@@ -152,6 +156,19 @@ Konten yang diimpor:
 - satu published product `tauco-cap-badak`;
 - UUIDv7, revision, canonical JSON, checksum, sort order, serta timestamp yang
   deterministik.
+
+## Database dan kontrak Admin CMS C1
+
+Migration v5 menambahkan penyimpanan admin user, RBAC, session, refresh token,
+TOTP terenkripsi, recovery-code hash, relasi revision-media, dan archive produk.
+Semua page/product revision beserta relasi medianya immutable setelah insert.
+Role `tauco_admin_runtime` dapat menjalankan operasi CMS yang diperlukan, tetapi
+tidak dapat DDL, hard delete inbox, atau mengubah katalog permission.
+
+OpenAPI memuat kontrak auth, Home/About, produk, media, inbox, dan activity log.
+Kontrak tersebut belum diregistrasikan ke Gin pada C1; public route Phase 1B
+tetap menjadi satu-satunya route aplikasi aktif. Runtime auth dimulai pada C2
+dan C3.
 
 ## Public read API B4
 

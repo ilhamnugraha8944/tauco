@@ -14,9 +14,9 @@ Dokumentasi struktur dan cara kerja kode tersedia di
 [BACKEND_CODE_DOCUMENTATION.md](./BACKEND_CODE_DOCUMENTATION.md) serta
 [BACKEND_CODE_DOCUMENTATION.pdf](./BACKEND_CODE_DOCUMENTATION.pdf).
 
-**Phase 1C** sedang dimulai secara lokal. Gate C0 telah membekukan scope Admin
-CMS, authentication, publishing, product/media management, inbox, dan activity
-log tanpa mengubah production. Kontrak dan progress ledger tersedia di
+**Phase 1C** sedang dikerjakan secara lokal. Gate C0-C1 telah membekukan scope
+serta menambahkan kontrak OpenAPI, migration CMS/auth, immutable revision, dan
+role database admin tanpa mengubah production. Kontrak dan progress ledger tersedia di
 [PHASE_1C_PLAN.md](./PHASE_1C_PLAN.md) serta
 [PHASE_1C_WALKTHROUGH.md](./PHASE_1C_WALKTHROUGH.md).
 
@@ -37,9 +37,9 @@ layanan backend. Bukti ada di
 | Privacy notice | Phase 1A |
 | Metadata, canonical, sitemap, robots, JSON-LD | Phase 1A |
 | Go REST API | Phase 1B local complete; public/contact/health/protected metrics aktif lokal |
-| PostgreSQL | Phase 1B local complete; migration v4, durable job, media, retention, dan integration lulus |
+| PostgreSQL | Phase 1B local complete; Phase 1C migration v5 dan role admin lulus lokal |
 | Redis | Phase 1B local complete; cache-aside, atomic limiter, fail-open, dan metrics lulus |
-| Admin CMS | Phase 1C C0 scope frozen; C1-C10 pending lokal |
+| Admin CMS | Phase 1C C0-C1 complete; C2-C10 pending lokal; runtime admin belum aktif |
 | Inventory dan order management | Out of scope Phase 1 |
 
 ## Tech stack

@@ -84,6 +84,18 @@ func TestPublicAPIWithPostgresAndRedis(t *testing.T) {
 		t.Fatalf("GET body status=%d", response.Code)
 	}
 
+	for _, shadowOnlyRoute := range []struct{ method, path string }{
+		{http.MethodPost, "/api/v1/admin/auth/login"},
+		{http.MethodGet, "/api/v1/media/019bfc80-0000-7000-8000-000000009999/display.webp"},
+	} {
+		request = httptest.NewRequest(shadowOnlyRoute.method, shadowOnlyRoute.path, nil)
+		response = httptest.NewRecorder()
+		app.Handler().ServeHTTP(response, request)
+		if response.Code != http.StatusNotFound {
+			t.Fatalf("C1 contract-only route %s status=%d, want 404", shadowOnlyRoute.path, response.Code)
+		}
+	}
+
 	for attempt := 1; attempt <= 6; attempt++ {
 		request = httptest.NewRequest(http.MethodPost, "/api/v1/contact-messages", strings.NewReader("invalid"))
 		request.RemoteAddr = "192.0.2.10:1234"

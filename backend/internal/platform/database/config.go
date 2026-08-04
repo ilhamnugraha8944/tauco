@@ -14,8 +14,9 @@ const (
 	// ApplicationSchema is private from PostgREST's default public exposure.
 	ApplicationSchema = "tauco_app"
 
-	MigratorRole = "tauco_migrator"
-	RuntimeRole  = "tauco_runtime"
+	MigratorRole     = "tauco_migrator"
+	RuntimeRole      = "tauco_runtime"
+	AdminRuntimeRole = "tauco_admin_runtime"
 )
 
 // LookupEnv matches os.LookupEnv and enables deterministic configuration tests.
@@ -26,6 +27,7 @@ type LookupEnv func(key string) (value string, found bool)
 type MigrationConfig struct {
 	MigrationURL   string
 	RuntimeURL     string
+	AdminURL       string
 	BootstrapRoles bool
 }
 
@@ -60,6 +62,7 @@ func LoadMigrationConfig(lookup LookupEnv) (MigrationConfig, error) {
 	}
 
 	runtimeURL, runtimeFound := lookup("DATABASE_URL")
+	adminURL, adminFound := lookup("ADMIN_DATABASE_URL")
 	bootstrap, err := loadBool(lookup, "MIGRATION_BOOTSTRAP_ROLES", false)
 	if err != nil {
 		return MigrationConfig{}, err
@@ -70,10 +73,17 @@ func LoadMigrationConfig(lookup LookupEnv) (MigrationConfig, error) {
 			Reason: "is required when MIGRATION_BOOTSTRAP_ROLES is true",
 		}
 	}
+	if bootstrap && (!adminFound || strings.TrimSpace(adminURL) == "") {
+		return MigrationConfig{}, &ConfigError{
+			Field:  "ADMIN_DATABASE_URL",
+			Reason: "is required when MIGRATION_BOOTSTRAP_ROLES is true",
+		}
+	}
 
 	cfg := MigrationConfig{
 		MigrationURL:   strings.TrimSpace(migrationURL),
 		RuntimeURL:     strings.TrimSpace(runtimeURL),
+		AdminURL:       strings.TrimSpace(adminURL),
 		BootstrapRoles: bootstrap,
 	}
 	if err := cfg.Validate(); err != nil {
@@ -115,7 +125,7 @@ func (c MigrationConfig) Validate() error {
 			Reason: "must use a login distinct from the migration login",
 		}
 	}
-	if runtime.username == MigratorRole || runtime.username == RuntimeRole {
+	if runtime.username == MigratorRole || runtime.username == RuntimeRole || runtime.username == AdminRuntimeRole {
 		return &ConfigError{
 			Field:  "DATABASE_URL",
 			Reason: "must use a LOGIN role distinct from fixed NOLOGIN authorization roles",
@@ -133,6 +143,36 @@ func (c MigrationConfig) Validate() error {
 			Field:  "DATABASE_URL",
 			Reason: "runtime password must be 16-256 printable ASCII characters during role bootstrap",
 		}
+	}
+	if c.AdminURL == "" {
+		if c.BootstrapRoles {
+			return &ConfigError{
+				Field:  "ADMIN_DATABASE_URL",
+				Reason: "is required when role bootstrap is enabled",
+			}
+		}
+		return nil
+	}
+
+	admin, err := parseDatabaseURL("ADMIN_DATABASE_URL", c.AdminURL, c.BootstrapRoles)
+	if err != nil {
+		return err
+	}
+	if migration.database != admin.database {
+		return &ConfigError{Field: "ADMIN_DATABASE_URL", Reason: "must target the same database as MIGRATION_DATABASE_URL"}
+	}
+	if admin.username == migration.username || admin.username == runtime.username {
+		return &ConfigError{Field: "ADMIN_DATABASE_URL", Reason: "must use a login distinct from migration and public runtime logins"}
+	}
+	if admin.username == MigratorRole || admin.username == RuntimeRole || admin.username == AdminRuntimeRole {
+		return &ConfigError{Field: "ADMIN_DATABASE_URL", Reason: "must use a LOGIN role distinct from fixed NOLOGIN authorization roles"}
+	}
+	if c.BootstrapRoles &&
+		(!strings.EqualFold(migration.host, admin.host) || migration.port != admin.port) {
+		return &ConfigError{Field: "ADMIN_DATABASE_URL", Reason: "must use the same host and port as MIGRATION_DATABASE_URL during role bootstrap"}
+	}
+	if c.BootstrapRoles && !isBootstrapPassword(admin.password) {
+		return &ConfigError{Field: "ADMIN_DATABASE_URL", Reason: "admin password must be 16-256 printable ASCII characters during role bootstrap"}
 	}
 	return nil
 }

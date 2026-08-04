@@ -77,10 +77,15 @@ func TestPhase1ASeedAndPublishedRepositories(t *testing.T) {
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 	databaseName := "tauco_repository_test_" + suffix
 	runtimeRoleName := "tauco_repository_runtime_" + suffix
+	adminRoleName := "tauco_repository_admin_" + suffix
 	if len(runtimeRoleName) > 63 {
 		runtimeRoleName = runtimeRoleName[:63]
 	}
+	if len(adminRoleName) > 63 {
+		adminRoleName = adminRoleName[:63]
+	}
 	const runtimePassword = "B3-repository-runtime-test-password"
+	const adminPassword = "C1-repository-admin-test-password"
 
 	databaseIdentifier := pgx.Identifier{databaseName}.Sanitize()
 	if _, err := admin.Exec(ctx, "CREATE DATABASE "+databaseIdentifier); err != nil {
@@ -94,6 +99,10 @@ func TestPhase1ASeedAndPublishedRepositories(t *testing.T) {
 		_, _ = admin.Exec(
 			context.Background(),
 			"DROP ROLE IF EXISTS "+pgx.Identifier{runtimeRoleName}.Sanitize(),
+		)
+		_, _ = admin.Exec(
+			context.Background(),
+			"DROP ROLE IF EXISTS "+pgx.Identifier{adminRoleName}.Sanitize(),
 		)
 	}()
 
@@ -111,9 +120,17 @@ func TestPhase1ASeedAndPublishedRepositories(t *testing.T) {
 		runtimeRoleName,
 		runtimePassword,
 	)
+	adminURL := replaceDatabaseAndUser(
+		t,
+		baseURL,
+		databaseName,
+		adminRoleName,
+		adminPassword,
+	)
 	config := MigrationConfig{
 		MigrationURL:   migrationURL,
 		RuntimeURL:     runtimeURL,
+		AdminURL:       adminURL,
 		BootstrapRoles: true,
 	}
 	if err := BootstrapRoles(ctx, config); err != nil {
