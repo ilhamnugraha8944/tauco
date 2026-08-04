@@ -51,6 +51,43 @@ test("admin login, TOTP setup, shell, account, and logout", async ({ page }) => 
   const mediaAccessibility = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   expect(mediaAccessibility.violations).toEqual([]);
 
+  await page.getByRole("link", { name: "Konten", exact: true }).click();
+  await page.getByRole("link", { name: /Homepage/ }).click();
+  await expect(page.getByRole("heading", { name: "Editor terstruktur" })).toBeVisible();
+  await page.getByRole("group", { name: "Hero", exact: true }).getByLabel("Judul").fill("Tauco Cap Badak Cianjur");
+  await page.getByLabel("Fact-check dikonfirmasi").check();
+  await page.getByRole("button", { name: "Save Draft" }).click();
+  await expect(page.getByText(/Draft revision \d+ tersimpan/)).toBeVisible();
+  await expect(page.locator(".admin-revision-panel li")).toHaveCount(2);
+
+  const previewPromise = page.waitForEvent("popup");
+  await page.getByRole("link", { name: "Preview" }).click();
+  const preview = await previewPromise;
+  await expect(preview.getByRole("heading", { name: "Tauco Cap Badak Cianjur" })).toBeVisible();
+  await preview.close();
+
+  await page.getByLabel("Fact-check dikonfirmasi").check();
+  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await expect(page.getByText(/dipublikasikan pada API lokal/)).toBeVisible();
+  await expect(page.locator(".admin-revision-panel li")).toHaveCount(3);
+  await page.getByRole("button", { name: "Unpublish", exact: true }).click();
+  await expect(page.getByText("Halaman di-unpublish dari API lokal.")).toBeVisible();
+
+  const editorAccessibility = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+  expect(editorAccessibility.violations).toEqual([]);
+
+  await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+  const editorDarkAccessibility = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+  expect(editorDarkAccessibility.violations).toEqual([]);
+  await page.emulateMedia({ colorScheme: "light", reducedMotion: "no-preference" });
+
+  await page.getByRole("link", { name: "Konten", exact: true }).click();
+  await page.getByRole("link", { name: /Tentang Kami/ }).click();
+  await page.getByRole("group", { name: "Bagian narasi" }).getByRole("group", { name: "Item 1" }).getByLabel("Heading").fill("Profil Tauco Cap Badak");
+  await page.getByLabel("Fact-check dikonfirmasi").check();
+  await page.getByRole("button", { name: "Save Draft" }).click();
+  await expect(page.getByText(/Draft revision \d+ tersimpan/)).toBeVisible();
+
   const shellAccessibility = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   expect(shellAccessibility.violations).toEqual([]);
 
@@ -63,6 +100,7 @@ test("BFF rejects unknown paths and unsupported methods", async ({ request }) =>
   const response = await request.get("/admin-api/auth/login");
   expect(response.status()).toBe(405);
   expect(response.headers().allow).toBe("POST");
+  expect((await request.post("/admin-api/pages/tauco-guide/drafts")).status()).toBe(404);
 });
 
 test("admin auth remains readable in dark mode", async ({ page }) => {

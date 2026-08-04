@@ -9,6 +9,7 @@ type PageHeroProps = {
   description: string;
   image: ImageAsset;
   breadcrumbs: BreadcrumbItem[];
+  adminPreview?: boolean;
 };
 
 export function PageHero({
@@ -17,6 +18,7 @@ export function PageHero({
   description,
   image,
   breadcrumbs,
+  adminPreview = false,
 }: PageHeroProps) {
   return (
     <section className="page-hero">
@@ -35,6 +37,7 @@ export function PageHero({
             className="page-hero-image"
             imageClassName="aspect-[4/3]"
             preload
+            adminPreview={adminPreview}
           />
         </div>
       </Container>

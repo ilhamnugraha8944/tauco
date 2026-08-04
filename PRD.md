@@ -33,9 +33,10 @@ Delivery dibagi agar website publik dapat diluncurkan lebih cepat:
   gate. Delivery
   dilakukan local-first dalam shadow-mode sehingga production Phase 1A tetap
   memakai konten lokal dan Netlify Forms.
-- **Phase 1C — implementing lokal:** C0-C5 complete. Fondasi data, auth API,
-  same-origin BFF, shell CMS, dan media CMS tersedia lokal. C6-C10 melanjutkan
-  publishing, product, inbox, operations, dan closeout dalam shadow-mode lokal.
+- **Phase 1C — implementing lokal:** C0-C6 complete. Fondasi data, auth API,
+  same-origin BFF, shell CMS, media CMS, serta editor dan publishing Home/About
+  tersedia lokal. C7-C10 melanjutkan product, inbox, operations, dan closeout
+  dalam shadow-mode lokal.
 - **Phase 1D — future:** remote deployment, hardening, migration/cutover konten
   lokal dan contact, load/security test, backup, dan operational readiness.
 - **Phase 2 — out of scope:** inventory, warehouse, order, payment, dan
@@ -169,7 +170,7 @@ inbox, dan audit trail.
 | Redis/Upstash | `IMPLEMENTED-1B-LOCAL` | Cache, rate limit, fail-open, dan integration lokal |
 | Object storage dan image worker | `IMPLEMENTED-1B-LOCAL` | Local/S3 port, safe image pipeline, dan worker lokal |
 | Admin authentication | `IMPLEMENTING-1C-LOCAL` | C1-C4 complete lokal; password, TOTP, auth API, BFF, dan account shell aktif |
-| CMS homepage/about | `IMPLEMENTING-1C-LOCAL` | C1 revision foundation complete; runtime C6 |
+| CMS homepage/about | `IMPLEMENTING-1C-LOCAL` | Runtime C6 complete lokal; production tetap memakai konten Phase 1A |
 | Product/media CMS | `IMPLEMENTING-1C-LOCAL` | Media runtime C5 complete; product runtime C7 pending |
 | Inbox dan activity log | `IMPLEMENTING-1C-LOCAL` | C1 contract dan privilege foundation complete; runtime C8 |
 | Inventory dan order | `OUT-OF-SCOPE` | Phase 2 |
@@ -476,7 +477,7 @@ Jika berpindah ke custom domain:
 ## 11. Backend Architecture — Phase 1B dan 1C
 
 Phase 1B berstatus `IMPLEMENTED-1B-LOCAL`. Phase 1C berstatus
-`IMPLEMENTING-1C-LOCAL`: C0-C5 complete dan runtime C6-C10 masih pending.
+`IMPLEMENTING-1C-LOCAL`: C0-C6 complete dan runtime C7-C10 masih pending.
 Admin CMS tetap bukan dependency runtime Phase 1A.
 
 ### 11.0 Boundary delivery
@@ -561,7 +562,8 @@ menggunakan opaque cursor.
 
 ### 11.4 Admin REST API
 
-**Status:** `IMPLEMENTING-1C-LOCAL`; C1 OpenAPI complete, runtime C2-C9 pending.
+**Status:** `IMPLEMENTING-1C-LOCAL`; auth C2-C4, media C5, serta page content C6
+complete lokal. Product, inbox, dan operations C7-C9 masih pending.
 
 - login, refresh, logout, current user;
 - setup/enable TOTP serta recovery/reset melalui CLI;
@@ -575,8 +577,9 @@ OpenAPI menjadi contract dan divalidasi dalam CI.
 
 ### 11.5 Authentication dan authorization
 
-**Status:** `IMPLEMENTING-1C-LOCAL`; C1-C5 complete lokal, termasuk
-schema/contract, auth domain, auth API, BFF, dan shell CMS.
+**Status:** `IMPLEMENTING-1C-LOCAL`; C1-C6 complete lokal, termasuk
+schema/contract, auth domain, auth API, BFF, shell CMS, media, dan content
+publishing.
 
 - Role aktif Phase 1: `super_admin`; schema tetap siap untuk RBAC.
 - Tidak ada public registration.
@@ -593,8 +596,8 @@ schema/contract, auth domain, auth API, BFF, dan shell CMS.
 
 ### 11.6 Content publishing
 
-**Status:** revision dan admin schema foundation C1 complete; runtime
-publishing dijadwalkan C6-C9.
+**Status:** revision foundation C1 dan runtime Home/About C6 complete lokal;
+durable invalidation consumer serta operational hardening dijadwalkan C9.
 
 - Homepage dan About merupakan singleton content.
 - Draft dan published revision dipisahkan.

@@ -21,13 +21,18 @@ const dynamicRoutes = [
   { match: /^media\/[0-9a-f-]{36}\/retry$/, methods: new Set(["POST"]), target: (path: string) => `/api/v1/admin/${path}` },
   { match: /^public-media\/[0-9a-f-]{36}\/display\.webp$/, methods: new Set(["GET"]), target: (path: string) => `/api/v1/${path.replace("public-media", "media")}` },
   { match: /^public-media\/[0-9a-f-]{36}\/variants\/(320|640|1280)\.webp$/, methods: new Set(["GET"]), target: (path: string) => `/api/v1/${path.replace("public-media", "media")}` },
+  { match: /^pages\/(home|about)$/, methods: new Set(["GET"]), target: (path: string) => `/api/v1/admin/${path}` },
+  { match: /^pages\/(home|about)\/drafts$/, methods: new Set(["POST"]), target: (path: string) => `/api/v1/admin/${path}` },
+  { match: /^pages\/(home|about)\/revisions\/[0-9a-f-]{36}$/, methods: new Set(["GET"]), target: (path: string) => `/api/v1/admin/${path}` },
+  { match: /^pages\/(home|about)\/revisions\/[0-9a-f-]{36}\/publish$/, methods: new Set(["POST"]), target: (path: string) => `/api/v1/admin/${path}` },
+  { match: /^pages\/(home|about)\/unpublish$/, methods: new Set(["POST"]), target: (path: string) => `/api/v1/admin/${path}` },
 ] as const;
 
 const forwardedRequestHeaders = [
   "content-type",
-	"etag",
-	"content-length",
+  "content-length",
   "cookie",
+  "if-match",
   "origin",
   "referer",
   "sec-fetch-site",
@@ -38,7 +43,9 @@ const forwardedRequestHeaders = [
 
 const forwardedResponseHeaders = [
   "cache-control",
+  "content-length",
   "content-type",
+  "etag",
   "retry-after",
   "x-request-id",
 ] as const;

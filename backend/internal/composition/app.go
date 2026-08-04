@@ -163,6 +163,7 @@ func NewPublicAPI(
 	limiter, _ := ratelimit.New(redisStore, localLimiter, metrics.ObserveRateLimit)
 	var adminAuthHandler *api.AdminAuthHandler
 	var adminMediaServer *api.AdminMediaServer
+	var adminContentServer *api.AdminContentServer
 	if options := infrastructure.AdminAuth; options != nil {
 		adminGORM, openErr := database.OpenAdminGORM(ctx, options.Database)
 		if openErr != nil {
@@ -217,6 +218,21 @@ func NewPublicAPI(
 			closeAll()
 			return nil, mediaErr
 		}
+		contentRepository, contentErr := contentrepo.NewAdminPostgres(adminGORM)
+		if contentErr != nil {
+			closeAll()
+			return nil, contentErr
+		}
+		contentAdmin, contentErr := contentapp.NewAdminService(contentRepository)
+		if contentErr != nil {
+			closeAll()
+			return nil, contentErr
+		}
+		adminContentServer, contentErr = api.NewAdminContentServer(contentAdmin)
+		if contentErr != nil {
+			closeAll()
+			return nil, contentErr
+		}
 	}
 	publicLimit, err := httpmiddleware.RateLimit(limiter, secrets.RateHMAC, httpmiddleware.RatePolicy{
 		Name: "public-read", Limit: 60, Window: time.Minute,
@@ -246,6 +262,7 @@ func NewPublicAPI(
 		if adminAuthHandler != nil {
 			adminAuthHandler.Register(router)
 			api.RegisterSafeMediaHandlers(router, adminMediaServer, adminAuthHandler, publicLimit)
+			api.RegisterSafeAdminContentHandlers(router, adminContentServer, adminAuthHandler)
 		}
 		api.RegisterSafePublicReadHandlers(
 			router,

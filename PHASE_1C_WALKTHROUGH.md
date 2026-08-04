@@ -7,7 +7,7 @@
 | Tanggal mulai | 4 Agustus 2026 |
 | Branch | `feature/phase-1c` |
 | Baseline | `520d315` |
-| Status | C0-C5 complete; C6-C10 pending |
+| Status | C0-C6 complete; C7-C10 pending |
 | Production | Tidak berubah |
 
 Dokumen ini menjadi ledger pelaksanaan Phase 1C. Setiap gate diperbarui setelah
@@ -668,20 +668,124 @@ C6: structured editor, immutable revision, preview, dan publishing Home/About.
 - [x] Upload abuse evidence.
 - [x] Walkthrough update C5.
 
+## Update C6: Homepage dan About CMS
+
+**Tanggal:** 4 Agustus 2026
+
+**Status:** Complete
+
+### Tujuan
+
+Menyediakan editor terstruktur untuk Home dan About dengan revision immutable,
+optimistic concurrency, preview terautentikasi, serta publish/unpublish lokal
+tanpa mengalihkan website production dari konten Phase 1A.
+
+### Perubahan
+
+- Menambahkan use case dan repository admin untuk membaca halaman, menyimpan
+  draft immutable, melihat revision, publish, dan unpublish.
+- Mengunci singleton page saat mutation serta mewajibkan strong `ETag` dan
+  `If-Match`, sehingga draft dari tab lama ditolak dengan `412`.
+- Memvalidasi payload dengan schema OpenAPI dan aturan konten yang sama dengan
+  frontend sebelum revision disimpan.
+- Menolak publish bila media yang direferensikan belum berstatus `ready`.
+- Membuat snapshot published baru tanpa mengubah revision lama, mencatat actor
+  ke activity log, dan mengantrekan durable job `content.invalidate_cache`.
+- Menambahkan BFF allowlist khusus Home/About serta menolak mutation `/tauco`.
+- Menambahkan editor form terstruktur, media picker, revision history/detail,
+  fact-check confirmation, preview, publish, dan unpublish.
+- Memakai komponen presentation yang sama pada preview CMS dan halaman publik
+  agar struktur hasil preview tidak menyimpang dari implementasi website.
+
+### Keputusan arsitektur
+
+- Next.js tetap bertindak sebagai same-origin BFF dan presentation layer; Go
+  tetap memegang validation, concurrency, transaction, audit, dan publishing.
+- Setiap Save Draft selalu menghasilkan revision baru. Revision lama tidak
+  pernah diperbarui atau dihapus oleh workflow C6.
+- Preview membaca revision tertentu, bukan mutable page state.
+- Checkbox fact-check wajib dikonfirmasi ulang setelah isi berubah dan sebelum
+  Save Draft atau Publish.
+- `/tauco` tetap dibaca dari sumber lokal dan tidak mempunyai editor/mutation.
+- Tidak ada dependency baru; form native dan Zod yang sudah ada digunakan
+  kembali sesuai keputusan Ponytail/YAGNI.
+
+### Command yang dijalankan
+
+```powershell
+npm.cmd run backend:format
+npm.cmd run backend:generate:check
+npm.cmd run backend:test
+npm.cmd run backend:test:integration
+npm.cmd run backend:vet
+npm.cmd run backend:build
+npm.cmd run typecheck
+npm.cmd run lint
+npm.cmd run test:e2e
+npm.cmd run test:admin
+git diff --check
+```
+
+### Hasil pengujian
+
+```text
+OpenAPI generated drift: PASS
+PostgreSQL content lifecycle integration: PASS
+concurrent Save Draft: satu sukses, satu PRECONDITION_FAILED
+immutable revision dan published snapshot: PASS
+media processing saat publish: REJECTED
+publish/unpublish, audit, durable invalidation enqueue: PASS
+frontend TypeScript/ESLint/build: PASS
+Phase 1A regression: 79 passed, 13 configured skips
+desktop/mobile admin E2E: 6 passed
+editor Home/About, preview, publish/unpublish, light/dark axe: PASS
+go vet dan backend command build: PASS
+```
+
+### Evidence
+
+- Dua writer dengan ETag sama diuji terhadap PostgreSQL disposable; hanya satu
+  draft yang tersimpan dan writer kedua menerima precondition failure.
+- Publish menghasilkan revision snapshot baru, memperbarui pointer published,
+  mencatat activity log, dan membuat satu job invalidasi durable.
+- Unpublish membersihkan pointer published dan membuat audit serta job
+  invalidasi terpisah.
+- E2E desktop dan mobile mengedit Home dan About melalui form terstruktur,
+  menyimpan draft, membuka preview terautentikasi, publish, lalu unpublish.
+- Mutation `/tauco-guide` melalui BFF menghasilkan 404.
+- Seluruh 79 regression test publik tetap lulus setelah presentation component
+  Home/About dipakai bersama oleh public page dan preview.
+- Tidak ada deploy, push, content cutover, contact cutover, atau secret lokal
+  yang masuk Git.
+
+### Known limitations
+
+- Handler worker untuk menjalankan job `content.invalidate_cache` baru dibuat
+  pada C9; C6 sudah membuat durable job secara transaction-safe.
+- Editor dan API masih local shadow-mode. Production Phase 1A tetap membaca
+  `LocalContentSource` dan tidak berubah saat C6 selesai.
+- Product, inbox, activity viewer, recovery, dan operational closeout masih
+  menjadi scope C7-C10.
+
+### Next gate
+
+C7: Product CMS dengan lifecycle draft, publish, archive, stable slug, media,
+dan public exclusion.
+
 ## C6 Checklist: Homepage dan About CMS
 
-- [ ] Structured Home editor.
-- [ ] Structured About editor.
-- [ ] Immutable Save Draft.
-- [ ] Revision history/detail.
-- [ ] Optimistic conflict.
-- [ ] Authenticated preview.
-- [ ] Publish/unpublish.
-- [ ] Media readiness.
-- [ ] Fact-check confirmation.
-- [ ] Audit dan cache invalidation job.
-- [ ] `/tauco` tetap read-only.
-- [ ] Walkthrough update C6.
+- [x] Structured Home editor.
+- [x] Structured About editor.
+- [x] Immutable Save Draft.
+- [x] Revision history/detail.
+- [x] Optimistic conflict.
+- [x] Authenticated preview.
+- [x] Publish/unpublish.
+- [x] Media readiness.
+- [x] Fact-check confirmation.
+- [x] Audit dan cache invalidation job.
+- [x] `/tauco` tetap read-only.
+- [x] Walkthrough update C6.
 
 ## C7 Checklist: Product CMS
 

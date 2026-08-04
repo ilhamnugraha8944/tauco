@@ -345,6 +345,7 @@ WHERE slug = 'cross-table-seed-collision'`).Error; err != nil {
 	assertContactTransaction(t, ctx, runtimeGORM, migrationGORM)
 	assertDurableJobClaims(t, ctx, runtimeGORM, migrationGORM)
 	assertMediaPipeline(t, ctx, runtimeGORM, adminGORM)
+	assertAdminContentLifecycle(t, ctx, adminGORM, plan)
 	assertCatalogPaginationProbe(
 		t,
 		ctx,
@@ -732,6 +733,105 @@ func assertMediaPipeline(t *testing.T, ctx context.Context, runtimeDatabase, adm
 }
 
 func intPointer(value int) *int { return &value }
+
+func assertAdminContentLifecycle(t *testing.T, ctx context.Context, adminDatabase *gorm.DB, plan contentapp.SeedPlan) {
+	t.Helper()
+	repository, err := contentrepo.NewAdminPostgres(adminDatabase)
+	if err != nil {
+		t.Fatalf("NewAdminPostgres(content): %v", err)
+	}
+	service, _ := contentapp.NewAdminService(repository)
+	page, err := service.Get(ctx, "home")
+	if err != nil {
+		t.Fatalf("get admin home: %v", err)
+	}
+	var actorID string
+	if err := adminDatabase.Raw(`SELECT id::text FROM tauco_app.admin_users ORDER BY created_at LIMIT 1`).Scan(&actorID).Error; err != nil || actorID == "" {
+		t.Fatalf("load content actor: %v", err)
+	}
+	var homeContent json.RawMessage
+	for _, item := range plan.Pages {
+		if item.Key == contentdomain.PageKeyHome {
+			homeContent = item.Revision.ContentJSON
+		}
+	}
+	if len(homeContent) == 0 {
+		t.Fatal("home seed content missing")
+	}
+
+	type result struct {
+		revision contentapp.AdminRevision
+		err      error
+	}
+	start := make(chan struct{})
+	results := make(chan result, 2)
+	for range 2 {
+		go func() {
+			<-start
+			revision, saveErr := service.SaveDraft(ctx, "home", contentapp.RevisionETag(page.Latest.ID), page.Latest.ID, actorID, homeContent)
+			results <- result{revision, saveErr}
+		}()
+	}
+	close(start)
+	var draft contentapp.AdminRevision
+	preconditions := 0
+	for range 2 {
+		item := <-results
+		if item.err == nil {
+			draft = item.revision
+		} else if errors.Is(item.err, contentapp.ErrPrecondition) {
+			preconditions++
+		} else {
+			t.Fatalf("concurrent draft error: %v", item.err)
+		}
+	}
+	if draft.ID == "" || preconditions != 1 {
+		t.Fatalf("concurrent draft=%+v preconditions=%d", draft, preconditions)
+	}
+	if _, err := service.SaveDraft(ctx, "tauco-guide", contentapp.RevisionETag(draft.ID), draft.ID, actorID, homeContent); !errors.Is(err, contentapp.ErrAdminPageNotFound) {
+		t.Fatalf("tauco guide mutation err=%v", err)
+	}
+
+	published, err := service.Publish(ctx, "home", draft.ID, contentapp.RevisionETag(draft.ID), actorID)
+	if err != nil || published.Status != "published" || published.ID == draft.ID {
+		t.Fatalf("publish home=%+v err=%v", published, err)
+	}
+	afterPublish, _ := service.Get(ctx, "home")
+	if afterPublish.PublishedRevisionID == nil || *afterPublish.PublishedRevisionID != published.ID {
+		t.Fatalf("published pointer=%v", afterPublish.PublishedRevisionID)
+	}
+	if err := service.Unpublish(ctx, "home", contentapp.RevisionETag(published.ID), actorID); err != nil {
+		t.Fatalf("unpublish home: %v", err)
+	}
+	afterUnpublish, _ := service.Get(ctx, "home")
+	if afterUnpublish.PublishedRevisionID != nil {
+		t.Fatalf("unpublished pointer=%v", afterUnpublish.PublishedRevisionID)
+	}
+
+	var jobCount, auditCount int64
+	if err := adminDatabase.Raw(`SELECT count(*) FROM tauco_app.background_jobs WHERE kind='content.invalidate_cache'`).Scan(&jobCount).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := adminDatabase.Raw(`SELECT count(*) FROM tauco_app.activity_logs WHERE event_type IN ('content.draft_saved','content.published','content.unpublished')`).Scan(&auditCount).Error; err != nil {
+		t.Fatal(err)
+	}
+	if jobCount != 2 || auditCount < 3 {
+		t.Fatalf("content jobs=%d audit=%d", jobCount, auditCount)
+	}
+
+	var processingID string
+	if err := adminDatabase.Raw(`SELECT id::text FROM tauco_app.media_assets WHERE status='processing' ORDER BY created_at DESC LIMIT 1`).Scan(&processingID).Error; err != nil || processingID == "" {
+		t.Fatalf("load processing media: %v", err)
+	}
+	blockedRaw := bytes.Replace(homeContent, []byte(`/images/tauco-hero-provisional.webp`), []byte(`/api/v1/media/`+processingID+`/display.webp`), 1)
+	blockedDraft, err := service.SaveDraft(ctx, "home", contentapp.RevisionETag(afterUnpublish.Latest.ID), afterUnpublish.Latest.ID, actorID, blockedRaw)
+	if err != nil {
+		t.Fatalf("save blocked media draft: %v", err)
+	}
+	if _, err := service.Publish(ctx, "home", blockedDraft.ID, contentapp.RevisionETag(blockedDraft.ID), actorID); !errors.Is(err, contentapp.ErrMediaNotReady) {
+		t.Fatalf("publish processing media err=%v", err)
+	}
+}
 
 func assertDurableJobClaims(
 	t *testing.T,

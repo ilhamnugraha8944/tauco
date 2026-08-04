@@ -1326,6 +1326,222 @@ figcaption {
 
 }
 
+.admin-content-index,
+.admin-content-editor,
+.admin-preview-page {
+  display: grid;
+  gap: 2rem;
+}
+
+.admin-content-page-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.admin-content-page-link {
+  display: flex;
+  min-height: 13rem;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  padding: 1.25rem;
+}
+
+.admin-content-page-link:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.admin-content-page-link span,
+.admin-content-page-link p,
+.admin-readonly-note p {
+  color: var(--muted);
+}
+
+.admin-content-page-link h2,
+.admin-readonly-note h2 {
+  margin: 0.45rem 0;
+}
+
+.admin-readonly-note {
+  border-left: 3px solid var(--accent);
+  padding-left: 1rem;
+}
+
+.admin-editor-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 2rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 1.5rem;
+}
+
+.admin-editor-header h1,
+.admin-preview-page > header strong {
+  margin-block: 0.5rem;
+}
+
+.admin-preview-page > header strong {
+  display: block;
+  font-size: 1.5rem;
+}
+
+.admin-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}
+
+.admin-editor-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18rem;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.admin-structured-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-editor-group {
+  display: grid;
+  min-width: 0;
+  gap: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 1rem;
+}
+
+.admin-editor-group .admin-editor-group {
+  background: var(--background);
+}
+
+.admin-editor-group legend {
+  padding-inline: 0.35rem;
+  font-weight: 760;
+}
+
+.admin-field textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--background);
+  color: var(--text);
+  padding: 0.7rem 0.75rem;
+  font: inherit;
+  line-height: 1.5;
+}
+
+.admin-field-note {
+  overflow-wrap: anywhere;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.admin-fact-check {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.75rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 1rem;
+  line-height: 1.5;
+}
+
+.admin-fact-check input {
+  width: 1.2rem;
+  height: 1.2rem;
+  margin-top: 0.2rem;
+}
+
+.admin-fact-check strong {
+  display: block;
+}
+
+.admin-revision-panel {
+  position: sticky;
+  top: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 1rem;
+}
+
+.admin-revision-panel h2 {
+  margin-top: 0;
+  font-size: 1rem;
+}
+
+.admin-revision-panel ol {
+  display: grid;
+  gap: 0.4rem;
+  max-height: 70dvh;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-revision-panel button {
+  display: grid;
+  width: 100%;
+  gap: 0.25rem;
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  padding: 0.65rem;
+  text-align: left;
+}
+
+.admin-revision-panel button:hover,
+.admin-revision-panel button[aria-current="true"] {
+  border-color: var(--border);
+  background: var(--surface-strong);
+}
+
+.admin-revision-panel small { color: var(--muted); }
+.admin-revision-panel em { display: flex; align-items: center; gap: 0.25rem; color: var(--accent); font-size: 0.72rem; font-style: normal; font-weight: 760; }
+
+.admin-preview-page {
+  max-width: 90rem;
+}
+
+.admin-public-preview {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--background);
+}
+
+.admin-public-preview .site-header,
+.admin-public-preview .site-footer { display: none; }
+
+@media (max-width: 900px) {
+  .admin-editor-layout { grid-template-columns: 1fr; }
+  .admin-revision-panel { position: static; }
+}
+
+@media (max-width: 767px) {
+  .admin-content-page-list { grid-template-columns: 1fr; }
+  .admin-editor-header { align-items: flex-start; flex-direction: column; }
+  .admin-editor-actions { justify-content: flex-start; width: 100%; }
+  .admin-editor-actions > * { width: 100%; }
+}
+
 .admin-kicker {
   margin: 0 0 0.65rem;
   color: var(--accent);

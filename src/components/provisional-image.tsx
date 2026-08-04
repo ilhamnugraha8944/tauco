@@ -10,6 +10,7 @@ type ProvisionalImageProps = {
   caption?: string;
   preload?: boolean;
   sizes: string;
+  adminPreview?: boolean;
 };
 
 export function ProvisionalImage({
@@ -20,15 +21,21 @@ export function ProvisionalImage({
   caption = "Ilustrasi penyajian",
   preload = false,
   sizes,
+  adminPreview = false,
 }: ProvisionalImageProps) {
+  const previewSource = adminPreview && src.startsWith("/api/v1/media/")
+    ? src.replace("/api/v1/media/", "/admin-api/public-media/")
+    : null;
   return (
     <figure className={className}>
       <div className="image-frame">
         <Image
-          src={getImageAsset(src)}
+          src={previewSource ?? getImageAsset(src)}
           alt={alt}
           className={`h-full w-full object-cover ${imageClassName}`}
-          placeholder="blur"
+          placeholder={previewSource ? "empty" : "blur"}
+          fill={previewSource ? true : undefined}
+          unoptimized={Boolean(previewSource)}
           preload={preload}
           fetchPriority={preload ? "high" : "low"}
           decoding="async"

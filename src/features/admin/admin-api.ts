@@ -29,7 +29,7 @@ function cookie(name: string): string {
   return match ? decodeURIComponent(match.slice(prefix.length)) : "";
 }
 
-async function send<T>(path: string, init: RequestInit, retry = true): Promise<T> {
+async function sendWithResponse<T>(path: string, init: RequestInit, retry = true): Promise<{ body: T; headers: Headers }> {
   const method = init.method ?? "GET";
   const headers = new Headers(init.headers);
   const csrf = cookie("tauco_admin_csrf");
@@ -52,7 +52,7 @@ async function send<T>(path: string, init: RequestInit, retry = true): Promise<T
   if (response.status === 401 && retry && path !== "auth/login" && path !== "auth/refresh") {
     try {
       await send("auth/refresh", { method: "POST" }, false);
-      return send<T>(path, init, false);
+      return sendWithResponse<T>(path, init, false);
     } catch {
       // Gunakan error asli agar UI tetap memberi pesan yang konsisten.
     }
@@ -67,7 +67,11 @@ async function send<T>(path: string, init: RequestInit, retry = true): Promise<T
     );
   }
 
-  return (response.status === 204 ? undefined : await response.json()) as T;
+  return { body: (response.status === 204 ? undefined : await response.json()) as T, headers: response.headers };
+}
+
+async function send<T>(path: string, init: RequestInit, retry = true): Promise<T> {
+  return (await sendWithResponse<T>(path, init, retry)).body;
 }
 
 export const adminAPI = {
@@ -109,6 +113,25 @@ export const adminAPI = {
   retryMedia(id: string) {
     return send<{ data: AdminMedia }>(`media/${id}/retry`, { method: "POST" });
   },
+  async getPage(key: AdminPageKey) {
+    const response = await sendWithResponse<{ data: AdminPage }>(`pages/${key}`, { method: "GET" });
+    return { ...response.body, etag: response.headers.get("etag") ?? "" };
+  },
+  async getPageRevision(key: AdminPageKey, id: string) {
+    const response = await sendWithResponse<{ data: AdminRevision }>(`pages/${key}/revisions/${id}`, { method: "GET" });
+    return { ...response.body, etag: response.headers.get("etag") ?? "" };
+  },
+  async savePageDraft(key: AdminPageKey, etag: string, baseRevisionId: string, content: EditableContent) {
+    const response = await sendWithResponse<{ data: AdminRevision }>(`pages/${key}/drafts`, { method: "POST", headers: { "If-Match": etag }, body: JSON.stringify({ baseRevisionId, content }) });
+    return { ...response.body, etag: response.headers.get("etag") ?? "" };
+  },
+  async publishPage(key: AdminPageKey, revisionId: string, etag: string) {
+    const response = await sendWithResponse<{ data: AdminRevision }>(`pages/${key}/revisions/${revisionId}/publish`, { method: "POST", headers: { "If-Match": etag } });
+    return { ...response.body, etag: response.headers.get("etag") ?? "" };
+  },
+  unpublishPage(key: AdminPageKey, etag: string) {
+    return send<void>(`pages/${key}/unpublish`, { method: "POST", headers: { "If-Match": etag } });
+  },
 };
 
 export type AdminMedia = {
@@ -123,5 +146,27 @@ export type AdminMedia = {
   lastErrorCode?: string;
   variants: Array<{ width: number; height: number; bytes: number; url: string }>;
   createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminPageKey = "home" | "about";
+export type EditableContent = Record<string, unknown>;
+export type AdminRevision = {
+  id: string;
+  ownerId: string;
+  revisionNumber: number;
+  status: "draft" | "published" | "archived";
+  schemaVersion: number;
+  content: EditableContent;
+  createdBy?: string;
+  createdAt: string;
+  publishedAt?: string;
+};
+export type AdminPage = {
+  id: string;
+  key: AdminPageKey;
+  latestRevision: AdminRevision;
+  publishedRevisionId?: string | null;
+  revisions: Array<Omit<AdminRevision, "ownerId" | "schemaVersion" | "content">>;
   updatedAt: string;
 };
