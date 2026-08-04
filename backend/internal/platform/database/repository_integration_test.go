@@ -21,6 +21,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"gorm.io/gorm"
 
+	authapp "github.com/ilhamnugraha8944/tauco/backend/internal/auth/application"
+	authdomain "github.com/ilhamnugraha8944/tauco/backend/internal/auth/domain"
+	authrepo "github.com/ilhamnugraha8944/tauco/backend/internal/auth/repository"
 	catalogapp "github.com/ilhamnugraha8944/tauco/backend/internal/catalog/application"
 	catalogcursor "github.com/ilhamnugraha8944/tauco/backend/internal/catalog/delivery/cursor"
 	catalogdomain "github.com/ilhamnugraha8944/tauco/backend/internal/catalog/domain"
@@ -306,6 +309,21 @@ WHERE slug = 'cross-table-seed-collision'`).Error; err != nil {
 	}
 	defer runtimeSQL.Close()
 
+	adminGORM, err := OpenAdminGORM(ctx, RuntimeConfig{
+		URL: adminURL, MaxOpenConns: 2, MaxIdleConns: 1,
+		ConnMaxLifetime: 30 * time.Minute, ConnMaxIdleTime: 5 * time.Minute,
+		PreferSimpleQuery: true,
+	})
+	if err != nil {
+		t.Fatalf("OpenAdminGORM() error = %v", err)
+	}
+	adminSQL, err := adminGORM.DB()
+	if err != nil {
+		t.Fatalf("admin GORM pool: %v", err)
+	}
+	defer adminSQL.Close()
+	assertAdminAuthLifecycle(t, ctx, adminGORM)
+
 	pageRepository, err := contentrepo.NewPostgresRepository(runtimeGORM)
 	if err != nil {
 		t.Fatalf("NewPostgresRepository(runtime) error = %v", err)
@@ -328,6 +346,74 @@ WHERE slug = 'cross-table-seed-collision'`).Error; err != nil {
 		productRepository,
 		plan,
 	)
+}
+
+func assertAdminAuthLifecycle(t *testing.T, ctx context.Context, db *gorm.DB) {
+	t.Helper()
+	store, err := authrepo.NewPostgres(db)
+	if err != nil {
+		t.Fatalf("NewPostgres(auth) error = %v", err)
+	}
+	privateKey, publicKey, err := authdomain.GenerateRSAKeyPair()
+	if err != nil {
+		t.Fatalf("GenerateRSAKeyPair() error = %v", err)
+	}
+	tokens, err := authdomain.NewTokenManager(privateKey, publicKey, "integration", "admin", "test-key", authapp.AccessTTL)
+	if err != nil {
+		t.Fatalf("NewTokenManager() error = %v", err)
+	}
+	box, err := authdomain.NewSecretBox([]byte("0123456789abcdef0123456789abcdef"), "test-key")
+	if err != nil {
+		t.Fatalf("NewSecretBox() error = %v", err)
+	}
+	service, err := authapp.NewService(store, tokens, box, []byte("integration-recovery-secret-32-bytes-minimum"))
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+	const email, password = "owner@example.test", "correct horse battery staple"
+	if err := service.BootstrapAdmin(ctx, email, password); err != nil {
+		t.Fatalf("BootstrapAdmin() error = %v", err)
+	}
+	login, err := service.Login(ctx, email, password, nil, nil, "integration")
+	if err != nil || login.Principal.Level != authapp.LevelPassword {
+		t.Fatalf("password login = %+v, %v", login.Principal, err)
+	}
+	setup, err := service.SetupTOTP(ctx, login.Principal)
+	if err != nil {
+		t.Fatalf("SetupTOTP() error = %v", err)
+	}
+	code, err := authdomain.CurrentTOTP(setup.Secret, time.Now())
+	if err != nil {
+		t.Fatalf("CurrentTOTP() error = %v", err)
+	}
+	enabled, err := service.EnableTOTP(ctx, login.Principal, code)
+	if err != nil || len(enabled.Codes) != authapp.RecoveryCount {
+		t.Fatalf("EnableTOTP() codes=%d error=%v", len(enabled.Codes), err)
+	}
+	if _, err := service.Login(ctx, email, password, &code, nil, "integration"); !errors.Is(err, authapp.ErrAuthentication) {
+		t.Fatalf("TOTP replay error = %v, want generic authentication error", err)
+	}
+	recovery := enabled.Codes[0]
+	recovered, err := service.Login(ctx, email, password, nil, &recovery, "integration")
+	if err != nil || recovered.Principal.Level != authapp.LevelMFA {
+		t.Fatalf("recovery login error = %v", err)
+	}
+	if _, err := service.Login(ctx, email, password, nil, &recovery, "integration"); !errors.Is(err, authapp.ErrAuthentication) {
+		t.Fatalf("recovery replay error = %v, want generic authentication error", err)
+	}
+	rotated, err := service.Refresh(ctx, recovered.Tokens.Refresh, recovered.Tokens.CSRF)
+	if err != nil {
+		t.Fatalf("Refresh() error = %v", err)
+	}
+	if _, err := service.ValidateAccess(ctx, rotated.Tokens.Access, true); err != nil {
+		t.Fatalf("ValidateAccess() error = %v", err)
+	}
+	if _, err := service.Refresh(ctx, recovered.Tokens.Refresh, recovered.Tokens.CSRF); !errors.Is(err, authapp.ErrRefreshReused) {
+		t.Fatalf("refresh reuse error = %v, want ErrRefreshReused", err)
+	}
+	if _, err := service.ValidateAccess(ctx, rotated.Tokens.Access, true); !errors.Is(err, authapp.ErrUnauthorized) {
+		t.Fatalf("reused session access error = %v, want unauthorized", err)
+	}
 }
 
 func assertMediaPipeline(t *testing.T, ctx context.Context, runtimeDatabase *gorm.DB) {

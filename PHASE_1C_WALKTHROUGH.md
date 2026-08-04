@@ -7,7 +7,7 @@
 | Tanggal mulai | 4 Agustus 2026 |
 | Branch | `feature/phase-1c` |
 | Baseline | `520d315` |
-| Status | C0-C1 complete; C2-C10 pending |
+| Status | C0-C2 complete; C3-C10 pending |
 | Production | Tidak berubah |
 
 Dokumen ini menjadi ledger pelaksanaan Phase 1C. Setiap gate diperbarui setelah
@@ -239,19 +239,96 @@ C2: auth domain dan CLI.
 - [x] OpenAPI drift check.
 - [x] Walkthrough update C1.
 
+## Update C2: Auth Domain dan CLI
+
+**Tanggal:** 4 Agustus 2026
+
+**Status:** Complete
+
+### Tujuan
+
+Menyediakan domain authentication dan recovery operator yang dapat diuji tanpa
+mengaktifkan endpoint admin atau mengubah production.
+
+### Perubahan
+
+- Password memakai Argon2id dengan parameter yang dibekukan di plan.
+- Access token memakai RS256 dengan validasi `alg`, `typ`, `kid`, issuer,
+  audience, seluruh claim waktu, user ID, session ID, dan JWT ID.
+- Refresh/CSRF token dibuat dari CSPRNG, hanya hash SHA-256 disimpan, dan reuse
+  mencabut seluruh session secara transaction-safe.
+- TOTP RFC 6238 disimpan terenkripsi AES-256-GCM dan counter dipakai sekali.
+- Sepuluh recovery code disimpan sebagai HMAC-SHA256 dan dipakai sekali.
+- CLI lokal menyediakan keygen, bootstrap, reset password, reset TOTP, dan
+  revoke session. Password dibaca dari stdin, bukan process argument.
+- Migration v6 menambah authentication level session dan lifecycle pencabutan
+  credential MFA.
+- Koneksi `ADMIN_DATABASE_URL` diverifikasi sebagai role admin least-privilege.
+
+### Keputusan arsitektur
+
+- Secret key lokal berada di `backend/.local-auth/` dan di-ignore Git.
+- Runtime public dan admin memakai pool serta identity assertion terpisah.
+- Refresh reuse harus commit pencabutan sebelum mengembalikan error generik;
+  rollback transaksi tidak boleh membatalkan tindakan protektif tersebut.
+- C2 belum mendaftarkan route admin apa pun.
+
+### Command yang dijalankan
+
+```powershell
+npm.cmd run backend:admin -- keygen .local-auth/jwt-private.pem .local-auth/jwt-public.pem
+npm.cmd run backend:migrate:up
+npm.cmd run backend:migrate:version
+npm.cmd run backend:format
+npm.cmd run backend:build
+npm.cmd run backend:test:integration
+git diff --check
+```
+
+### Hasil pengujian
+
+```text
+migration: version=6 dirty=false
+backend command build: PASS
+fresh database auth lifecycle: PASS
+Argon2id bootstrap/login: PASS
+TOTP setup/enable/replay rejection: PASS
+recovery-code one-time use: PASS
+refresh rotation/reuse revocation: PASS
+Windows Application Control fallback: PASS
+```
+
+### Evidence
+
+- Integration suite membuat database disposable dan role admin terpisah.
+- Access baru valid setelah MFA, TOTP/recovery replay ditolak dengan error
+  generik, dan reuse refresh lama membuat access session hasil rotasi invalid.
+- RSA private key, `.env`, dan nilai runtime lokal tidak masuk Git.
+- Tidak ada unit-test file baru dan production Phase 1A tidak berubah.
+
+### Known limitations
+
+- Endpoint auth/cookie/CSRF/rate limit belum diaktifkan; itu C3.
+- Belum ada akun admin permanen karena email/password owner belum diberikan.
+- Key C2 hanya untuk local development dan bukan key production.
+
+### Next gate
+
+C3: auth API dan security middleware.
+
 ## C2 Checklist: Auth Domain dan CLI
 
-- [ ] Argon2id password hashing.
-- [ ] RS256 key generation/loading.
-- [ ] JWT claims dan validation.
-- [ ] Refresh token hashing/rotation model.
-- [ ] AES-GCM TOTP secret storage.
-- [ ] TOTP replay protection.
-- [ ] Recovery code generation/consumption.
-- [ ] Admin bootstrap CLI.
-- [ ] Password/TOTP/session recovery CLI.
-- [ ] Auth integration evidence.
-- [ ] Walkthrough update C2.
+- [x] Argon2id password hashing.
+- [x] RS256 key generation/loading.
+- [x] JWT claims dan validation.
+- [x] Refresh token hashing/rotation model.
+- [x] AES-GCM TOTP secret storage.
+- [x] TOTP replay protection.
+- [x] Recovery code generation/consumption.
+- [x] Admin bootstrap CLI.
+- [x] Password/TOTP/session recovery CLI.
+- [x] Auth integration evidence.
+- [x] Walkthrough update C2.
 
 ## C3 Checklist: Auth API dan Security Middleware
 

@@ -30,6 +30,7 @@
     "lighthouse": "node scripts/run-lighthouse.mjs",
     "lighthouse:production": "node scripts/run-production-lighthouse.mjs",
     "backend:dev": "node scripts/run-backend-db.mjs api",
+    "backend:admin": "node scripts/run-backend-db.mjs admin",
     "backend:worker": "node scripts/run-backend-db.mjs worker",
     "backend:worker:ready": "node scripts/run-backend-db.mjs worker --check",
     "backend:media:import": "node scripts/run-backend-db.mjs media-import",

@@ -81,6 +81,11 @@ switch (operation) {
     run("go", ["-C", "backend", "run", "./cmd/api"]);
     break;
   }
+  case "admin": {
+    if (!process.env.ADMIN_DATABASE_URL?.trim()) fail("ADMIN_DATABASE_URL wajib tersedia untuk admin CLI.");
+    run("go", ["-C", "backend", "run", "./cmd/admin", ...operationArguments]);
+    break;
+  }
   case "worker": {
     requireRuntimeConfiguration();
     if (operationArguments.length > 1 || (operationArguments.length === 1 && operationArguments[0] !== "--check")) {
@@ -181,6 +186,6 @@ switch (operation) {
   default:
     fail(
       "usage: run-backend-db.mjs " +
-        "<api|worker|media-import args...|ops args...|loadcheck|migrate args...|seed-phase1a|integration>",
+        "<api|admin args...|worker|media-import args...|ops args...|loadcheck|migrate args...|seed-phase1a|integration>",
     );
 }

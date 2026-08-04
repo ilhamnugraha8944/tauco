@@ -36,6 +36,15 @@ type RuntimeConfig struct {
 // LoadRuntimeConfig loads the runtime connection policy without ever
 // including the secret-bearing URL in an error.
 func LoadRuntimeConfig(lookup LookupEnv) (RuntimeConfig, error) {
+	return loadRuntimeConfig(lookup, "DATABASE_URL")
+}
+
+// LoadAdminRuntimeConfig loads the isolated CMS connection policy.
+func LoadAdminRuntimeConfig(lookup LookupEnv) (RuntimeConfig, error) {
+	return loadRuntimeConfig(lookup, "ADMIN_DATABASE_URL")
+}
+
+func loadRuntimeConfig(lookup LookupEnv, urlField string) (RuntimeConfig, error) {
 	if lookup == nil {
 		return RuntimeConfig{}, &ConfigError{
 			Field:  "environment",
@@ -43,14 +52,14 @@ func LoadRuntimeConfig(lookup LookupEnv) (RuntimeConfig, error) {
 		}
 	}
 
-	rawURL, found := lookup("DATABASE_URL")
+	rawURL, found := lookup(urlField)
 	if !found || strings.TrimSpace(rawURL) == "" {
 		return RuntimeConfig{}, &ConfigError{
-			Field:  "DATABASE_URL",
+			Field:  urlField,
 			Reason: "is required",
 		}
 	}
-	if _, err := parseDatabaseURL("DATABASE_URL", rawURL, true); err != nil {
+	if _, err := parseDatabaseURL(urlField, rawURL, true); err != nil {
 		return RuntimeConfig{}, err
 	}
 
@@ -106,10 +115,25 @@ func LoadRuntimeConfig(lookup LookupEnv) (RuntimeConfig, error) {
 // OpenGORM opens and verifies a runtime database connection. Prepared
 // statements are disabled for Supavisor transaction-pool compatibility.
 func OpenGORM(ctx context.Context, config RuntimeConfig) (*gorm.DB, error) {
+	return openGORM(ctx, config, "DATABASE_URL", assertRuntimeIdentity)
+}
+
+// OpenAdminGORM opens the CMS connection and fails closed unless it inherits
+// exactly the fixed least-privilege admin authorization role.
+func OpenAdminGORM(ctx context.Context, config RuntimeConfig) (*gorm.DB, error) {
+	return openGORM(ctx, config, "ADMIN_DATABASE_URL", assertAdminIdentity)
+}
+
+func openGORM(
+	ctx context.Context,
+	config RuntimeConfig,
+	urlField string,
+	assertIdentity func(context.Context, *sql.DB) error,
+) (*gorm.DB, error) {
 	if ctx == nil {
 		return nil, errors.New("open database: context is required")
 	}
-	if err := validateRuntimeConfig(config); err != nil {
+	if err := validateRuntimeConfig(config, urlField); err != nil {
 		return nil, err
 	}
 
@@ -137,7 +161,7 @@ func OpenGORM(ctx context.Context, config RuntimeConfig) (*gorm.DB, error) {
 		_ = sqlDatabase.Close()
 		return nil, fmt.Errorf("verify PostgreSQL runtime connection: %w", err)
 	}
-	if err := assertRuntimeIdentity(ctx, sqlDatabase); err != nil {
+	if err := assertIdentity(ctx, sqlDatabase); err != nil {
 		_ = sqlDatabase.Close()
 		return nil, err
 	}
@@ -192,8 +216,8 @@ func OpenMigrationGORM(
 	return database, nil
 }
 
-func validateRuntimeConfig(config RuntimeConfig) error {
-	if _, err := parseDatabaseURL("DATABASE_URL", config.URL, true); err != nil {
+func validateRuntimeConfig(config RuntimeConfig, urlField string) error {
+	if _, err := parseDatabaseURL(urlField, config.URL, true); err != nil {
 		return err
 	}
 	if config.MaxOpenConns < 1 {
@@ -222,9 +246,57 @@ func validateRuntimeConfig(config RuntimeConfig) error {
 	}
 	if !config.PreferSimpleQuery {
 		return &ConfigError{
-			Field:  "DATABASE_URL",
+			Field:  urlField,
 			Reason: "runtime connections must use the pooler-safe simple protocol",
 		}
+	}
+	return nil
+}
+
+func assertAdminIdentity(ctx context.Context, database *sql.DB) error {
+	var (
+		isSuperuser, canCreateDB, canCreateRole, canReplicate, canBypassRLS bool
+		isAdminMember, isRuntimeMember, isMigratorMember                    bool
+		canCreateSchema, canCreateDatabase, canCreateTemp, canCreatePublic  bool
+		canReadUsers, canWriteUsers, canInsertRevision, canUpdatePages      bool
+		canDeleteInbox, canWritePermissions                                 bool
+		currentSchema                                                       string
+	)
+	err := database.QueryRowContext(ctx, `
+SELECT
+    role.rolsuper, role.rolcreatedb, role.rolcreaterole,
+    role.rolreplication, role.rolbypassrls,
+    pg_has_role(current_user, 'tauco_admin_runtime', 'MEMBER'),
+    pg_has_role(current_user, 'tauco_runtime', 'MEMBER'),
+    pg_has_role(current_user, 'tauco_migrator', 'MEMBER'),
+    has_schema_privilege(current_user, 'tauco_app', 'CREATE'),
+    has_database_privilege(current_user, current_database(), 'CREATE'),
+    has_database_privilege(current_user, current_database(), 'TEMPORARY'),
+    has_schema_privilege(current_user, 'public', 'CREATE'),
+    has_table_privilege(current_user, 'tauco_app.admin_users', 'SELECT'),
+    has_table_privilege(current_user, 'tauco_app.admin_users', 'INSERT,UPDATE'),
+    has_table_privilege(current_user, 'tauco_app.page_revisions', 'INSERT'),
+    has_table_privilege(current_user, 'tauco_app.pages', 'UPDATE'),
+    has_table_privilege(current_user, 'tauco_app.contact_messages', 'DELETE'),
+    has_table_privilege(current_user, 'tauco_app.permissions', 'INSERT,UPDATE,DELETE'),
+    current_schema()
+FROM pg_catalog.pg_roles AS role
+WHERE role.rolname = current_user`).Scan(
+		&isSuperuser, &canCreateDB, &canCreateRole, &canReplicate, &canBypassRLS,
+		&isAdminMember, &isRuntimeMember, &isMigratorMember,
+		&canCreateSchema, &canCreateDatabase, &canCreateTemp, &canCreatePublic,
+		&canReadUsers, &canWriteUsers, &canInsertRevision, &canUpdatePages,
+		&canDeleteInbox, &canWritePermissions, &currentSchema,
+	)
+	if err != nil {
+		return fmt.Errorf("verify PostgreSQL admin identity: %w", err)
+	}
+	if isSuperuser || canCreateDB || canCreateRole || canReplicate || canBypassRLS ||
+		!isAdminMember || isRuntimeMember || isMigratorMember || canCreateSchema ||
+		canCreateDatabase || canCreateTemp || canCreatePublic || currentSchema != ApplicationSchema ||
+		!canReadUsers || !canWriteUsers || !canInsertRevision || !canUpdatePages ||
+		canDeleteInbox || canWritePermissions {
+		return errors.New("verify PostgreSQL admin identity: connection is not least-privilege tauco admin runtime")
 	}
 	return nil
 }
