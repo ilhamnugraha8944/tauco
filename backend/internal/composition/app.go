@@ -9,19 +9,25 @@ import (
 	"fmt"
 	"net/http"
 	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	catalogapp "github.com/ilhamnugraha8944/tauco/backend/internal/catalog/application"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/catalog/delivery/cursor"
 	catalogrepo "github.com/ilhamnugraha8944/tauco/backend/internal/catalog/repository"
+	contactapp "github.com/ilhamnugraha8944/tauco/backend/internal/contact/application"
+	contactrepo "github.com/ilhamnugraha8944/tauco/backend/internal/contact/repository"
 	contentapp "github.com/ilhamnugraha8944/tauco/backend/internal/content/application"
 	contentrepo "github.com/ilhamnugraha8944/tauco/backend/internal/content/repository"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/delivery/api"
+	platformcache "github.com/ilhamnugraha8944/tauco/backend/internal/platform/cache"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/platform/config"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/platform/database"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/platform/httpmiddleware"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/platform/httpserver"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/platform/logging"
+	"github.com/ilhamnugraha8944/tauco/backend/internal/platform/observability"
+	"github.com/ilhamnugraha8944/tauco/backend/internal/platform/ratelimit"
 )
 
 // App owns the API process dependencies and their lifecycle.
@@ -30,19 +36,35 @@ type App struct {
 	handler  http.Handler
 	server   *httpserver.Server
 	database *sql.DB
+	cache    *platformcache.Redis
 }
 
 // New validates configuration and wires the B1 platform foundation.
 func New(cfg config.Config) (*App, error) {
-	return newApp(cfg, nil)
+	return newApp(cfg, routerSetup{}, nil)
 }
 
 // NewPublicAPI wires the B4 public read API to least-privilege PostgreSQL.
+type PublicAPISecrets struct {
+	CursorHMAC    []byte
+	ContactHMAC   []byte
+	RateHMAC      []byte
+	MetricsBearer []byte
+}
+
+type PublicAPIInfrastructure struct {
+	RedisURL          string
+	CORSOrigins       []string
+	TrustedProxyCIDRs []string
+	MediaRoot         string
+}
+
 func NewPublicAPI(
 	ctx context.Context,
 	cfg config.Config,
 	databaseConfig database.RuntimeConfig,
-	cursorSecret []byte,
+	secrets PublicAPISecrets,
+	infrastructure PublicAPIInfrastructure,
 ) (*App, error) {
 	gormDatabase, err := database.OpenGORM(ctx, databaseConfig)
 	if err != nil {
@@ -56,24 +78,38 @@ func NewPublicAPI(
 		_ = sqlDatabase.Close()
 	}
 
-	pageRepository, err := contentrepo.NewPostgresRepository(gormDatabase)
+	redisStore, err := platformcache.NewRedis(infrastructure.RedisURL)
 	if err != nil {
 		closeDatabase()
 		return nil, err
 	}
-	productRepository, err := catalogrepo.NewPostgresRepository(gormDatabase)
-	if err != nil {
+	closeAll := func() {
+		_ = redisStore.Close()
 		closeDatabase()
+	}
+
+	metrics := observability.NewRegistry()
+	observedCache := platformcache.Observe(redisStore, metrics)
+	pagePostgres, err := contentrepo.NewPostgresRepository(gormDatabase)
+	if err != nil {
+		closeAll()
 		return nil, err
 	}
+	productPostgres, err := catalogrepo.NewPostgresRepository(gormDatabase)
+	if err != nil {
+		closeAll()
+		return nil, err
+	}
+	pageRepository := contentrepo.NewCached(pagePostgres, observedCache, 5*time.Minute)
+	productRepository := catalogrepo.NewCached(productPostgres, observedCache, 5*time.Minute)
 	pageReader, err := contentapp.NewPublishedReader(pageRepository)
 	if err != nil {
-		closeDatabase()
+		closeAll()
 		return nil, err
 	}
-	cursorCodec, err := cursor.NewHMACSHA256(cursorSecret)
+	cursorCodec, err := cursor.NewHMACSHA256(secrets.CursorHMAC)
 	if err != nil {
-		closeDatabase()
+		closeAll()
 		return nil, err
 	}
 	productReader, err := catalogapp.NewPublishedReader(
@@ -81,33 +117,92 @@ func NewPublicAPI(
 		cursorCodec,
 	)
 	if err != nil {
-		closeDatabase()
+		closeAll()
+		return nil, err
+	}
+	contactStore, err := contactrepo.NewPostgresStore(gormDatabase)
+	if err != nil {
+		closeAll()
+		return nil, err
+	}
+	contactIntake, err := contactapp.NewIntake(contactStore, secrets.ContactHMAC)
+	if err != nil {
+		closeAll()
 		return nil, err
 	}
 	publicReadServer, err := api.NewPublicReadServer(pageReader, productReader)
 	if err != nil {
-		closeDatabase()
+		closeAll()
+		return nil, err
+	}
+	if err := publicReadServer.WithContactIntake(contactIntake); err != nil {
+		closeAll()
+		return nil, err
+	}
+	localLimiter, _ := ratelimit.NewLocal(10_000)
+	limiter, _ := ratelimit.New(redisStore, localLimiter, metrics.ObserveRateLimit)
+	publicLimit, err := httpmiddleware.RateLimit(limiter, secrets.RateHMAC, httpmiddleware.RatePolicy{
+		Name: "public-read", Limit: 60, Window: time.Minute,
+	})
+	if err != nil {
+		closeAll()
+		return nil, err
+	}
+	contactLimit, err := httpmiddleware.RateLimit(limiter, secrets.RateHMAC, httpmiddleware.RatePolicy{
+		Name: "contact", Limit: 5, Window: time.Hour,
+	})
+	if err != nil {
+		closeAll()
+		return nil, err
+	}
+	corsMiddleware, err := httpmiddleware.CORS(infrastructure.CORSOrigins)
+	if err != nil {
+		closeAll()
 		return nil, err
 	}
 
-	app, err := newApp(cfg, func(router gin.IRouter) {
+	var registrationError error
+	app, err := newApp(cfg, routerSetup{
+		trustedProxies: infrastructure.TrustedProxyCIDRs,
+		middleware:     []gin.HandlerFunc{metrics.HTTPMiddleware(), httpmiddleware.SecurityHeaders(), corsMiddleware},
+	}, func(router gin.IRouter) {
 		api.RegisterSafePublicReadHandlers(
 			router,
 			publicReadServer,
 			nil,
 			"",
+			publicLimit,
+			httpmiddleware.RejectBody(),
 		)
+		api.RegisterSafeContactHandler(router, publicReadServer, nil, "", contactLimit)
+		registrationError = registerOperations(router, operationsDependencies{
+			Database: sqlDatabase, Cache: redisStore,
+			MediaRoot:    infrastructure.MediaRoot,
+			MetricsToken: secrets.MetricsBearer, Metrics: metrics,
+		})
 	})
 	if err != nil {
-		closeDatabase()
+		closeAll()
 		return nil, err
 	}
+	if registrationError != nil {
+		_ = app.Close()
+		closeAll()
+		return nil, registrationError
+	}
 	app.database = sqlDatabase
+	app.cache = redisStore
 	return app, nil
+}
+
+type routerSetup struct {
+	trustedProxies []string
+	middleware     []gin.HandlerFunc
 }
 
 func newApp(
 	cfg config.Config,
+	setup routerSetup,
 	registerRoutes func(gin.IRouter),
 ) (*App, error) {
 	if err := cfg.Validate(); err != nil {
@@ -119,23 +214,29 @@ func newApp(
 		return nil, fmt.Errorf("create application logger: %w", err)
 	}
 
+	middleware := []gin.HandlerFunc{httpmiddleware.AccessLog(logger)}
+	middleware = append(middleware, setup.middleware...)
 	router, err := httpserver.NewRouter(httpserver.RouterOptions{
-		TrustedProxies: []string{},
+		TrustedProxies: append([]string(nil), setup.trustedProxies...),
 		PanicReporter: func(ctx context.Context, report httpserver.PanicReport) {
 			requestID, _ := httpserver.RequestIDFromContext(ctx)
-			logger.Error(
-				"http panic recovered",
+			fields := []logging.Field{
 				logging.RequestID(requestID),
 				logging.Route(report.Route),
 				logging.Method(report.Method),
 				logging.Status(report.Status),
 				logging.Latency(report.Latency),
 				logging.ErrorCode("HTTP_PANIC_RECOVERED"),
+			}
+			if traceID, ok := httpserver.TraceIDFromContext(ctx); ok {
+				fields = append(fields, logging.TraceID(traceID))
+			}
+			logger.Error(
+				"http panic recovered",
+				fields...,
 			)
 		},
-		Middleware: []gin.HandlerFunc{
-			httpmiddleware.AccessLog(logger),
-		},
+		Middleware: middleware,
 	})
 	if err != nil {
 		_ = syncLogger(logger)
@@ -212,7 +313,12 @@ func (a *App) Close() error {
 		databaseError = a.database.Close()
 		a.database = nil
 	}
-	return errors.Join(databaseError, syncLogger(a.logger))
+	var cacheError error
+	if a.cache != nil {
+		cacheError = a.cache.Close()
+		a.cache = nil
+	}
+	return errors.Join(databaseError, cacheError, syncLogger(a.logger))
 }
 
 func syncLogger(logger *logging.Logger) error {

@@ -12,6 +12,10 @@ build/
 coverage/
 dist/
 tmp/
+.go-build-cache/
+.tool-bin/
+.test-bin/
+.local-media/
 
 *.log
 *.out

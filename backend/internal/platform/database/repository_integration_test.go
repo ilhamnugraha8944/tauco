@@ -6,6 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -22,12 +25,21 @@ import (
 	catalogcursor "github.com/ilhamnugraha8944/tauco/backend/internal/catalog/delivery/cursor"
 	catalogdomain "github.com/ilhamnugraha8944/tauco/backend/internal/catalog/domain"
 	catalogrepo "github.com/ilhamnugraha8944/tauco/backend/internal/catalog/repository"
+	contactapp "github.com/ilhamnugraha8944/tauco/backend/internal/contact/application"
+	contactdomain "github.com/ilhamnugraha8944/tauco/backend/internal/contact/domain"
+	contactrepo "github.com/ilhamnugraha8944/tauco/backend/internal/contact/repository"
 	contentapp "github.com/ilhamnugraha8944/tauco/backend/internal/content/application"
 	contentdomain "github.com/ilhamnugraha8944/tauco/backend/internal/content/domain"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/content/importer"
 	contentrepo "github.com/ilhamnugraha8944/tauco/backend/internal/content/repository"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/contract/requestmeta"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/delivery/api"
+	jobsdomain "github.com/ilhamnugraha8944/tauco/backend/internal/jobs/domain"
+	jobsrepo "github.com/ilhamnugraha8944/tauco/backend/internal/jobs/repository"
+	mediaapp "github.com/ilhamnugraha8944/tauco/backend/internal/media/application"
+	mediaprocessor "github.com/ilhamnugraha8944/tauco/backend/internal/media/processor"
+	mediarepo "github.com/ilhamnugraha8944/tauco/backend/internal/media/repository"
+	mediastorage "github.com/ilhamnugraha8944/tauco/backend/internal/media/storage"
 )
 
 const repositoryIntegrationLock int64 = 839_103_221_702
@@ -289,6 +301,9 @@ WHERE slug = 'cross-table-seed-collision'`).Error; err != nil {
 	}
 	assertPublishedProductParity(t, ctx, productRepository, plan)
 	assertPublicReadHTTP(t, pageRepository, productRepository)
+	assertContactTransaction(t, ctx, runtimeGORM, migrationGORM)
+	assertDurableJobClaims(t, ctx, runtimeGORM, migrationGORM)
+	assertMediaPipeline(t, ctx, runtimeGORM)
 	assertCatalogPaginationProbe(
 		t,
 		ctx,
@@ -296,6 +311,226 @@ WHERE slug = 'cross-table-seed-collision'`).Error; err != nil {
 		productRepository,
 		plan,
 	)
+}
+
+func assertMediaPipeline(t *testing.T, ctx context.Context, runtimeDatabase *gorm.DB) {
+	t.Helper()
+	store, err := mediastorage.NewLocal(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewLocal(media) error = %v", err)
+	}
+	repository, err := mediarepo.NewPostgres(runtimeDatabase)
+	if err != nil {
+		t.Fatalf("NewPostgres(media) error = %v", err)
+	}
+	processor := mediaprocessor.Image{}
+	ingestor, _ := mediaapp.NewIngestor(repository, store, processor)
+
+	fixture := image.NewNRGBA(image.Rect(0, 0, 700, 400))
+	for y := range 400 {
+		for x := range 700 {
+			fixture.SetNRGBA(x, y, color.NRGBA{R: uint8(x % 255), G: uint8(y % 255), B: 80, A: 255})
+		}
+	}
+	var encoded bytes.Buffer
+	if err := png.Encode(&encoded, fixture); err != nil {
+		t.Fatalf("encode media fixture: %v", err)
+	}
+	assetID, replayed, err := ingestor.Ingest(ctx, encoded.Bytes(), "Ilustrasi uji pipeline media", false)
+	if err != nil || replayed || assetID == "" {
+		t.Fatalf("first media ingest id=%q replayed=%t err=%v", assetID, replayed, err)
+	}
+	replayedID, replayed, err := ingestor.Ingest(ctx, encoded.Bytes(), "Ilustrasi uji pipeline media", false)
+	if err != nil || !replayed || replayedID != assetID {
+		t.Fatalf("media replay id=%q replayed=%t err=%v", replayedID, replayed, err)
+	}
+
+	handler, _ := mediaapp.NewVariantHandler(repository, store, processor)
+	payload, _ := json.Marshal(map[string]string{"mediaAssetId": assetID})
+	if err := handler.Handle(ctx, payload); err != nil {
+		t.Fatalf("media variant handler: %v", err)
+	}
+	var status string
+	if err := runtimeDatabase.Raw(`SELECT status FROM tauco_app.media_assets WHERE id = ?`, assetID).Scan(&status).Error; err != nil {
+		t.Fatalf("read media status: %v", err)
+	}
+	if status != "ready" {
+		t.Fatalf("media status = %q, want ready", status)
+	}
+	var variantCount, jobCount, activityCount int64
+	for query, destination := range map[string]*int64{
+		`SELECT count(*) FROM tauco_app.media_variants WHERE media_asset_id = '` + assetID + `'`:                  &variantCount,
+		`SELECT count(*) FROM tauco_app.background_jobs WHERE idempotency_key = 'media.variants:` + assetID + `'`: &jobCount,
+		`SELECT count(*) FROM tauco_app.activity_logs WHERE id = '` + assetID + `'`:                               &activityCount,
+	} {
+		if err := runtimeDatabase.Raw(query).Scan(destination).Error; err != nil {
+			t.Fatalf("count media pipeline row: %v", err)
+		}
+	}
+	if variantCount != 2 || jobCount != 1 || activityCount != 1 {
+		t.Fatalf("media counts variants=%d jobs=%d activity=%d", variantCount, jobCount, activityCount)
+	}
+	// At-least-once execution must not duplicate variants or activity.
+	if err := handler.Handle(ctx, payload); err != nil {
+		t.Fatalf("media handler replay: %v", err)
+	}
+	var replayVariantCount int64
+	if err := runtimeDatabase.Raw(`SELECT count(*) FROM tauco_app.media_variants WHERE media_asset_id = ?`, assetID).Scan(&replayVariantCount).Error; err != nil || replayVariantCount != 2 {
+		t.Fatalf("media variants after replay = %d, err=%v", replayVariantCount, err)
+	}
+}
+
+func assertDurableJobClaims(
+	t *testing.T,
+	ctx context.Context,
+	runtimeDatabase *gorm.DB,
+	migrationDatabase *gorm.DB,
+) {
+	t.Helper()
+	first, _ := jobsrepo.NewPostgresRepository(runtimeDatabase)
+	second, _ := jobsrepo.NewPostgresRepository(runtimeDatabase)
+	start := make(chan struct{})
+	type claimResult struct {
+		owner string
+		jobs  []jobsdomain.Job
+		err   error
+	}
+	results := make(chan claimResult, 2)
+	for _, worker := range []struct {
+		owner string
+		repo  *jobsrepo.PostgresRepository
+	}{{"worker-a", first}, {"worker-b", second}} {
+		go func(owner string, repo *jobsrepo.PostgresRepository) {
+			<-start
+			jobs, err := repo.Claim(ctx, owner, 2, time.Minute)
+			results <- claimResult{owner: owner, jobs: jobs, err: err}
+		}(worker.owner, worker.repo)
+	}
+	close(start)
+	claimed := map[string]string{}
+	for range 2 {
+		result := <-results
+		if result.err != nil {
+			t.Fatalf("Claim(%s) error = %v", result.owner, result.err)
+		}
+		for _, job := range result.jobs {
+			if prior := claimed[job.ID]; prior != "" {
+				t.Fatalf("job %s claimed by %s and %s", job.ID, prior, result.owner)
+			}
+			claimed[job.ID] = result.owner
+		}
+	}
+	if len(claimed) != 4 {
+		t.Fatalf("concurrent claimed jobs = %d, want 4", len(claimed))
+	}
+	for jobID, owner := range claimed {
+		if err := first.Succeed(ctx, jobID, owner); err != nil {
+			t.Fatalf("Succeed(%s) error = %v", jobID, err)
+		}
+	}
+
+	const crashJobID = "019bfc80-0000-7000-8000-000000009701"
+	if err := migrationDatabase.Exec(`
+		INSERT INTO tauco_app.background_jobs (
+			id, kind, payload_json, idempotency_key, max_attempts
+		) VALUES (?, 'test.crash', '{}'::jsonb, 'integration-crash-job', 2)
+	`, crashJobID).Error; err != nil {
+		t.Fatalf("insert crash job: %v", err)
+	}
+	crashed, err := first.Claim(ctx, "crashed-worker", 1, time.Millisecond)
+	if err != nil || len(crashed) != 1 {
+		t.Fatalf("crash Claim() = %d/%v", len(crashed), err)
+	}
+	time.Sleep(5 * time.Millisecond)
+	reclaimed, err := second.Claim(ctx, "recovery-worker", 1, time.Minute)
+	if err != nil || len(reclaimed) != 1 || reclaimed[0].ID != crashJobID || reclaimed[0].Attempts != 2 {
+		t.Fatalf("reclaim = %+v/%v", reclaimed, err)
+	}
+	if err := second.Fail(ctx, crashJobID, "recovery-worker", time.Now().UTC(), "TEST_FAILURE"); err != nil {
+		t.Fatalf("Fail(dead) error = %v", err)
+	}
+	if err := second.Replay(ctx, crashJobID, "job-replay-integration"); err != nil {
+		t.Fatalf("Replay() error = %v", err)
+	}
+	var status string
+	var attempts int
+	if err := runtimeDatabase.Raw(`
+		SELECT status, attempts FROM tauco_app.background_jobs WHERE id = ?
+	`, crashJobID).Row().Scan(&status, &attempts); err != nil {
+		t.Fatalf("read replayed job: %v", err)
+	}
+	if status != "retry" || attempts != 0 {
+		t.Fatalf("replayed status/attempts = %s/%d", status, attempts)
+	}
+}
+
+func assertContactTransaction(
+	t *testing.T,
+	ctx context.Context,
+	runtimeDatabase *gorm.DB,
+	migrationDatabase *gorm.DB,
+) {
+	t.Helper()
+	store, err := contactrepo.NewPostgresStore(runtimeDatabase)
+	if err != nil {
+		t.Fatalf("NewPostgresStore() error = %v", err)
+	}
+	intake, err := contactapp.NewIntake(store, []byte("01234567890123456789012345678901"))
+	if err != nil {
+		t.Fatalf("NewIntake() error = %v", err)
+	}
+	submission := contactapp.Submission{
+		Message: contactdomain.Message{
+			Name: "Integration", Email: "integration@example.com",
+			Subject: contactdomain.SubjectGeneral,
+			Body:    "Pesan integration contact yang panjangnya valid.", PrivacyConsent: true,
+		},
+		IdempotencyKey: "contact-integration-000001",
+		RequestID:      "contact-integration-request",
+	}
+	if result, err := intake.Submit(ctx, submission); err != nil || result.Replayed {
+		t.Fatalf("first contact Submit() = %+v/%v", result, err)
+	}
+	assertTableCount(t, runtimeDatabase, "contact_messages", 1)
+	assertTableCount(t, runtimeDatabase, "background_jobs", 2)
+	if result, err := intake.Submit(ctx, submission); err != nil || !result.Replayed {
+		t.Fatalf("replayed contact Submit() = %+v/%v", result, err)
+	}
+	assertTableCount(t, runtimeDatabase, "contact_messages", 1)
+	assertTableCount(t, runtimeDatabase, "background_jobs", 2)
+
+	submission.Message.Body = "Payload berbeda dengan idempotency key yang sama."
+	if _, err := intake.Submit(ctx, submission); !errors.Is(err, contactapp.ErrIdempotencyConflict) {
+		t.Fatalf("conflicting contact Submit() error = %v", err)
+	}
+
+	maintenanceStore, _ := contactrepo.NewPostgresStore(migrationDatabase)
+	maintenanceIntake, _ := contactapp.NewIntake(
+		maintenanceStore,
+		[]byte("01234567890123456789012345678901"),
+	)
+	expired := submission
+	expired.IdempotencyKey = "contact-integration-expired"
+	expired.Message.Body = "Pesan lama yang sudah melewati batas retensi data."
+	expired.ConsentAt = time.Now().UTC().AddDate(-1, -1, 0)
+	if _, err := maintenanceIntake.Submit(ctx, expired); err != nil {
+		t.Fatalf("expired contact Submit() error = %v", err)
+	}
+	deleted, err := maintenanceStore.PurgeExpired(ctx, time.Now().UTC(), 100)
+	if err != nil || deleted != 1 {
+		t.Fatalf("PurgeExpired() = %d/%v", deleted, err)
+	}
+}
+
+func assertTableCount(t *testing.T, database *gorm.DB, table string, want int64) {
+	t.Helper()
+	var count int64
+	if err := database.Raw("SELECT count(*) FROM tauco_app." + table).Scan(&count).Error; err != nil {
+		t.Fatalf("count %s: %v", table, err)
+	}
+	if count != want {
+		t.Fatalf("%s count = %d, want %d", table, count, want)
+	}
 }
 
 func assertPublicReadHTTP(

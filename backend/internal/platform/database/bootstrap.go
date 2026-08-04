@@ -38,7 +38,7 @@ func BootstrapRoles(ctx context.Context, cfg MigrationConfig) error {
 	if err != nil {
 		return fmt.Errorf("connect for database role bootstrap: %w", err)
 	}
-	defer conn.Close(ctx)
+	defer func() { _ = conn.Close(ctx) }()
 
 	if err := createAuthorizationRoles(ctx, conn); err != nil {
 		return err
@@ -265,6 +265,10 @@ SELECT
                           'product_revisions', 'media_assets', 'media_variants'
                       )
                       AND acl.privilege_type = 'SELECT'
+                  )
+                  OR (
+                      relation.relname IN ('media_assets', 'media_variants')
+                      AND acl.privilege_type IN ('INSERT', 'UPDATE')
                   )
                   OR (
                       relation.relname = 'contact_messages'

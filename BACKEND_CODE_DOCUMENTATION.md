@@ -1,107 +1,391 @@
 # Dokumentasi Kode Backend Tauco Cap Badak
 
-## Go API, PostgreSQL, dan OpenAPI
+## Phase 1B B1-B10
 
 | Atribut | Nilai |
 | --- | --- |
-| Versi | 1.0 |
-| Tanggal | 28 Juli 2026 |
-| Status kode | Phase 1B B1-B4 |
-| Runtime | Go 1.26.5, Gin, GORM, PostgreSQL 17 |
+| Versi dokumen | 3.0 |
+| Tanggal | 3 Agustus 2026 |
+| Status kode | Phase 1B local complete, B0-B10 |
+| Runtime | Go, Gin, GORM, PostgreSQL, Redis |
 | Mode | Local-first, shadow-mode |
 
-## 1. Fungsi Backend
+Backend belum menggantikan website production. Next.js masih membaca content
+lokal dan form production masih memakai Netlify Forms.
 
-Backend menyediakan REST API publik untuk membaca konten yang sudah
-dipublikasikan. PostgreSQL menjadi source of truth, sedangkan kontrak HTTP
-berasal dari OpenAPI.
-
-Saat ini backend tidak menggantikan website production. Next.js production
-masih membaca file konten lokal dan form kontak masih memakai Netlify Forms.
-
-Route aktif:
+## 1. Komponen Runtime
 
 ```text
-GET /health/live
-GET /api/v1/home
-GET /api/v1/about
-GET /api/v1/tauco-guide
-GET /api/v1/products
-GET /api/v1/products/{slug}
+HTTP API
+  -> security / CORS / rate limit / request ID / trace / metrics / recovery
+  -> generated OpenAPI transport
+  -> application use case
+  -> cached repository
+  -> PostgreSQL + Redis
+
+Worker
+  -> atomic PostgreSQL job claim
+  -> bounded goroutine pool
+  -> contact email/activity atau media variants
+  -> retry, dead-letter, replay
+  -> retention purge saat startup dan setiap 24 jam
 ```
 
-Route contact, readiness, dan metrics sudah didefinisikan dalam OpenAPI tetapi
-belum diregistrasikan sampai implementasinya tersedia.
+Process yang tersedia:
 
-## 2. Arsitektur
-
-```text
-HTTP request
-    |
-    v
-Gin middleware
-request ID, recovery, access log
-    |
-    v
-Generated OpenAPI transport
-parameter binding dan response visitor
-    |
-    v
-Delivery handler
-DTO, ETag, 304, problem response
-    |
-    v
-Application use case
-published read dan cursor pagination
-    |
-    v
-Repository interface
-    |
-    v
-GORM PostgreSQL adapter
-    |
-    v
-Schema privat tauco_app
-```
-
-Aturan dependency:
-
-- `domain` hanya memuat entity dan invariant.
-- `application` memuat use case serta repository port.
-- `delivery` menerjemahkan HTTP dan generated OpenAPI type.
-- `repository` menjalankan query PostgreSQL.
-- `platform` menangani database, HTTP server, config, dan logging.
-- `composition` adalah satu-satunya tempat concrete dependency dirangkai.
-
-Architecture test menolak dependency yang mengarah ke outer layer.
-
-## 3. Struktur Kode
-
-| Lokasi | Tanggung jawab |
+| Command | Fungsi |
 | --- | --- |
-| `backend/cmd/api` | Entry point HTTP API |
-| `backend/cmd/migrate` | CLI migration |
-| `backend/cmd/seed` | CLI deterministic seed |
-| `backend/internal/content` | Page domain, use case, importer, repository |
-| `backend/internal/catalog` | Product domain, pagination, cursor, repository |
-| `backend/internal/delivery/api` | Generated contract dan B4 handler |
-| `backend/internal/platform/database` | GORM, role bootstrap, migration |
-| `backend/internal/platform/httpserver` | Gin router dan middleware dasar |
-| `backend/internal/platform/logging` | Zap logger dan redaksi |
-| `backend/internal/composition` | Dependency wiring dan lifecycle |
-| `backend/migrations` | Versioned SQL migration |
-| `backend/openapi/openapi.yaml` | Sumber kontrak API |
-| `contracts/fixtures` | Fixture bersama Go dan TypeScript |
+| `backend/cmd/api` | Public REST API |
+| `backend/cmd/worker` | Durable background worker |
+| `backend/cmd/migrate` | Versioned SQL migration |
+| `backend/cmd/seed` | Import content Phase 1A |
+| `backend/cmd/media-import` | Ingest media internal, bukan HTTP upload |
+| `backend/cmd/ops` | Dead-job replay dan targeted cache purge |
+| `backend/cmd/loadcheck` | Cold/warm local performance baseline |
 
-File `api.gen.go` dibuat oleh `oapi-codegen` dan tidak boleh diedit manual.
+## 2. Struktur Folder dan Fungsi
 
-## 4. Menjalankan Backend
+```text
+backend/
+|-- cmd/                         executable entry point
+|   |-- api/                     HTTP API dan graceful shutdown
+|   |-- worker/                  background job serta retention loop
+|   |-- migrate/                 apply/rollback/version SQL migration
+|   |-- seed/                    import konten Phase 1A ke PostgreSQL
+|   |-- media-import/            ingest gambar melalui CLI internal
+|   |-- ops/                     replay job dan invalidasi cache
+|   `-- loadcheck/               baseline cold/warm API lokal
+|-- internal/
+|   |-- composition/             wiring dependency dan lifecycle process
+|   |-- delivery/api/            handler serta type hasil OpenAPI generator
+|   |-- contract/requestmeta/    request ID dan problem instance
+|   |-- content/                 page domain, reader, importer, repository
+|   |-- catalog/                 product domain, reader, cursor, repository
+|   |-- contact/                 validasi intake, transaksi, email/activity
+|   |-- jobs/                    durable queue, lease, retry, worker pool
+|   |-- media/                   ingest, image processor, storage, repository
+|   |-- audit/                   boundary activity log
+|   `-- platform/                adapter teknis bersama
+|       |-- cache/               Redis cache-aside dan observasi
+|       |-- config/              environment configuration
+|       |-- database/            GORM, SQL migration, connection pool
+|       |-- email/               SMTP sender
+|       |-- httpmiddleware/      CORS, rate limit, headers, access log
+|       |-- httpserver/          Gin router, trace, recovery, server
+|       |-- logging/             structured log dan redaction
+|       |-- observability/       Prometheus registry
+|       `-- ratelimit/           Redis limiter dan local fallback
+|-- migrations/                 versioned SQL dan embedded migration
+|-- openapi/                    source contract dan generator config
+|-- docs/                       operations serta security runbook
+|-- compose.yaml                PostgreSQL, Redis, dan Mailpit lokal
+`-- Dockerfile                  multi-stage build, scratch runtime
+```
 
-Prasyarat:
+Folder fitur seperti `content`, `catalog`, `contact`, `jobs`, dan `media`
+memiliki `domain`, `application`, serta adapter yang diperlukan fitur itu.
+Folder `platform` hanya berisi kemampuan teknis yang dapat dipakai lintas
+fitur. `composition` menjadi satu-satunya tempat yang memilih implementasi
+konkret dan menyambungkannya.
 
-- Docker Desktop aktif.
-- PostgreSQL dan Redis berstatus `healthy`.
-- `backend/.env` tersedia dan tidak masuk Git.
+### Fungsi file pusat
+
+| File | Fungsi |
+| --- | --- |
+| `cmd/api/main.go` | Membaca environment, membuat `composition.App`, menangani signal, menjalankan HTTP server. |
+| `composition/app.go` | Membuka PostgreSQL/Redis, membuat repository/use case/middleware, mendaftarkan route, menutup resource. |
+| `composition/operations.go` | Readiness, autentikasi metrics, dan snapshot operasional. |
+| `delivery/api/api.gen.go` | Type dan interface HTTP hasil OpenAPI; tidak diedit manual. |
+| `delivery/api/public_read.go` | Pemetaan use case page/product menjadi response HTTP, ETag, 304, dan problem response. |
+| `delivery/api/contact.go` | Strict body validation dan pemetaan contact intake menjadi response HTTP. |
+| `content/repository/cached.go` | Decorator cache page di atas PostgreSQL. |
+| `catalog/repository/cached.go` | Decorator cache list/detail product di atas PostgreSQL. |
+| `contact/application/intake.go` | Validasi submission dan orkestrasi transaksi idempotent. |
+| `jobs/application/worker.go` | Claim batch, bounded goroutine, heartbeat, success/retry/dead state. |
+| `media/application/pipeline.go` | Orkestrasi normalized original dan pembuatan variant. |
+| `platform/httpserver/router.go` | Urutan middleware dasar, liveness, 404/405, serta recovery. |
+| `platform/observability/metrics.go` | Counter/gauge/latency Prometheus tanpa PII. |
+
+## 3. Clean Architecture
+
+| Layer | Isi |
+| --- | --- |
+| `domain` | Entity, value, dan invariant |
+| `application` | Use case serta interface/port |
+| `delivery` | HTTP DTO, generated OpenAPI, error mapping |
+| `repository` | PostgreSQL dan cache decorator |
+| `platform` | Database, Redis, HTTP, email, logging, limiter |
+| `composition` | Concrete dependency wiring dan lifecycle |
+
+Domain dan application tidak mengimpor Gin, GORM, Redis, AWS SDK, atau Zap.
+Architecture test menjaga arah dependency ini.
+
+## 4. Flow Backend dan Aplikasi
+
+### 4.1 Startup API lokal
+
+```text
+npm backend:dev
+  -> wrapper memuat backend/.env
+  -> cmd/api memvalidasi config dan secret
+  -> composition membuka PostgreSQL serta Redis
+  -> composition membangun repository, use case, limiter, metrics, router
+  -> HTTP server listen dan menunggu shutdown signal
+  -> shutdown menghentikan server lalu menutup pool PostgreSQL/Redis
+```
+
+Startup gagal cepat bila config wajib atau PostgreSQL tidak valid. Redis boleh
+gagal saat request karena cache dan limiter memiliki jalur fail-open/fallback,
+tetapi URL serta client tetap harus dapat dibuat saat composition.
+
+### 4.2 Public content melalui Go API lokal
+
+```text
+HTTP GET
+  -> request ID + traceparent
+  -> access log + metrics + security headers + CORS
+  -> privacy-safe rate limit
+  -> generated OpenAPI handler
+  -> content/catalog PublishedReader
+  -> Redis cache-aside
+       hit  -> validasi domain -> response
+       miss -> PostgreSQL published revision -> isi cache -> response
+       error/corrupt -> PostgreSQL -> perbaiki cache bila memungkinkan
+  -> ETag cocok menghasilkan 304; selain itu JSON 200
+```
+
+Redis bukan source of truth. Hanya revision yang ditunjuk sebagai `published`
+di PostgreSQL yang dapat keluar melalui API. Product slug yang tidak ditemukan
+menjadi RFC 7807 `404`, bukan response kosong.
+
+### 4.3 Contact API lokal dan worker
+
+```text
+POST /api/v1/contact-messages
+  -> CORS + contact rate limit + strict Content-Type/body/query
+  -> validasi field, consent, honeypot, Idempotency-Key
+  -> satu transaksi PostgreSQL
+       contact_messages
+       background_jobs: contact.email_notification
+       background_jobs: contact.activity_log
+  -> 201 segera, tanpa menunggu email
+
+worker
+  -> claim job dengan SKIP LOCKED + lease
+  -> channel bounded -> dua goroutine default
+  -> ambil contact berdasarkan ID
+  -> SMTP email atau append activity log
+  -> success | retry dengan backoff | dead-letter
+```
+
+Replay memakai idempotency digest sehingga retry browser tidak menggandakan
+pesan. Job hanya menyimpan ID pesan; nama, email, telepon, dan isi pesan tidak
+disalin ke payload antrean atau metrics. Retention loop menghapus pesan yang
+jatuh tempo dalam batch 100 saat worker mulai dan setiap 24 jam.
+
+### 4.4 Media lokal
+
+```text
+media-import CLI
+  -> batas ukuran + magic byte + decode validation
+  -> orientasi EXIF + re-encode PNG tanpa metadata
+  -> simpan normalized original secara immutable
+  -> transaksi media_assets + media.generate_variants job
+  -> worker membuat WebP 320/640/1280 tanpa upscale
+  -> semua sukses: ready; error: failed dan dapat di-retry
+```
+
+Tidak ada endpoint upload pada Phase 1B. Local storage adalah default; port
+S3-compatible sudah tersedia tetapi belum dihubungkan ke provider remote.
+
+### 4.5 Operations
+
+```text
+/health/live       process hidup, tanpa dependency call
+/health/ready      PostgreSQL wajib; Redis/storage dapat degraded
+/internal/metrics  bearer token -> Prometheus text
+backend:ops        replay dead job atau naikkan cache generation tag
+```
+
+Request ID selalu tersedia. Trace ID diteruskan hanya bila `traceparent` valid.
+Structured log dan metrics tidak menyimpan body, credential, raw IP, atau PII.
+
+### 4.6 Flow website production saat ini
+
+```text
+content/*.json
+  -> LocalContentSource + Zod saat build/render
+  -> Next.js App Router menghasilkan initial HTML, metadata, JSON-LD
+  -> Netlify menyajikan halaman publik
+  -> browser menerima copy SEO tanpa menunggu client-side fetch
+
+form kontak browser
+  -> validasi React
+  -> POST URL-encoded ke /__forms.html
+  -> Netlify Forms inbox + email notification
+```
+
+Jadi production Phase 1A belum memanggil Go API. Backend Phase 1B berjalan
+lokal sebagai shadow system agar schema, contract, worker, cache, dan keamanan
+siap sebelum cutover. Pada Phase 1C, implementasi `ContentSource` dapat diganti
+dengan adapter API tanpa mengubah komponen page. Cutover form ke contact API
+baru dilakukan pada gate terpisah setelah backend remote stabil.
+
+## 5. Route Aktif
+
+```text
+GET  /health/live
+GET  /api/v1/home
+GET  /api/v1/about
+GET  /api/v1/tauco-guide
+GET  /api/v1/products
+GET  /api/v1/products/{slug}
+POST /api/v1/contact-messages
+```
+
+Readiness dan protected metrics baru diaktifkan pada B9. Tidak ada route admin,
+login, inventory, order, atau upload media pada Phase 1B.
+
+Public response memakai generated OpenAPI type, envelope `data/meta`,
+`X-Request-ID`, strong `ETag`, conditional `304`, dan RFC 7807 untuk error.
+
+## 6. Database
+
+Schema aplikasi adalah `tauco_app`. Migration saat ini:
+
+```text
+version=4 dirty=false
+```
+
+Tabel utama:
+
+| Tabel | Tanggung jawab |
+| --- | --- |
+| `pages`, `page_revisions` | Published page revisions |
+| `products`, `product_revisions` | Published product revisions |
+| `contact_messages` | Pesan, consent, dan retention deadline |
+| `background_jobs` | Durable queue dan lease state |
+| `media_assets`, `media_variants` | Normalized original dan WebP output |
+| `activity_logs` | Append-only activity |
+
+`tauco_runtime` dapat membaca published content, menerima contact, memproses
+job, dan mengubah state media. Role ini tidak dapat melakukan DDL, menulis
+published revision, atau menghapus data. Schema hanya berubah melalui SQL
+migration; `AutoMigrate` dilarang.
+
+## 7. Contact Transaction
+
+`POST /api/v1/contact-messages` menerapkan:
+
+- JSON maksimal 32 KiB dan unknown field ditolak;
+- `Idempotency-Key` wajib, 16-128 printable ASCII;
+- validasi nama, email, telepon opsional, subject, message, consent, honeypot;
+- HMAC digest untuk idempotency key dan SHA-256 untuk canonical payload;
+- retention deadline tepat 12 bulan.
+
+Satu transaksi PostgreSQL membuat:
+
+```text
+1 contact_messages
+1 contact.email_notification job
+1 contact.activity_log job
+```
+
+Job hanya membawa `contactMessageId`, bukan PII. Replay payload sama aman dan
+tidak menggandakan row; key sama dengan payload berbeda menghasilkan `409`.
+
+## 8. Durable Worker
+
+Job diklaim dengan `FOR UPDATE SKIP LOCKED`. Default:
+
+| Setting | Nilai |
+| --- | ---: |
+| Batch | 10 |
+| Goroutine worker | 2 |
+| Channel capacity | 20 |
+| Lease | 120 detik |
+| Heartbeat | 30 detik |
+| Max attempts | 8 |
+| Backoff awal/maksimum | 30 detik / 30 menit |
+| Jitter | +/-20 persen |
+
+Delivery bersifat at-least-once sehingga handler wajib idempotent. Lease yang
+expired dapat direclaim. Kegagalan berulang menjadi `dead`; replay mengubahnya
+ke `retry` dan mencatat activity. Shutdown melepaskan lease yang belum selesai.
+
+## 9. Media Pipeline
+
+Media hanya masuk melalui CLI internal. Batas input:
+
+- maksimal 10 MiB;
+- JPEG, PNG, atau static WebP;
+- magic byte dan actual decode harus cocok;
+- maksimal 40 megapixel dan sisi 12.000 pixel;
+- animated WebP, SVG, GIF, corrupt, dan truncated input ditolak.
+
+Processor menerapkan orientasi EXIF, lalu encode ulang full-resolution menjadi
+PNG privat. Re-encode menghilangkan metadata EXIF/GPS. Worker membuat WebP pada
+width 320, 640, dan 1280. Target di atas source dilewati tanpa upscale.
+
+Resize memakai maksimal dua goroutine. Object key bersifat content-addressed
+dan immutable. Local adapter memakai atomic file create; S3 adapter memakai
+conditional `If-None-Match: *`. Seluruh variant selesai sebelum status menjadi
+`ready`; partial failure menjadi `failed` dan dapat di-retry.
+
+## 10. Redis Cache
+
+Cache-aside dipasang pada page, product list, dan product detail:
+
+- TTL dasar 5 menit dengan jitter +/-10 persen;
+- `singleflight` menggabungkan concurrent cache miss;
+- cached domain object divalidasi ulang setelah decode;
+- corrupt cache diabaikan dan diperbaiki;
+- Redis error selalu fail-open ke PostgreSQL.
+
+Invalidation memakai generation tag, bukan key scan:
+
+```text
+home
+about
+tauco-guide
+products
+product:{slug}
+```
+
+Publish/unpublish Phase 1C cukup menaikkan generation yang terkait.
+
+## 11. Security Middleware
+
+| Kontrol | Implementasi |
+| --- | --- |
+| Public rate limit | 60 request/menit/IP |
+| Contact rate limit | 5 request/jam/IP |
+| Distributed counter | Atomic Redis Lua script |
+| Redis failure | Local bounded fallback, maksimum 10.000 key |
+| Client identifier | HMAC-SHA256 dari resolved IP |
+| Trusted proxy | Exact CIDR dari environment |
+| CORS | Exact origin allowlist, tanpa wildcard |
+| Headers | nosniff, frame deny, referrer, permissions policy |
+| GET body | Ditolak |
+| Contact body/type | 32 KiB, strict JSON, exact Content-Type |
+| Panic | Recovered dan dipetakan ke generic RFC 7807 |
+
+Raw IP, request body, token, credential, email, dan telepon tidak ditulis ke
+structured log.
+
+## 12. Object Storage
+
+Application hanya mengenal port berikut:
+
+```text
+PutIfAbsent(context, key, contentType, bytes)
+Get(context, key)
+```
+
+Adapter local dipakai pada shadow-mode. Adapter S3-compatible tersedia untuk
+pilot Supabase Storage/R2, tetapi belum mempunyai credential atau bucket remote.
+
+## 13. Menjalankan Lokal
 
 Dari root repository:
 
@@ -113,217 +397,85 @@ npm.cmd run backend:seed:phase1a
 npm.cmd run backend:dev
 ```
 
-Migration yang benar menampilkan:
+Terminal kedua untuk worker:
 
-```text
-version=3 dirty=false
+```powershell
+npm.cmd run backend:worker
 ```
 
-API berjalan pada:
+Ingest media internal:
 
-```text
-http://127.0.0.1:8080
+```powershell
+npm.cmd run backend:media:import -- --file "D:\gambar\produk.jpg" --alt "Foto produk"
 ```
 
-Hentikan API dengan `Ctrl+C`. Hentikan dependency tanpa menghapus volume:
+Hentikan API/worker dengan `Ctrl+C`. Container dapat dihentikan tanpa menghapus
+volume:
 
 ```powershell
 npm.cmd run backend:compose:down
 ```
 
-## 5. Konfigurasi Runtime
+## 14. Environment Variable Utama
 
-| Environment variable | Fungsi |
+| Variable | Fungsi |
 | --- | --- |
-| `APP_ENV` | `local`, `test`, `staging`, atau `production` |
-| `HTTP_HOST`, `PORT` | Alamat HTTP server |
-| `DATABASE_URL` | Login PostgreSQL runtime |
-| `DATABASE_MAX_OPEN_CONNS` | Batas koneksi terbuka |
-| `DATABASE_MAX_IDLE_CONNS` | Batas koneksi idle |
-| `DATABASE_CONN_MAX_LIFETIME` | Umur maksimum koneksi |
-| `DATABASE_CONN_MAX_IDLE_TIME` | Waktu idle maksimum |
-| `CURSOR_HMAC_SECRET` | Kunci cursor, minimal 32 byte |
-| `LOG_LEVEL`, `LOG_FORMAT` | Level dan format log |
+| `DATABASE_URL` | PostgreSQL runtime login |
+| `MIGRATION_DATABASE_URL` | Migration/seed login |
+| `REDIS_URL` | Cache dan distributed rate limit |
+| `CURSOR_HMAC_SECRET` | Signed pagination cursor |
+| `CONTACT_HMAC_SECRET` | Contact idempotency digest |
+| `RATE_LIMIT_HMAC_SECRET` | Privacy-safe rate key |
+| `METRICS_BEARER_TOKEN` | Token khusus protected metrics |
+| `CORS_ALLOWED_ORIGINS` | Exact comma-separated origins |
+| `TRUSTED_PROXY_CIDRS` | Exact comma-separated proxy CIDR |
+| `SMTP_HOST/PORT/FROM/TO` | Contact notification adapter |
+| `MEDIA_LOCAL_ROOT` | Private local media object root |
 
-Runtime memakai PostgreSQL simple protocol dan menonaktifkan prepared
-statement agar kompatibel dengan Supavisor transaction pooler.
+File `backend/.env` tidak masuk Git. Remote environment wajib memakai secret
+manager dan credential berbeda.
 
-Nilai secret tidak boleh ditulis ke log, source code, atau Git.
-
-## 6. Database
-
-Application table berada di schema privat `tauco_app`.
-
-| Tabel | Fungsi |
-| --- | --- |
-| `pages` | Identitas stabil singleton page |
-| `page_revisions` | Revision konten page |
-| `products` | Identitas, slug, dan urutan product |
-| `product_revisions` | Revision detail product |
-| `media_assets` | Metadata original media |
-| `media_variants` | Hasil resize media |
-| `contact_messages` | Pesan dan consent pengunjung |
-| `background_jobs` | Durable asynchronous job |
-| `activity_logs` | Append-only audit activity |
-
-Role:
-
-- `tauco_migrator`: owner schema dan migration, tidak dapat login langsung.
-- `tauco_runtime`: authorization role aplikasi, tidak dapat login langsung.
-- `tauco_app_runtime`: login lokal yang mewarisi least-privilege runtime role.
-
-Runtime dapat membaca published content, tetapi tidak dapat membuat schema,
-table, atau mengubah published revision.
-
-Schema diubah hanya melalui SQL migration. `GORM AutoMigrate` dilarang.
-
-## 7. Public Read API
-
-Semua response sukses memakai envelope:
-
-```json
-{
-  "data": {},
-  "meta": {
-    "apiVersion": "v1",
-    "requestId": "request-id"
-  }
-}
-```
-
-Response list menambahkan:
-
-```json
-{
-  "page": {
-    "limit": 20,
-    "hasMore": false,
-    "nextCursor": null
-  }
-}
-```
-
-### Published-only
-
-Repository hanya mengambil revision yang:
-
-- dipilih oleh `published_revision_id`;
-- dimiliki entity yang sama;
-- mempunyai status `published`;
-- lolos validasi checksum canonical JSON.
-
-Draft dan archived revision tidak dapat keluar melalui public API.
-
-### Pagination
-
-Catalog diurutkan berdasarkan:
-
-```text
-sort_order ASC, id ASC
-```
-
-Cursor berisi posisi terakhir dan query hash, lalu ditandatangani HMAC-SHA256.
-Cursor yang rusak, dimodifikasi, atau memakai secret berbeda menghasilkan:
-
-```text
-400 INVALID_CURSOR
-```
-
-Default limit adalah 20 dan maksimum 50.
-
-### ETag
-
-Response publik mengirim:
-
-```text
-Cache-Control: public, max-age=0, s-maxage=300, stale-while-revalidate=60
-ETag: "sha256-..."
-```
-
-Client dapat mengirim `If-None-Match`. Jika data belum berubah, API
-mengembalikan `304` tanpa response body.
-
-### Error
-
-Error memakai `application/problem+json` dan tidak mengekspos error internal.
-
-| Kondisi | Status |
-| --- | --- |
-| Query, limit, atau header tidak valid | `400` |
-| Cursor tidak valid | `400 INVALID_CURSOR` |
-| Product tidak ditemukan | `404 PRODUCT_NOT_FOUND` |
-| PostgreSQL tidak tersedia | `503 SERVICE_UNAVAILABLE` |
-| Panic atau serialization failure | `500 INTERNAL_SERVER_ERROR` |
-
-Setiap response membawa `X-Request-ID`.
-
-## 8. Logging dan Lifecycle
-
-Zap menghasilkan structured log. Access log memakai route template dan tidak
-merekam query string atau request body.
-
-Field sensitif seperti credential, token, email, telepon, IP, dan teks panjang
-direduksi atau disensor.
-
-Ketika menerima `Ctrl+C` atau `SIGTERM`, server:
-
-1. berhenti menerima request baru;
-2. menunggu request aktif sesuai shutdown deadline;
-3. menutup pool PostgreSQL;
-4. melakukan flush logger.
-
-## 9. Perintah Pengembangan
+## 15. Test dan Quality Command
 
 ```powershell
 npm.cmd run backend:format
 npm.cmd run backend:generate:check
 npm.cmd run backend:test
 npm.cmd run backend:test:integration
+npm.cmd run backend:race
 npm.cmd run backend:vet
+npm.cmd run backend:lint
+npm.cmd run backend:vuln
+npm.cmd run backend:load
+npm.cmd run backend:container:build
 npm.cmd run backend:build
 ```
 
-`backend:test:integration` memakai PostgreSQL disposable untuk migration,
-privilege, seed, repository, dan HTTP read API. Database disposable dihapus
-setelah test.
+Integration test memakai PostgreSQL disposable dan Redis container nyata.
+Evidence sebelum unit-test cleanup mencakup transaction/idempotency,
+two-worker claim, crash/reclaim,
+dead-letter replay, media abuse/no-upscale/idempotency, cache fail-open,
+singleflight, generation invalidation, atomic concurrent rate limit, CORS, dan
+trusted proxy.
 
-Acceptance B4 memeriksa:
+Atas instruksi owner setelah B10 lulus, unit-test files dan dependency Vitest
+dihapus. Architecture, acceptance, contract, migration, PostgreSQL/Redis
+integration, E2E, serta production smoke tetap tersedia.
 
-- lima public read route;
-- parity dengan fixture Phase 1A;
-- published-only;
-- unknown product `404`;
-- invalid cursor dan limit;
-- unknown atau duplicate query;
-- cursor pagination;
-- ETag dan `304`;
-- PostgreSQL-to-HTTP integration.
+## 16. Operations
 
-## 10. Menambah Fitur
+- Liveness: `GET /health/live` tanpa dependency call.
+- Readiness: `GET /health/ready`; PostgreSQL wajib, Redis/storage boleh degraded.
+- Worker probe: `npm.cmd run backend:worker:ready`.
+- Metrics: `GET /internal/metrics` dengan metrics bearer token.
+- Runbook: `backend/docs/OPERATIONS.md`.
+- Security review: `backend/docs/SECURITY_REVIEW.md`.
+- Final evidence: `PHASE_1B_QUALITY_REPORT.md`.
 
-Urutan perubahan backend:
+## 17. Boundary Berikutnya
 
-1. ubah domain invariant jika diperlukan;
-2. tambahkan use case dan port pada `application`;
-3. implementasikan adapter pada `repository`;
-4. ubah OpenAPI lalu generate ulang;
-5. implementasikan delivery handler;
-6. rangkai dependency pada `composition`;
-7. tambahkan test terkecil yang membuktikan behavior.
+- B11: optional remote pilot setelah instruksi owner.
+- Phase 1C: Admin CMS, authentication, publishing, dan upload HTTP.
 
-Jangan:
-
-- mengimpor Gin atau GORM ke domain/application;
-- mengedit `api.gen.go`;
-- memakai `AutoMigrate`;
-- mengakses database langsung dari frontend;
-- menaruh secret dalam source atau fixture.
-
-## 11. Boundary Saat Ini
-
-- Redis baru dependency lokal; cache dan rate limiting masuk B8.
-- Contact API belum aktif; persistence masuk B5.
-- Worker belum aktif; concurrency dan retry masuk B6.
-- Media processing belum aktif; pipeline masuk B7.
-- Admin, authentication, inventory, dan order tidak termasuk Phase 1B.
-- Supabase belum dipasang. PostgreSQL Docker adalah environment lokal.
+Tidak ada deployment, push, frontend cutover, contact cutover, atau cloud
+mutation pada implementasi B0-B10 ini.

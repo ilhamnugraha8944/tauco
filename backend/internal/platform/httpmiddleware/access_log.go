@@ -22,6 +22,7 @@ func AccessLog(logger *logging.Logger) gin.HandlerFunc {
 			route = "unmatched"
 		}
 		requestID, _ := httpserver.RequestIDFromGinContext(c)
+		traceID, hasTrace := httpserver.TraceIDFromGinContext(c)
 
 		fields := []logging.Field{
 			logging.RequestID(requestID),
@@ -29,6 +30,9 @@ func AccessLog(logger *logging.Logger) gin.HandlerFunc {
 			logging.Method(c.Request.Method),
 			logging.Status(c.Writer.Status()),
 			logging.Latency(time.Since(startedAt)),
+		}
+		if hasTrace {
+			fields = append(fields, logging.TraceID(traceID))
 		}
 
 		switch status := c.Writer.Status(); {

@@ -196,7 +196,7 @@ func TestMigrationRoundTripAndRuntimePrivileges(t *testing.T) {
 	if err := migrator.Up(); err != nil {
 		t.Fatalf("migration Up() error = %v", err)
 	}
-	assertMigrationVersion(t, migrator, 3)
+	assertMigrationVersion(t, migrator, 4)
 	if err := BootstrapRoles(ctx, cfg); err != nil {
 		t.Fatalf("post-migration idempotent BootstrapRoles() error = %v", err)
 	}
@@ -238,15 +238,15 @@ func TestMigrationRoundTripAndRuntimePrivileges(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewMigrator(rotated login) error = %v", err)
 	}
-	assertMigrationVersion(t, rotatedMigrator, 3)
+	assertMigrationVersion(t, rotatedMigrator, 4)
 	if err := rotatedMigrator.DownOne(); err != nil {
 		t.Fatalf("rotated migration DownOne() error = %v", err)
 	}
-	assertMigrationVersion(t, rotatedMigrator, 2)
+	assertMigrationVersion(t, rotatedMigrator, 3)
 	if err := rotatedMigrator.Up(); err != nil {
 		t.Fatalf("rotated migration Up() error = %v", err)
 	}
-	assertMigrationVersion(t, rotatedMigrator, 3)
+	assertMigrationVersion(t, rotatedMigrator, 4)
 	if err := rotatedMigrator.Close(); err != nil {
 		t.Fatalf("close rotated migrator: %v", err)
 	}
@@ -305,7 +305,7 @@ func TestMigrationRoundTripAndRuntimePrivileges(t *testing.T) {
 	if err := migrator.Up(); err != nil {
 		t.Fatalf("second migration Up() error = %v", err)
 	}
-	assertMigrationVersion(t, migrator, 3)
+	assertMigrationVersion(t, migrator, 4)
 	if err := migrator.DownAll(); err != nil {
 		t.Fatalf("second migration DownAll() error = %v", err)
 	}

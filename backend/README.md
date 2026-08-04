@@ -21,6 +21,10 @@ Phase 1B tidak mencakup:
 Lihat `../PHASE_1B_PLAN.md` untuk rancangan lengkap dan
 `../PHASE_1B_WALKTHROUGH.md` untuk evidence setiap gate.
 
+Phase 1B B0-B10 telah selesai lokal. Final evidence tersedia di
+`../PHASE_1B_QUALITY_REPORT.md`; runbook di `docs/OPERATIONS.md`; security review
+di `docs/SECURITY_REVIEW.md`.
+
 ## Prasyarat
 
 - Go sesuai versi pada `go.mod`;
@@ -121,7 +125,7 @@ npm.cmd run backend:migrate:up
 npm.cmd run backend:migrate:version
 ```
 
-Hasil version yang diharapkan adalah `version=3 dirty=false`. Import konten
+Hasil version yang diharapkan adalah `version=4 dirty=false`. Import konten
 Phase 1A:
 
 ```powershell
@@ -164,8 +168,8 @@ strong `ETag`, public cache header, dan mendukung conditional request `304`.
 Catalog memakai HMAC-signed cursor dengan default limit 20 dan maksimum 50.
 Unknown product menghasilkan true `404`.
 
-Contact, readiness, dan metrics belum diregistrasikan. Production Next.js juga
-belum memakai API ini.
+Contact sudah aktif pada backend shadow. Readiness dan metrics baru dikerjakan
+pada B9. Production Next.js belum memakai API ini.
 
 Jalankan dari root repository agar `backend/.env` dimuat oleh wrapper:
 
@@ -180,9 +184,55 @@ Invoke-WebRequest http://127.0.0.1:8080/api/v1/home
 Invoke-WebRequest http://127.0.0.1:8080/api/v1/products
 ```
 
+## Contact, worker, media, cache, dan security B5-B8
+
+Contact backend tersedia pada `POST /api/v1/contact-messages`. Request wajib
+JSON, `Idempotency-Key`, consent, dan maksimal 32 KiB. Satu transaksi menyimpan
+message serta membuat job email dan activity. Production tetap memakai Netlify
+Forms sampai cutover Phase 1D.
+
+Jalankan worker durable:
+
+```powershell
+npm.cmd run backend:worker
+```
+
+Worker memakai PostgreSQL lease, heartbeat, dua goroutine, retry dengan jitter,
+dead-letter, dan replay. SMTP lokal dapat diarahkan ke Mailpit.
+
+Media Phase 1B hanya dapat di-ingest melalui CLI internal:
+
+```powershell
+npm.cmd run backend:media:import -- --file "D:\gambar\produk.jpg" --alt "Foto produk"
+```
+
+Source JPEG/PNG/static WebP dinormalisasi menjadi PNG privat dan worker membuat
+WebP 320/640/1280 tanpa upscale. Tidak ada endpoint upload HTTP sebelum Admin
+CMS Phase 1C.
+
+Public read memakai Redis cache-aside 5 menit dengan jitter dan generation
+tags. Redis down otomatis jatuh ke PostgreSQL. Rate limit menggunakan Redis
+dengan fallback lokal bounded: 60 request/menit untuk read dan 5 request/jam
+untuk contact. CORS memakai exact allowlist dan forwarded IP hanya dipercaya
+dari CIDR yang dikonfigurasi.
+
 Dokumentasi kode lengkap tersedia di
 `../BACKEND_CODE_DOCUMENTATION.md` dan
 `../BACKEND_CODE_DOCUMENTATION.pdf`.
+
+## Observability dan quality B9-B10
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8080/health/live
+Invoke-RestMethod http://127.0.0.1:8080/health/ready
+npm.cmd run backend:worker:ready
+npm.cmd run backend:quality
+```
+
+Protected metrics berada di `/internal/metrics` dan memerlukan
+`METRICS_BEARER_TOKEN`. Valid `traceparent` dipropagasikan ke response dan log.
+Runbook lengkap berada di `docs/OPERATIONS.md`; security review di
+`docs/SECURITY_REVIEW.md`; hasil akhir di `../PHASE_1B_QUALITY_REPORT.md`.
 
 ## OpenAPI dan generated contract
 
@@ -236,8 +286,8 @@ B8, serta readiness dan protected metrics diselesaikan pada B9.
 - Validasi response bisnis terhadap generated/OpenAPI contract sebelum emit;
   khusus image alt, parser boleh trim input authored tetapi response B4 wajib
   mengirim string canonical yang sudah tanpa whitespace di tepi.
-- Tambahkan authentication middleware metrics dan negative E2E sebelum
-  `/internal/metrics` dapat diregistrasikan.
+- Metrics authentication memakai dedicated bearer token, constant-time
+  comparison, serta negative/positive integration check.
 
 ### Menyalakan Mailpit
 
@@ -316,9 +366,9 @@ Dependency lokal tidak memakai tag `latest`:
 | Redis | `redis:8.8.0-alpine3.23` |
 | Mail capture | `axllent/mailpit:v1.30.0` |
 
-Object storage sengaja belum ditambahkan. Adapter dan dependency lokalnya
-dibekukan pada gate B7 agar keputusan storage tidak bocor ke domain atau use
-case.
+Object storage memakai port pada application layer. Adapter local aktif untuk
+shadow-mode; adapter S3-compatible tersedia tetapi belum diberi credential atau
+bucket remote sampai pilot B11.
 
 ## Troubleshooting singkat
 

@@ -15,6 +15,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	catalogapp "github.com/ilhamnugraha8944/tauco/backend/internal/catalog/application"
+	contactapp "github.com/ilhamnugraha8944/tauco/backend/internal/contact/application"
 	contentapp "github.com/ilhamnugraha8944/tauco/backend/internal/content/application"
 	contentdomain "github.com/ilhamnugraha8944/tauco/backend/internal/content/domain"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/contract/requestmeta"
@@ -28,6 +29,16 @@ type PublicReadServer struct {
 	StrictServerInterface
 	pages    *contentapp.PublishedReader
 	products *catalogapp.PublishedReader
+	contacts *contactapp.Intake
+}
+
+// WithContactIntake enables the B5 contact operation on the public server.
+func (server *PublicReadServer) WithContactIntake(intake *contactapp.Intake) error {
+	if server == nil || intake == nil {
+		return errors.New("public server requires a contact intake")
+	}
+	server.contacts = intake
+	return nil
 }
 
 var _ StrictServerInterface = (*PublicReadServer)(nil)
@@ -50,6 +61,7 @@ func RegisterSafePublicReadHandlers(
 	server StrictServerInterface,
 	middlewares []StrictMiddlewareFunc,
 	baseURL string,
+	routeMiddleware ...gin.HandlerFunc,
 ) {
 	handler := NewSafeStrictHandler(server, middlewares)
 	options := NewSafeGinServerOptions(baseURL)
@@ -60,29 +72,30 @@ func RegisterSafePublicReadHandlers(
 
 	router.GET(
 		baseURL+"/api/v1/home",
-		rejectUnknownQuery(),
-		wrapper.GetHome,
+		appendRouteMiddleware(routeMiddleware, rejectUnknownQuery(), wrapper.GetHome)...,
 	)
 	router.GET(
 		baseURL+"/api/v1/about",
-		rejectUnknownQuery(),
-		wrapper.GetAbout,
+		appendRouteMiddleware(routeMiddleware, rejectUnknownQuery(), wrapper.GetAbout)...,
 	)
 	router.GET(
 		baseURL+"/api/v1/tauco-guide",
-		rejectUnknownQuery(),
-		wrapper.GetTaucoGuide,
+		appendRouteMiddleware(routeMiddleware, rejectUnknownQuery(), wrapper.GetTaucoGuide)...,
 	)
 	router.GET(
 		baseURL+"/api/v1/products",
-		rejectUnknownQuery("cursor", "limit"),
-		wrapper.ListProducts,
+		appendRouteMiddleware(routeMiddleware, rejectUnknownQuery("cursor", "limit"), wrapper.ListProducts)...,
 	)
 	router.GET(
 		baseURL+"/api/v1/products/:slug",
-		rejectUnknownQuery(),
-		wrapper.GetProductBySlug,
+		appendRouteMiddleware(routeMiddleware, rejectUnknownQuery(), wrapper.GetProductBySlug)...,
 	)
+}
+
+func appendRouteMiddleware(prefix []gin.HandlerFunc, handlers ...gin.HandlerFunc) []gin.HandlerFunc {
+	combined := make([]gin.HandlerFunc, 0, len(prefix)+len(handlers))
+	combined = append(combined, prefix...)
+	return append(combined, handlers...)
 }
 
 // GetHome returns the current immutable homepage revision.
