@@ -4,9 +4,9 @@
 
 | Atribut | Nilai |
 | --- | --- |
-| Versi dokumen | 1.2 |
-| Tanggal | 28 Juli 2026 |
-| Status produk | Phase 1A complete di production; Phase 1B complete lokal; Phase 1C–1D planned |
+| Versi dokumen | 1.3 |
+| Tanggal | 4 Agustus 2026 |
+| Status produk | Phase 1A complete production; Phase 1B complete lokal; Phase 1C implementing lokal; Phase 1D planned |
 | Bahasa produk | Indonesia |
 | Target pasar awal | Indonesia |
 | Target deployment Phase 1A | Implemented di `https://tauco-cap-badak.netlify.app` |
@@ -33,10 +33,11 @@ Delivery dibagi agar website publik dapat diluncurkan lebih cepat:
   gate. Delivery
   dilakukan local-first dalam shadow-mode sehingga production Phase 1A tetap
   memakai konten lokal dan Netlify Forms.
-- **Phase 1C — future:** Admin CMS, authentication, publishing workflow,
-  product/media management, dan inbox.
-- **Phase 1D — future:** hardening, migration konten lokal ke CMS, load/security
-  test, backup, dan operational readiness.
+- **Phase 1C — implementing lokal:** C0 scope freeze complete. C1-C10 akan
+  membangun Admin CMS, authentication, publishing workflow, product/media
+  management, inbox, dan activity log dalam shadow-mode lokal.
+- **Phase 1D — future:** remote deployment, hardening, migration/cutover konten
+  lokal dan contact, load/security test, backup, dan operational readiness.
 - **Phase 2 — out of scope:** inventory, warehouse, order, payment, dan
   transaction processing.
 
@@ -47,6 +48,9 @@ Label status dalam dokumen ini:
 - `IMPLEMENTED-1B-LOCAL`: gate B0-B10 selesai dan tercatat pada
   `PHASE_1B_PLAN.md`, `PHASE_1B_WALKTHROUGH.md`, serta
   `PHASE_1B_QUALITY_REPORT.md`; belum dideploy.
+- `IMPLEMENTING-1C-LOCAL`: scope dan kontrak C0 telah dibekukan pada
+  `PHASE_1C_PLAN.md` serta `PHASE_1C_WALKTHROUGH.md`; runtime C1-C10 belum
+  selesai dan belum dideploy.
 - `PLANNED`: desain target yang belum diimplementasikan pada Phase 1A.
 - `OUT-OF-SCOPE`: bukan bagian delivery Phase 1.
 
@@ -164,10 +168,10 @@ inbox, dan audit trail.
 | PostgreSQL/Supabase | `IMPLEMENTED-1B-LOCAL` | Migration v4, repository, durable jobs, retention, dan integration lokal |
 | Redis/Upstash | `IMPLEMENTED-1B-LOCAL` | Cache, rate limit, fail-open, dan integration lokal |
 | Object storage dan image worker | `IMPLEMENTED-1B-LOCAL` | Local/S3 port, safe image pipeline, dan worker lokal |
-| Admin authentication | `PLANNED` | Phase 1C |
-| CMS homepage/about | `PLANNED` | Phase 1C |
-| Product/media CMS | `PLANNED` | Phase 1C |
-| Inbox dan activity log | `PLANNED` | Phase 1C |
+| Admin authentication | `IMPLEMENTING-1C-LOCAL` | C0 scope frozen; runtime mulai C1 |
+| CMS homepage/about | `IMPLEMENTING-1C-LOCAL` | C0 scope frozen; runtime C6 |
+| Product/media CMS | `IMPLEMENTING-1C-LOCAL` | C0 scope frozen; runtime C5 dan C7 |
+| Inbox dan activity log | `IMPLEMENTING-1C-LOCAL` | C0 scope frozen; runtime C8 |
 | Inventory dan order | `OUT-OF-SCOPE` | Phase 2 |
 
 ## 6. Functional Requirements — Phase 1A
@@ -471,9 +475,9 @@ Jika berpindah ke custom domain:
 
 ## 11. Backend Architecture — Phase 1B dan 1C
 
-Phase 1B berstatus `IMPLEMENTED-1B-LOCAL`. Requirement Admin CMS dan authentication
-di bagian ini tetap `PLANNED` untuk Phase 1C dan bukan dependency runtime Phase
-1A.
+Phase 1B berstatus `IMPLEMENTED-1B-LOCAL`. Phase 1C berstatus
+`IMPLEMENTING-1C-LOCAL`: C0 scope freeze complete dan runtime C1-C10 masih
+pending. Admin CMS tetap bukan dependency runtime Phase 1A.
 
 ### 11.0 Boundary delivery
 
@@ -491,7 +495,8 @@ Phase 1B memakai local-first shadow-mode:
   drill, dan production hardening mulai Phase 1D.
 
 Kontrak eksekusi rinci dan acceptance gate berada di
-[PHASE_1B_PLAN.md](./PHASE_1B_PLAN.md).
+[PHASE_1B_PLAN.md](./PHASE_1B_PLAN.md) dan
+[PHASE_1C_PLAN.md](./PHASE_1C_PLAN.md).
 
 ### 11.1 Topologi target
 
@@ -556,10 +561,10 @@ menggunakan opaque cursor.
 
 ### 11.4 Admin REST API
 
-**Status:** `PLANNED` untuk Phase 1C.
+**Status:** `IMPLEMENTING-1C-LOCAL`; C0 scope frozen, runtime C1-C9 pending.
 
 - login, refresh, logout, current user;
-- setup/enable/disable TOTP;
+- setup/enable TOTP serta recovery/reset melalui CLI;
 - read/save draft, preview, publish, dan unpublish page;
 - product create/read/update, preview, publish, archive;
 - media upload dan status polling;
@@ -570,7 +575,7 @@ OpenAPI menjadi contract dan divalidasi dalam CI.
 
 ### 11.5 Authentication dan authorization
 
-**Status:** `PLANNED` untuk Phase 1C.
+**Status:** `IMPLEMENTING-1C-LOCAL`; C0 scope frozen, runtime C1-C4 pending.
 
 - Role aktif Phase 1: `super_admin`; schema tetap siap untuk RBAC.
 - Tidak ada public registration.
@@ -578,7 +583,8 @@ OpenAPI menjadi contract dan divalidasi dalam CI.
 - Access JWT RS256 berumur pendek dan disimpan pada secure HttpOnly cookie.
 - Opaque refresh token dirotasi, disimpan dalam bentuk hash, dan dapat dicabut
   per session.
-- TOTP opsional bagi bisnis tetapi wajib diverifikasi saat login apabila aktif.
+- TOTP wajib disiapkan sebelum akun dapat menggunakan CMS dan wajib
+  diverifikasi pada setiap login.
 - Cookie mutation dilindungi Origin check, CSRF token, SameSite policy, dan CORS
   allowlist.
 - Admin browser mengakses API melalui same-origin BFF/proxy agar cookie tidak
@@ -586,7 +592,8 @@ OpenAPI menjadi contract dan divalidasi dalam CI.
 
 ### 11.6 Content publishing
 
-**Status:** schema foundation pada Phase 1B; runtime publishing pada Phase 1C.
+**Status:** schema foundation pada Phase 1B; C0 scope frozen; runtime
+publishing dijadwalkan C6-C9.
 
 - Homepage dan About merupakan singleton content.
 - Draft dan published revision dipisahkan.
@@ -785,7 +792,8 @@ Daftar status rinci berada di [FACT_CHECK.md](./FACT_CHECK.md).
 - Bahasa Phase 1 hanya Indonesia; kontrak konten dibuat agar locale dapat
   ditambahkan kemudian.
 - Phase 1A tidak memiliki database, API Go, Redis, login, atau CMS.
-- Netlify Forms tetap menjadi transport kontak production sepanjang Phase 1B.
+- Netlify Forms tetap menjadi transport kontak production sepanjang Phase 1B
+  dan Phase 1C.
   Contact endpoint Go dibangun dalam shadow-mode dan baru dapat menggantikannya
   pada Phase 1D setelah anti-spam, email, retensi, privacy, dan rollback gate
   lulus.
