@@ -36,9 +36,11 @@ type LabelCount struct {
 // Snapshot contains state that is inexpensive to aggregate from PostgreSQL at
 // scrape time. None of its labels can contain visitor-controlled data.
 type Snapshot struct {
-	Jobs         []LabelCount
-	Media        []LabelCount
-	RetentionDue int64
+	Jobs          []LabelCount
+	Media         []LabelCount
+	AdminSessions []LabelCount
+	Publishing    []LabelCount
+	RetentionDue  int64
 }
 
 type Registry struct {
@@ -139,6 +141,14 @@ func (registry *Registry) Render(databaseStats sql.DBStats, snapshot Snapshot) s
 	sortLabelCounts(snapshot.Media)
 	for _, value := range snapshot.Media {
 		fmt.Fprintf(&output, "tauco_media_assets{status=\"%s\"} %d\n", value.Status, value.Count)
+	}
+	sortLabelCounts(snapshot.AdminSessions)
+	for _, value := range snapshot.AdminSessions {
+		fmt.Fprintf(&output, "tauco_admin_sessions{status=\"%s\"} %d\n", value.Status, value.Count)
+	}
+	sortLabelCounts(snapshot.Publishing)
+	for _, value := range snapshot.Publishing {
+		fmt.Fprintf(&output, "tauco_publishing_entities{kind=\"%s\",status=\"%s\"} %d\n", value.Kind, value.Status, value.Count)
 	}
 	fmt.Fprintf(&output, "tauco_contact_retention_due %d\n", snapshot.RetentionDue)
 	return output.String()

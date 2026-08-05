@@ -320,7 +320,7 @@ func NewPublicAPI(
 		)
 		api.RegisterSafeContactHandler(router, publicReadServer, nil, "", contactLimit)
 		registrationError = registerOperations(router, operationsDependencies{
-			Database: sqlDatabase, Cache: redisStore,
+			Database: sqlDatabase, AdminDatabase: adminSQL, Cache: redisStore,
 			MediaRoot:    infrastructure.MediaRoot,
 			MetricsToken: secrets.MetricsBearer, Metrics: metrics,
 		})

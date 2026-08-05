@@ -7,7 +7,7 @@
 | Tanggal mulai | 4 Agustus 2026 |
 | Branch | `feature/phase-1c` |
 | Baseline | `520d315` |
-| Status | C0-C8 complete; C9-C10 pending |
+| Status | C0-C9 complete; C10 pending |
 | Production | Tidak berubah |
 
 Dokumen ini menjadi ledger pelaksanaan Phase 1C. Setiap gate diperbarui setelah
@@ -883,15 +883,52 @@ Inbox dan Activity axe A/AA: PASS
 
 ## C9 Checklist: Publishing, Recovery, dan Operations
 
-- [ ] Durable cache invalidation handler.
-- [ ] Page/product generation tags.
-- [ ] Idempotent retry/dead-letter recovery.
-- [ ] Auth/TOTP recovery runbook.
-- [ ] Revision conflict runbook.
-- [ ] Media retry runbook.
-- [ ] Admin/session/publish metrics.
-- [ ] Phase 1D revalidation boundary preserved.
-- [ ] Walkthrough update C9.
+**Tanggal:** 5 Agustus 2026
+
+**Status:** Complete
+
+### Hasil C9
+
+- Worker kini memiliki handler `content.invalidate_cache` dan Redis menjadi
+  dependency readiness worker bersama PostgreSQL, media storage, dan SMTP.
+- Payload legacy page (`generationTag`) dan payload product
+  (`generationTags`) divalidasi ketat. Tag yang diizinkan hanya `home`,
+  `about`, `products`, dan `product:{slug}`; field asing ditolak.
+- Retry invalidasi aman: generation hanya bergerak maju sehingga eksekusi
+  ulang tidak dapat menghidupkan cache lama. Dead job tetap direplay melalui
+  command ops yang sudah tersedia setelah penyebab diperbaiki.
+- Metrics menambahkan jumlah session admin `active/expired/revoked` dan state
+  publishing page/product dengan label bounded tanpa PII.
+- `PHASE_1C_RUNBOOK.md` mendokumentasikan password/TOTP/session recovery,
+  revision conflict, media retry, dead job replay, cache recovery, dan metrics.
+- Boundary Phase 1D tetap eksplisit: tidak ada Next.js revalidation, remote
+  provider, deploy, atau production cutover pada C9.
+
+### Verifikasi C9
+
+```text
+Worker readiness PostgreSQL/Redis/media/SMTP: PASS
+OpenAPI drift, Go format/build, TypeScript, ESLint: PASS
+Cache payload allowlist dan repeat-safe generation integration: PASS
+PostgreSQL repository integration via Linux container: PASS
+Composition API, Redis, metrics publishing integration: PASS
+```
+
+- [x] Durable cache invalidation handler.
+- [x] Page/product generation tags.
+- [x] Idempotent retry/dead-letter recovery.
+- [x] Auth/TOTP recovery runbook.
+- [x] Revision conflict runbook.
+- [x] Media retry runbook.
+- [x] Admin/session/publish metrics.
+- [x] Phase 1D revalidation boundary preserved.
+- [x] Walkthrough update C9.
+
+### Limitation dan next gate
+
+- Metrics dan recovery masih untuk lingkungan lokal; alerting dan remote
+  incident response menjadi scope Phase 1D.
+- C10 tetap diperlukan untuk quality gate menyeluruh dan local closeout.
 
 ## C10 Checklist: Quality Gate dan Local Closeout
 

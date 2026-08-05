@@ -14,12 +14,13 @@ Dokumentasi struktur dan cara kerja kode tersedia di
 [BACKEND_CODE_DOCUMENTATION.md](./BACKEND_CODE_DOCUMENTATION.md) serta
 [BACKEND_CODE_DOCUMENTATION.pdf](./BACKEND_CODE_DOCUMENTATION.pdf).
 
-**Phase 1C** sedang dikerjakan secara lokal. Gate C0-C8 telah menambahkan
+**Phase 1C** sedang dikerjakan secara lokal. Gate C0-C9 telah menambahkan
 fondasi data dan auth, auth API, same-origin BFF, shell CMS, media, serta editor
 Home/About dengan revision dan publishing lokal tanpa mengubah production.
 Kontrak dan progress ledger tersedia di
 [PHASE_1C_PLAN.md](./PHASE_1C_PLAN.md) serta
-[PHASE_1C_WALKTHROUGH.md](./PHASE_1C_WALKTHROUGH.md).
+[PHASE_1C_WALKTHROUGH.md](./PHASE_1C_WALKTHROUGH.md), dan
+[PHASE_1C_RUNBOOK.md](./PHASE_1C_RUNBOOK.md).
 
 **Status handoff:** Phase 1A berstatus PRD-complete dan telah tersedia di
 `https://tauco-cap-badak.netlify.app`. Gate G0–G8 sudah lulus dan Phase 1A
@@ -40,7 +41,7 @@ layanan backend. Bukti ada di
 | Go REST API | Phase 1B local complete; public/contact/health/protected metrics aktif lokal |
 | PostgreSQL | Phase 1B local complete; Phase 1C migration v6 dan role admin lulus lokal |
 | Redis | Phase 1B local complete; cache-aside, atomic limiter, fail-open, dan metrics lulus |
-| Admin CMS | Phase 1C C0-C8 complete; C9-C10 pending lokal; login/TOTP, content/product/media CMS, inbox, dan activity aktif lokal |
+| Admin CMS | Phase 1C C0-C9 complete; C10 pending lokal; CMS, inbox/activity, publishing worker, recovery, dan metrics aktif lokal |
 | Inventory dan order management | Out of scope Phase 1 |
 
 ## Tech stack

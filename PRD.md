@@ -33,9 +33,9 @@ Delivery dibagi agar website publik dapat diluncurkan lebih cepat:
   gate. Delivery
   dilakukan local-first dalam shadow-mode sehingga production Phase 1A tetap
   memakai konten lokal dan Netlify Forms.
-- **Phase 1C — implementing lokal:** C0-C8 complete. Fondasi data, auth API,
+- **Phase 1C — implementing lokal:** C0-C9 complete. Fondasi data, auth API,
   same-origin BFF, shell CMS, media CMS, editor dan publishing Home/About,
-  Product CMS, inbox, dan activity tersedia lokal. C9-C10 melanjutkan operations dan closeout
+  Product CMS, inbox/activity, worker publishing, recovery, dan metrics tersedia lokal. C10 menyelesaikan quality closeout
   dalam shadow-mode lokal.
 - **Phase 1D — future:** remote deployment, hardening, migration/cutover konten
   lokal dan contact, load/security test, backup, dan operational readiness.
@@ -477,7 +477,7 @@ Jika berpindah ke custom domain:
 ## 11. Backend Architecture — Phase 1B dan 1C
 
 Phase 1B berstatus `IMPLEMENTED-1B-LOCAL`. Phase 1C berstatus
-`IMPLEMENTING-1C-LOCAL`: C0-C8 complete dan runtime C9-C10 masih pending.
+`IMPLEMENTING-1C-LOCAL`: C0-C9 complete dan quality closeout C10 masih pending.
 Admin CMS tetap bukan dependency runtime Phase 1A.
 
 ### 11.0 Boundary delivery
@@ -563,7 +563,7 @@ menggunakan opaque cursor.
 ### 11.4 Admin REST API
 
 **Status:** `IMPLEMENTING-1C-LOCAL`; auth C2-C4, media C5, serta page content C6
-complete lokal. Product C7 serta inbox/activity C8 complete; operations C9 masih pending.
+complete lokal. Product C7, inbox/activity C8, dan operations C9 complete.
 
 - login, refresh, logout, current user;
 - setup/enable TOTP serta recovery/reset melalui CLI;
@@ -596,8 +596,8 @@ publishing.
 
 ### 11.6 Content publishing
 
-**Status:** revision foundation C1 dan runtime Home/About C6 complete lokal;
-durable invalidation consumer serta operational hardening dijadwalkan C9.
+**Status:** revision foundation C1, Home/About C6, Product C7, serta durable
+invalidation consumer dan operational recovery C9 complete lokal.
 
 - Homepage dan About merupakan singleton content.
 - Draft dan published revision dipisahkan.
@@ -674,6 +674,9 @@ berakhir.
   decode validation; SVG tidak diterima.
 
 ### 11.11 Observability dan operations
+
+**Status:** metrics admin/session/publishing dan local recovery runbook complete
+pada C9. Remote alert, backup, serta restore drill tetap scope Phase 1D.
 
 - Metrics: request latency/error, cache hit, DB pool, queue depth, retry/dead
   jobs, resize duration, dan email result.

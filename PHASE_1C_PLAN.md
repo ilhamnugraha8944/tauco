@@ -6,7 +6,7 @@
 | --- | --- |
 | Versi | 1.0 |
 | Tanggal | 4 Agustus 2026 |
-| Status | C0-C8 complete; C9-C10 pending |
+| Status | C0-C9 complete; C10 pending |
 | Branch | `feature/phase-1c` |
 | Baseline | Phase 1B commit `520d315` |
 | Mode | Local-first shadow-mode |

@@ -63,7 +63,7 @@ func TestPublicAPIWithPostgresAndRedis(t *testing.T) {
 	request.Header.Set("traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")
 	response = httptest.NewRecorder()
 	app.Handler().ServeHTTP(response, request)
-	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "tauco_db_pool_open_connections") || response.Header().Get("traceparent") == "" {
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "tauco_db_pool_open_connections") || !strings.Contains(response.Body.String(), "tauco_publishing_entities") || response.Header().Get("traceparent") == "" {
 		t.Fatalf("metrics status=%d headers=%v body=%s", response.Code, response.Header(), response.Body.String())
 	}
 

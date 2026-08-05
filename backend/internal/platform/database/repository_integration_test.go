@@ -350,6 +350,7 @@ WHERE slug = 'cross-table-seed-collision'`).Error; err != nil {
 	assertAdminContentLifecycle(t, ctx, adminGORM, plan)
 	assertAdminProductLifecycle(t, ctx, adminGORM, runtimeGORM, plan)
 	assertAdminInboxActivity(t, ctx, adminGORM)
+	assertCacheInvalidationPayloads(t, ctx)
 	assertCatalogPaginationProbe(
 		t,
 		ctx,
@@ -357,6 +358,34 @@ WHERE slug = 'cross-table-seed-collision'`).Error; err != nil {
 		productRepository,
 		plan,
 	)
+}
+
+type generationProbe map[string]int
+
+func (probe generationProbe) Bump(_ context.Context, tag string) error { probe[tag]++; return nil }
+
+func assertCacheInvalidationPayloads(t *testing.T, ctx context.Context) {
+	t.Helper()
+	probe := generationProbe{}
+	handler, err := contentapp.NewCacheInvalidationHandler(probe)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, payload := range []json.RawMessage{
+		json.RawMessage(`{"generationTag":"home"}`),
+		json.RawMessage(`{"generationTags":["products","product:produk-integration"]}`),
+		json.RawMessage(`{"generationTags":["products","product:produk-integration"]}`),
+	} {
+		if err := handler.Handle(ctx, payload); err != nil {
+			t.Fatalf("cache invalidation payload: %v", err)
+		}
+	}
+	if probe["home"] != 1 || probe["products"] != 2 || probe["product:produk-integration"] != 2 {
+		t.Fatalf("cache generations=%v", probe)
+	}
+	if err := handler.Handle(ctx, json.RawMessage(`{"generationTag":"unsafe tag","email":"pii@example.test"}`)); !errors.Is(err, contentapp.ErrInvalidCacheInvalidation) {
+		t.Fatalf("unsafe cache payload err=%v", err)
+	}
 }
 
 func assertAdminProductLifecycle(t *testing.T, ctx context.Context, adminDatabase, runtimeDatabase *gorm.DB, plan contentapp.SeedPlan) {
