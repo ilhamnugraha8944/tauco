@@ -4,9 +4,9 @@
 
 | Atribut | Nilai |
 | --- | --- |
-| Versi dokumen | 1.3 |
-| Tanggal | 4 Agustus 2026 |
-| Status produk | Phase 1A complete production; Phase 1B complete lokal; Phase 1C implementing lokal; Phase 1D planned |
+| Versi dokumen | 1.4 |
+| Tanggal | 5 Agustus 2026 |
+| Status produk | Phase 1A complete production; Phase 1B dan 1C complete lokal; Phase 1D planned |
 | Bahasa produk | Indonesia |
 | Target pasar awal | Indonesia |
 | Target deployment Phase 1A | Implemented di `https://tauco-cap-badak.netlify.app` |
@@ -33,10 +33,10 @@ Delivery dibagi agar website publik dapat diluncurkan lebih cepat:
   gate. Delivery
   dilakukan local-first dalam shadow-mode sehingga production Phase 1A tetap
   memakai konten lokal dan Netlify Forms.
-- **Phase 1C — implementing lokal:** C0-C9 complete. Fondasi data, auth API,
+- **Phase 1C — complete lokal:** C0-C10 complete. Fondasi data, auth API,
   same-origin BFF, shell CMS, media CMS, editor dan publishing Home/About,
-  Product CMS, inbox/activity, worker publishing, recovery, dan metrics tersedia lokal. C10 menyelesaikan quality closeout
-  dalam shadow-mode lokal.
+  Product CMS, inbox/activity, worker publishing, recovery, metrics, dan quality
+  closeout tersedia dalam shadow-mode lokal.
 - **Phase 1D — future:** remote deployment, hardening, migration/cutover konten
   lokal dan contact, load/security test, backup, dan operational readiness.
 - **Phase 2 — out of scope:** inventory, warehouse, order, payment, dan
@@ -49,9 +49,9 @@ Label status dalam dokumen ini:
 - `IMPLEMENTED-1B-LOCAL`: gate B0-B10 selesai dan tercatat pada
   `PHASE_1B_PLAN.md`, `PHASE_1B_WALKTHROUGH.md`, serta
   `PHASE_1B_QUALITY_REPORT.md`; belum dideploy.
-- `IMPLEMENTING-1C-LOCAL`: scope C0 serta kontrak dan database foundation C1
-  telah selesai pada `PHASE_1C_PLAN.md` serta `PHASE_1C_WALKTHROUGH.md`; runtime C2-C10 belum
-  selesai dan belum dideploy.
+- `IMPLEMENTED-1C-LOCAL`: gate C0-C10 selesai dan tercatat pada
+  `PHASE_1C_PLAN.md`, `PHASE_1C_WALKTHROUGH.md`, serta
+  `PHASE_1C_QUALITY_REPORT.md`; belum dideploy.
 - `PLANNED`: desain target yang belum diimplementasikan pada Phase 1A.
 - `OUT-OF-SCOPE`: bukan bagian delivery Phase 1.
 
@@ -166,13 +166,13 @@ inbox, dan audit trail.
 | Technical SEO | `IMPLEMENTED-1A` | Metadata, canonical, sitemap, robots, JSON-LD |
 | Responsive dan accessibility baseline | `IMPLEMENTED-1A` | Semantic HTML dan keyboard flow |
 | REST API Go | `IMPLEMENTED-1B-LOCAL` | Public/contact/health/metrics dan quality gate complete lokal |
-| PostgreSQL/Supabase | `IMPLEMENTING-1C-LOCAL` | Phase 1B complete; migration v5 auth/RBAC/session/MFA dan role admin lulus lokal |
+| PostgreSQL/Supabase | `IMPLEMENTED-1C-LOCAL` | Migration v6, auth/RBAC/session/MFA, role admin, dan integration lulus lokal |
 | Redis/Upstash | `IMPLEMENTED-1B-LOCAL` | Cache, rate limit, fail-open, dan integration lokal |
 | Object storage dan image worker | `IMPLEMENTED-1B-LOCAL` | Local/S3 port, safe image pipeline, dan worker lokal |
-| Admin authentication | `IMPLEMENTING-1C-LOCAL` | C1-C4 complete lokal; password, TOTP, auth API, BFF, dan account shell aktif |
-| CMS homepage/about | `IMPLEMENTING-1C-LOCAL` | Runtime C6 complete lokal; production tetap memakai konten Phase 1A |
-| Product/media CMS | `IMPLEMENTING-1C-LOCAL` | Media runtime C5 dan product runtime C7 complete lokal |
-| Inbox dan activity log | `IMPLEMENTING-1C-LOCAL` | Runtime C8 complete lokal; inbox production tetap Netlify Forms |
+| Admin authentication | `IMPLEMENTED-1C-LOCAL` | Password, TOTP, session, auth API, BFF, account, dan security gate lulus |
+| CMS homepage/about | `IMPLEMENTED-1C-LOCAL` | Draft/history/preview/publish lokal; production tetap konten Phase 1A |
+| Product/media CMS | `IMPLEMENTED-1C-LOCAL` | CRUD, revision, archive, upload/variant/retry, dan publishing lokal lulus |
+| Inbox dan activity log | `IMPLEMENTED-1C-LOCAL` | Cursor/status/audit lokal lulus; inbox production tetap Netlify Forms |
 | Inventory dan order | `OUT-OF-SCOPE` | Phase 2 |
 
 ## 6. Functional Requirements — Phase 1A
@@ -477,7 +477,7 @@ Jika berpindah ke custom domain:
 ## 11. Backend Architecture — Phase 1B dan 1C
 
 Phase 1B berstatus `IMPLEMENTED-1B-LOCAL`. Phase 1C berstatus
-`IMPLEMENTING-1C-LOCAL`: C0-C9 complete dan quality closeout C10 masih pending.
+`IMPLEMENTED-1C-LOCAL`: C0-C10 complete dan quality closeout lulus.
 Admin CMS tetap bukan dependency runtime Phase 1A.
 
 ### 11.0 Boundary delivery
@@ -538,7 +538,7 @@ Modul Phase 1B:
 - `jobs`
 - `audit`
 
-Modul `auth` mulai diimplementasikan pada Phase 1C.
+Modul `auth` telah diimplementasikan secara lokal pada Phase 1C.
 
 ### 11.3 Public REST API
 
@@ -562,8 +562,8 @@ menggunakan opaque cursor.
 
 ### 11.4 Admin REST API
 
-**Status:** `IMPLEMENTING-1C-LOCAL`; auth C2-C4, media C5, serta page content C6
-complete lokal. Product C7, inbox/activity C8, dan operations C9 complete.
+**Status:** `IMPLEMENTED-1C-LOCAL`; auth, media, page/product content,
+inbox/activity, operations, dan quality gate complete lokal.
 
 - login, refresh, logout, current user;
 - setup/enable TOTP serta recovery/reset melalui CLI;
@@ -577,9 +577,8 @@ OpenAPI menjadi contract dan divalidasi dalam CI.
 
 ### 11.5 Authentication dan authorization
 
-**Status:** `IMPLEMENTING-1C-LOCAL`; C1-C6 complete lokal, termasuk
-schema/contract, auth domain, auth API, BFF, shell CMS, media, dan content
-publishing.
+**Status:** `IMPLEMENTED-1C-LOCAL`; schema/contract, auth domain, auth API, BFF,
+shell CMS, media, content/product publishing, recovery, dan security gate lulus.
 
 - Role aktif Phase 1: `super_admin`; schema tetap siap untuk RBAC.
 - Tidak ada public registration.

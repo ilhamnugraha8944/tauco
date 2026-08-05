@@ -108,7 +108,7 @@ func NewTokenManager(
 	ttl time.Duration,
 ) (*TokenManager, error) {
 	if private == nil || public == nil || strings.TrimSpace(issuer) == "" || strings.TrimSpace(audience) == "" ||
-		strings.TrimSpace(keyID) == "" || ttl <= 0 || ttl > 15*time.Minute || private.PublicKey.N.Cmp(public.N) != 0 || private.PublicKey.E != public.E {
+		strings.TrimSpace(keyID) == "" || ttl <= 0 || ttl > 15*time.Minute || private.N.Cmp(public.N) != 0 || private.E != public.E {
 		return nil, errors.New("invalid JWT manager configuration")
 	}
 	return &TokenManager{private: private, public: public, issuer: issuer, audience: audience, keyID: keyID, ttl: ttl, now: time.Now}, nil
@@ -185,7 +185,7 @@ func GenerateRSAKeyPair() (*rsa.PrivateKey, *rsa.PublicKey, error) {
 }
 
 func EncodeRSAKeyPair(private *rsa.PrivateKey, public *rsa.PublicKey) ([]byte, []byte, error) {
-	if private == nil || public == nil || private.PublicKey.N.Cmp(public.N) != 0 || private.PublicKey.E != public.E {
+	if private == nil || public == nil || private.N.Cmp(public.N) != 0 || private.E != public.E {
 		return nil, nil, errors.New("invalid RSA key pair")
 	}
 	privateDER, err := x509.MarshalPKCS8PrivateKey(private)
@@ -219,7 +219,7 @@ func ParseRSAKeyPair(privatePEM, publicPEM []byte) (*rsa.PrivateKey, *rsa.Public
 		return nil, nil, errors.New("invalid RSA public key")
 	}
 	public, ok := publicValue.(*rsa.PublicKey)
-	if !ok || private.PublicKey.N.Cmp(public.N) != 0 || private.PublicKey.E != public.E {
+	if !ok || private.N.Cmp(public.N) != 0 || private.E != public.E {
 		return nil, nil, errors.New("RSA key pair does not match")
 	}
 	return private, public, nil

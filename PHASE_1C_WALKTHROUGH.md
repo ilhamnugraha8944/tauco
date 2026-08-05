@@ -7,7 +7,7 @@
 | Tanggal mulai | 4 Agustus 2026 |
 | Branch | `feature/phase-1c` |
 | Baseline | `520d315` |
-| Status | C0-C9 complete; C10 pending |
+| Status | C0-C10 complete lokal |
 | Production | Tidak berubah |
 
 Dokumen ini menjadi ledger pelaksanaan Phase 1C. Setiap gate diperbarui setelah
@@ -932,18 +932,130 @@ Composition API, Redis, metrics publishing integration: PASS
 
 ## C10 Checklist: Quality Gate dan Local Closeout
 
-- [ ] Migration/integration.
-- [ ] OpenAPI contract/drift.
-- [ ] Auth/security suite.
-- [ ] Race, vet, lint, vulnerability.
-- [ ] Container build.
-- [ ] Admin Playwright E2E.
-- [ ] Admin axe/accessibility.
-- [ ] Frontend Phase 1A regression.
-- [ ] Production Phase 1A smoke.
-- [ ] Quality report.
-- [ ] PRD `IMPLEMENTED-1C-LOCAL`.
-- [ ] README dan runbook final.
-- [ ] Backend documentation MD/PDF final.
-- [ ] No deployment/cutover.
-- [ ] Walkthrough update C10.
+- [x] Migration/integration.
+- [x] OpenAPI contract/drift.
+- [x] Auth/security suite.
+- [x] Race, vet, lint, vulnerability.
+- [x] Container build.
+- [x] Admin Playwright E2E.
+- [x] Admin axe/accessibility.
+- [x] Frontend Phase 1A regression.
+- [x] Production Phase 1A smoke.
+- [x] Quality report.
+- [x] PRD `IMPLEMENTED-1C-LOCAL`.
+- [x] README dan runbook final.
+- [x] Backend documentation MD/PDF final.
+- [x] No deployment/cutover.
+- [x] Walkthrough update C10.
+
+## Update C10
+
+| Field | Nilai |
+| --- | --- |
+| Tanggal | 5 Agustus 2026 |
+| Status | Complete |
+| Scope | Quality gate dan local closeout |
+| Boundary | Tidak ada push, deploy, public content cutover, atau contact cutover |
+
+### Tujuan
+
+Menutup seluruh acceptance Phase 1C dengan regression yang dapat diulang,
+memperbaiki issue yang ditemukan quality gate, membekukan evidence final, dan
+menyerahkan dokumentasi kode serta operasi yang sesuai dengan runtime C0-C10.
+
+### Perubahan
+
+- Memperbaiki fallback `scripts/run-go-tests.mjs` agar package yang executable
+  lokalnya diblokir Windows Application Control langsung diuji melalui Docker.
+- Menangani close PostgreSQL admin CLI dan enam simplifikasi staticcheck pada
+  auth/media delivery. Lint final menghasilkan 0 issue.
+- Menaikkan override PostCSS ke `^8.5.25` tanpa menaikkan Next.js atau menambah
+  dependency. Audit dependency production final menghasilkan 0 vulnerability.
+- Membuat `PHASE_1C_QUALITY_REPORT.md`.
+- Memfinalkan PRD, README, plan, runbook, walkthrough, dan dokumentasi backend
+  MD/PDF sampai status `IMPLEMENTED-1C-LOCAL`.
+
+### Keputusan arsitektur
+
+- Quality gate memperluas suite Phase 1B; tidak membuat unit-test file baru.
+- Threshold load p95 100 ms tidak dilonggarkan. Percobaan pertama setelah scan
+  container gagal pada 485 ms; pengulangan warm lulus pada 90 ms dengan 0% error.
+- Production audit dipakai untuk dependency yang dapat mencapai runtime.
+  Dua advisory high pada tooling development tetap mengikuti penerimaan risiko
+  development-only oleh owner.
+- Admin tetap dense operational UI. Checklist design publik hanya dipakai untuk
+  regression theme, responsive, focus, accessibility, motion, dan anti-pattern;
+  tidak ada redesign atau dependency UI baru.
+
+### Command yang dijalankan
+
+```powershell
+docker compose -f backend/compose.yaml --profile mail ps
+npm.cmd run backend:format:check
+npm.cmd run backend:generate:check
+npm.cmd run backend:worker:ready
+npm.cmd run backend:test:integration
+npm.cmd run backend:race
+npm.cmd run backend:vet
+npm.cmd run backend:lint
+npm.cmd run backend:vuln
+npm.cmd run backend:load
+npm.cmd run backend:container:build
+npm.cmd audit --omit=dev --audit-level=moderate
+npm.cmd run check:frontend
+npm.cmd run test:admin
+npm.cmd run test:e2e
+npm.cmd run qa:g6
+npm.cmd run backend:docs:pdf
+git diff --check
+```
+
+### Hasil pengujian
+
+```text
+Go format: 106 file, PASS
+OpenAPI generated drift: PASS
+Migration v1-v6 + PostgreSQL/Redis integration: PASS
+Auth/security/repository/composition integration: PASS
+Race detector: PASS
+go vet: PASS
+golangci-lint: 0 issue
+govulncheck: 0 reachable vulnerability
+npm production audit: 0 vulnerability
+Load warm: cold 157 ms, 200 read, p95 90 ms, p99 100 ms, error 0%
+Container scratch image build: PASS
+Frontend lint/typecheck/build: PASS
+Admin E2E + axe desktop/mobile: 6/6 PASS
+Public local E2E: 79 PASS, 13 intentional skip
+Production Phase 1A smoke: 29/29 PASS
+```
+
+Source preflight dan Playwright memverifikasi auto dark mode, reduced motion,
+responsive collapse, keyboard/focus, no overflow, CTA/form contrast, initial
+HTML, internal link, true 404, serta visible copy tanpa em dash/en dash. Tidak
+ada redesign, scroll listener, `h-screen`, GSAP/Motion, icon family tambahan,
+atau gambar palsu yang ditambahkan pada C10.
+
+### Evidence
+
+- `PHASE_1C_QUALITY_REPORT.md`
+- `BACKEND_CODE_DOCUMENTATION.md`
+- `BACKEND_CODE_DOCUMENTATION.pdf`
+- `PHASE_1C_RUNBOOK.md`
+- OpenAPI dan integration/E2E suite yang tetap executable di repository
+- Planned local commit: `chore(cms): complete phase 1c gate c10`
+
+### Known limitation
+
+- Windows Application Control masih memblokir sebagian executable test Go
+  temporer; Docker fallback final lulus dan sekarang repeatable.
+- Intentional unknown product 404 dapat menulis `NoFallbackError` internal Next
+  pada server test, tetapi response tetap true 404 dan seluruh assertion lulus.
+- Remote alerting, backup/restore, secret rotation, provider deployment, dan
+  production cutover tetap belum dikerjakan.
+
+### Next phase
+
+Phase 1C selesai lokal. Langkah berikutnya adalah Phase 1D planning untuk
+deployment, remote infrastructure, hardening, backup/restore, dan controlled
+content/contact cutover. Tidak ada pekerjaan Phase 1D yang diotorisasi oleh C10.

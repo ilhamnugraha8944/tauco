@@ -151,13 +151,13 @@ func (server *AdminMediaServer) GetMediaVariant(ctx context.Context, request Get
 	}
 	switch value := response.(type) {
 	case GetMediaDisplay200ImagewebpResponse:
-		return GetMediaVariant200ImagewebpResponse{value.MediaBinaryOKImagewebpResponse}, nil
+		return GetMediaVariant200ImagewebpResponse(value), nil
 	case GetMediaDisplay304Response:
 		return GetMediaVariant304Response(value), nil
 	case GetMediaDisplay404ApplicationProblemPlusJSONResponse:
-		return GetMediaVariant404ApplicationProblemPlusJSONResponse{value.NotFoundApplicationProblemPlusJSONResponse}, nil
+		return GetMediaVariant404ApplicationProblemPlusJSONResponse(value), nil
 	case GetMediaDisplay500ApplicationProblemPlusJSONResponse:
-		return GetMediaVariant500ApplicationProblemPlusJSONResponse{value.InternalServerErrorApplicationProblemPlusJSONResponse}, nil
+		return GetMediaVariant500ApplicationProblemPlusJSONResponse(value), nil
 	default:
 		return nil, fmt.Errorf("unexpected media response %T", response)
 	}

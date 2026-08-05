@@ -54,7 +54,7 @@ func run(args []string, input io.Reader) error {
 	if err != nil {
 		return err
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 	runtime, err := auth.LoadRuntime(os.LookupEnv)
 	if err != nil {
 		return err

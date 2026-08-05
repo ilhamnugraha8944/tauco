@@ -4,6 +4,9 @@ Runbook ini untuk recovery CMS lokal. Jalankan dari root repository dengan
 Docker Desktop, PostgreSQL, Redis, API, dan worker lokal. Jangan gunakan
 credential production pada Phase 1C.
 
+**Status:** Phase 1C C0-C10 complete lokal. Runbook ini bukan instruksi
+deployment atau production cutover.
+
 ## 1. Pemeriksaan awal
 
 ```powershell
@@ -101,7 +104,31 @@ Endpoint `/internal/metrics` memerlukan bearer token lokal. Periksa minimal:
 Label metrics dibatasi dan tidak boleh berisi email, nama, isi pesan, token,
 atau metadata audit mentah.
 
-## 8. Boundary Phase 1D
+## 8. Final local verification
+
+Jalankan sebelum handoff ke Phase 1D atau setelah perubahan lintas modul:
+
+```powershell
+npm.cmd run backend:format:check
+npm.cmd run backend:generate:check
+npm.cmd run backend:test:integration
+npm.cmd run backend:race
+npm.cmd run backend:vet
+npm.cmd run backend:lint
+npm.cmd run backend:vuln
+npm.cmd run backend:load
+npm.cmd run backend:container:build
+npm.cmd run check:frontend
+npm.cmd run test:admin
+npm.cmd run test:e2e
+```
+
+Production smoke `npm.cmd run qa:g6` bersifat read-only. Jangan menjalankan
+live form test tanpa sengaja karena akan membuat submission nyata.
+
+Evidence baseline final ada di `PHASE_1C_QUALITY_REPORT.md`.
+
+## 9. Boundary Phase 1D
 
 Phase 1C tidak mengubah production Netlify, `LocalContentSource`, Netlify
 Forms, canonical, atau Search Console. Revalidation Next.js/ISR, remote API,
