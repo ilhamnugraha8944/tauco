@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ilhamnugraha8944/tauco/backend/internal/auth"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/composition"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/platform/config"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/platform/database"
@@ -30,6 +31,24 @@ func run() int {
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "database configuration error: %v\n", err)
 		return 1
+	}
+	var adminAuth *composition.AdminAuthOptions
+	if strings.TrimSpace(os.Getenv("ADMIN_DATABASE_URL")) != "" {
+		adminDatabase, loadErr := database.LoadAdminRuntimeConfig(os.LookupEnv)
+		if loadErr != nil {
+			_, _ = fmt.Fprintln(os.Stderr, "admin database configuration error")
+			return 1
+		}
+		authRuntime, loadErr := auth.LoadRuntime(os.LookupEnv)
+		if loadErr != nil {
+			_, _ = fmt.Fprintln(os.Stderr, "admin auth configuration error")
+			return 1
+		}
+		adminAuth = &composition.AdminAuthOptions{
+			Database: adminDatabase, Runtime: authRuntime,
+			AllowedOrigins: splitCSV(os.Getenv("ADMIN_ALLOWED_ORIGINS")),
+			SecureCookies:  strings.EqualFold(os.Getenv("ADMIN_COOKIE_SECURE"), "true"),
+		}
 	}
 
 	initializationContext, cancelInitialization := context.WithTimeout(
@@ -52,6 +71,7 @@ func run() int {
 			CORSOrigins:       splitCSV(os.Getenv("CORS_ALLOWED_ORIGINS")),
 			TrustedProxyCIDRs: splitCSV(os.Getenv("TRUSTED_PROXY_CIDRS")),
 			MediaRoot:         os.Getenv("MEDIA_LOCAL_ROOT"),
+			AdminAuth:         adminAuth,
 		},
 	)
 	if err != nil {

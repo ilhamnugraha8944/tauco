@@ -12,6 +12,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	auditapp "github.com/ilhamnugraha8944/tauco/backend/internal/audit/application"
+	auditrepo "github.com/ilhamnugraha8944/tauco/backend/internal/audit/repository"
+	"github.com/ilhamnugraha8944/tauco/backend/internal/auth"
+	authapp "github.com/ilhamnugraha8944/tauco/backend/internal/auth/application"
+	authrepo "github.com/ilhamnugraha8944/tauco/backend/internal/auth/repository"
 	catalogapp "github.com/ilhamnugraha8944/tauco/backend/internal/catalog/application"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/catalog/delivery/cursor"
 	catalogrepo "github.com/ilhamnugraha8944/tauco/backend/internal/catalog/repository"
@@ -20,6 +25,10 @@ import (
 	contentapp "github.com/ilhamnugraha8944/tauco/backend/internal/content/application"
 	contentrepo "github.com/ilhamnugraha8944/tauco/backend/internal/content/repository"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/delivery/api"
+	mediaapp "github.com/ilhamnugraha8944/tauco/backend/internal/media/application"
+	mediaprocessor "github.com/ilhamnugraha8944/tauco/backend/internal/media/processor"
+	mediarepo "github.com/ilhamnugraha8944/tauco/backend/internal/media/repository"
+	mediastorage "github.com/ilhamnugraha8944/tauco/backend/internal/media/storage"
 	platformcache "github.com/ilhamnugraha8944/tauco/backend/internal/platform/cache"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/platform/config"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/platform/database"
@@ -32,11 +41,12 @@ import (
 
 // App owns the API process dependencies and their lifecycle.
 type App struct {
-	logger   *logging.Logger
-	handler  http.Handler
-	server   *httpserver.Server
-	database *sql.DB
-	cache    *platformcache.Redis
+	logger        *logging.Logger
+	handler       http.Handler
+	server        *httpserver.Server
+	database      *sql.DB
+	adminDatabase *sql.DB
+	cache         *platformcache.Redis
 }
 
 // New validates configuration and wires the B1 platform foundation.
@@ -57,6 +67,14 @@ type PublicAPIInfrastructure struct {
 	CORSOrigins       []string
 	TrustedProxyCIDRs []string
 	MediaRoot         string
+	AdminAuth         *AdminAuthOptions
+}
+
+type AdminAuthOptions struct {
+	Database       database.RuntimeConfig
+	Runtime        auth.Runtime
+	AllowedOrigins []string
+	SecureCookies  bool
 }
 
 func NewPublicAPI(
@@ -77,6 +95,7 @@ func NewPublicAPI(
 	closeDatabase := func() {
 		_ = sqlDatabase.Close()
 	}
+	var adminSQL *sql.DB
 
 	redisStore, err := platformcache.NewRedis(infrastructure.RedisURL)
 	if err != nil {
@@ -84,6 +103,9 @@ func NewPublicAPI(
 		return nil, err
 	}
 	closeAll := func() {
+		if adminSQL != nil {
+			_ = adminSQL.Close()
+		}
 		_ = redisStore.Close()
 		closeDatabase()
 	}
@@ -141,6 +163,121 @@ func NewPublicAPI(
 	}
 	localLimiter, _ := ratelimit.NewLocal(10_000)
 	limiter, _ := ratelimit.New(redisStore, localLimiter, metrics.ObserveRateLimit)
+	var adminAuthHandler *api.AdminAuthHandler
+	var adminMediaServer *api.AdminMediaServer
+	var adminContentServer *api.AdminContentServer
+	var adminProductServer *api.AdminProductServer
+	var adminInboxActivityServer *api.AdminInboxActivityServer
+	if options := infrastructure.AdminAuth; options != nil {
+		adminGORM, openErr := database.OpenAdminGORM(ctx, options.Database)
+		if openErr != nil {
+			closeAll()
+			return nil, openErr
+		}
+		adminSQL, err = adminGORM.DB()
+		if err != nil {
+			closeAll()
+			return nil, fmt.Errorf("access admin PostgreSQL pool: %w", err)
+		}
+		store, storeErr := authrepo.NewPostgres(adminGORM)
+		if storeErr != nil {
+			closeAll()
+			return nil, storeErr
+		}
+		service, serviceErr := authapp.NewService(store, options.Runtime.Tokens, options.Runtime.Secrets, options.Runtime.RecoverySecret)
+		if serviceErr != nil {
+			closeAll()
+			return nil, serviceErr
+		}
+		adminAuthHandler, err = api.NewAdminAuthHandler(service, limiter, api.AdminAuthConfig{
+			AllowedOrigins: options.AllowedOrigins, RateSecret: secrets.RateHMAC, SecureCookies: options.SecureCookies,
+			RequestID: func(c *gin.Context) string { id, _ := httpserver.RequestIDFromGinContext(c); return id },
+		})
+		if err != nil {
+			closeAll()
+			return nil, err
+		}
+		mediaRepository, mediaErr := mediarepo.NewPostgres(adminGORM)
+		if mediaErr != nil {
+			closeAll()
+			return nil, mediaErr
+		}
+		mediaStore, mediaErr := mediastorage.NewLocal(infrastructure.MediaRoot)
+		if mediaErr != nil {
+			closeAll()
+			return nil, mediaErr
+		}
+		mediaIngestor, mediaErr := mediaapp.NewIngestor(mediaRepository, mediaStore, mediaprocessor.Image{})
+		if mediaErr != nil {
+			closeAll()
+			return nil, mediaErr
+		}
+		mediaAdmin, mediaErr := mediaapp.NewAdminService(mediaRepository, cursorCodec)
+		if mediaErr != nil {
+			closeAll()
+			return nil, mediaErr
+		}
+		adminMediaServer, mediaErr = api.NewAdminMediaServer(mediaAdmin, mediaIngestor, mediaStore)
+		if mediaErr != nil {
+			closeAll()
+			return nil, mediaErr
+		}
+		contentRepository, contentErr := contentrepo.NewAdminPostgres(adminGORM)
+		if contentErr != nil {
+			closeAll()
+			return nil, contentErr
+		}
+		contentAdmin, contentErr := contentapp.NewAdminService(contentRepository)
+		if contentErr != nil {
+			closeAll()
+			return nil, contentErr
+		}
+		adminContentServer, contentErr = api.NewAdminContentServer(contentAdmin)
+		if contentErr != nil {
+			closeAll()
+			return nil, contentErr
+		}
+		productAdminRepository, productErr := catalogrepo.NewAdminPostgres(adminGORM)
+		if productErr != nil {
+			closeAll()
+			return nil, productErr
+		}
+		productAdmin, productErr := catalogapp.NewAdminProductService(productAdminRepository, cursorCodec)
+		if productErr != nil {
+			closeAll()
+			return nil, productErr
+		}
+		adminProductServer, productErr = api.NewAdminProductServer(productAdmin)
+		if productErr != nil {
+			closeAll()
+			return nil, productErr
+		}
+		adminContactRepository, inboxErr := contactrepo.NewPostgresStore(adminGORM)
+		if inboxErr != nil {
+			closeAll()
+			return nil, inboxErr
+		}
+		adminInbox, inboxErr := contactapp.NewAdminMessageService(adminContactRepository, cursorCodec)
+		if inboxErr != nil {
+			closeAll()
+			return nil, inboxErr
+		}
+		adminActivityRepository, inboxErr := auditrepo.NewAdminPostgres(adminGORM)
+		if inboxErr != nil {
+			closeAll()
+			return nil, inboxErr
+		}
+		adminActivity, inboxErr := auditapp.NewAdminService(adminActivityRepository, cursorCodec)
+		if inboxErr != nil {
+			closeAll()
+			return nil, inboxErr
+		}
+		adminInboxActivityServer, inboxErr = api.NewAdminInboxActivityServer(adminInbox, adminActivity)
+		if inboxErr != nil {
+			closeAll()
+			return nil, inboxErr
+		}
+	}
 	publicLimit, err := httpmiddleware.RateLimit(limiter, secrets.RateHMAC, httpmiddleware.RatePolicy{
 		Name: "public-read", Limit: 60, Window: time.Minute,
 	})
@@ -166,6 +303,13 @@ func NewPublicAPI(
 		trustedProxies: infrastructure.TrustedProxyCIDRs,
 		middleware:     []gin.HandlerFunc{metrics.HTTPMiddleware(), httpmiddleware.SecurityHeaders(), corsMiddleware},
 	}, func(router gin.IRouter) {
+		if adminAuthHandler != nil {
+			adminAuthHandler.Register(router)
+			api.RegisterSafeMediaHandlers(router, adminMediaServer, adminAuthHandler, publicLimit)
+			api.RegisterSafeAdminContentHandlers(router, adminContentServer, adminAuthHandler)
+			api.RegisterSafeAdminProductHandlers(router, adminProductServer, adminAuthHandler)
+			api.RegisterSafeAdminInboxActivityHandlers(router, adminInboxActivityServer, adminAuthHandler)
+		}
 		api.RegisterSafePublicReadHandlers(
 			router,
 			publicReadServer,
@@ -176,7 +320,7 @@ func NewPublicAPI(
 		)
 		api.RegisterSafeContactHandler(router, publicReadServer, nil, "", contactLimit)
 		registrationError = registerOperations(router, operationsDependencies{
-			Database: sqlDatabase, Cache: redisStore,
+			Database: sqlDatabase, AdminDatabase: adminSQL, Cache: redisStore,
 			MediaRoot:    infrastructure.MediaRoot,
 			MetricsToken: secrets.MetricsBearer, Metrics: metrics,
 		})
@@ -191,6 +335,7 @@ func NewPublicAPI(
 		return nil, registrationError
 	}
 	app.database = sqlDatabase
+	app.adminDatabase = adminSQL
 	app.cache = redisStore
 	return app, nil
 }
@@ -313,12 +458,17 @@ func (a *App) Close() error {
 		databaseError = a.database.Close()
 		a.database = nil
 	}
+	var adminDatabaseError error
+	if a.adminDatabase != nil {
+		adminDatabaseError = a.adminDatabase.Close()
+		a.adminDatabase = nil
+	}
 	var cacheError error
 	if a.cache != nil {
 		cacheError = a.cache.Close()
 		a.cache = nil
 	}
-	return errors.Join(databaseError, cacheError, syncLogger(a.logger))
+	return errors.Join(databaseError, adminDatabaseError, cacheError, syncLogger(a.logger))
 }
 
 func syncLogger(logger *logging.Logger) error {

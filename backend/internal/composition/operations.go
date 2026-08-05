@@ -22,11 +22,12 @@ type readinessCache interface {
 }
 
 type operationsDependencies struct {
-	Database     *sql.DB
-	Cache        readinessCache
-	MediaRoot    string
-	MetricsToken []byte
-	Metrics      *observability.Registry
+	Database      *sql.DB
+	AdminDatabase *sql.DB
+	Cache         readinessCache
+	MediaRoot     string
+	MetricsToken  []byte
+	Metrics       *observability.Registry
 }
 
 func registerOperations(router gin.IRouter, dependencies operationsDependencies) error {
@@ -100,7 +101,7 @@ func metricsHandler(dependencies operationsDependencies) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		queryContext, cancel := context.WithTimeout(ctx.Request.Context(), 3*time.Second)
 		defer cancel()
-		snapshot, err := operationalSnapshot(queryContext, dependencies.Database)
+		snapshot, err := operationalSnapshot(queryContext, dependencies.Database, dependencies.AdminDatabase)
 		if err != nil {
 			httpserver.WriteProblem(ctx, http.StatusInternalServerError,
 				"urn:tauco-cap-badak:problem:internal", "Terjadi kesalahan internal",
@@ -114,7 +115,7 @@ func metricsHandler(dependencies operationsDependencies) gin.HandlerFunc {
 	}
 }
 
-func operationalSnapshot(ctx context.Context, database *sql.DB) (observability.Snapshot, error) {
+func operationalSnapshot(ctx context.Context, database, adminDatabase *sql.DB) (observability.Snapshot, error) {
 	var snapshot observability.Snapshot
 	rows, err := database.QueryContext(ctx, `
 		SELECT kind, status, count(*)
@@ -161,5 +162,51 @@ func operationalSnapshot(ctx context.Context, database *sql.DB) (observability.S
 	err = database.QueryRowContext(ctx, `
 		SELECT count(*) FROM tauco_app.contact_messages
 		WHERE retention_delete_at <= transaction_timestamp()`).Scan(&snapshot.RetentionDue)
-	return snapshot, err
+	if err != nil {
+		return snapshot, err
+	}
+	rows, err = database.QueryContext(ctx, `
+		SELECT kind,status,count(*) FROM (
+			SELECT 'page' AS kind,CASE WHEN published_revision_id IS NULL THEN 'unpublished' ELSE 'published' END AS status FROM tauco_app.pages
+			UNION ALL
+			SELECT 'product',CASE WHEN archived_at IS NOT NULL THEN 'archived' WHEN published_revision_id IS NOT NULL THEN 'published' ELSE 'unpublished' END FROM tauco_app.products
+		) entity GROUP BY kind,status`)
+	if err != nil {
+		return snapshot, err
+	}
+	for rows.Next() {
+		var value observability.LabelCount
+		if err := rows.Scan(&value.Kind, &value.Status, &value.Count); err != nil {
+			return snapshot, err
+		}
+		snapshot.Publishing = append(snapshot.Publishing, value)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return snapshot, err
+	}
+	if err := rows.Close(); err != nil {
+		return snapshot, err
+	}
+	if adminDatabase != nil {
+		rows, err = adminDatabase.QueryContext(ctx, `SELECT CASE WHEN revoked_at IS NOT NULL THEN 'revoked' WHEN expires_at<=transaction_timestamp() THEN 'expired' ELSE 'active' END AS status,count(*) FROM tauco_app.admin_sessions GROUP BY status`)
+		if err != nil {
+			return snapshot, err
+		}
+		for rows.Next() {
+			var value observability.LabelCount
+			if err := rows.Scan(&value.Status, &value.Count); err != nil {
+				return snapshot, err
+			}
+			snapshot.AdminSessions = append(snapshot.AdminSessions, value)
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return snapshot, err
+		}
+		if err := rows.Close(); err != nil {
+			return snapshot, err
+		}
+	}
+	return snapshot, nil
 }

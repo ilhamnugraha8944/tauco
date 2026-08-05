@@ -40,6 +40,7 @@ backend/api.exe
 backend/coverage.out
 backend/*.test
 backend/.local-media/
+backend/.local-auth/
 backend/.go-build-cache/
 backend/.tool-bin/
 

@@ -14,6 +14,15 @@ Dokumentasi struktur dan cara kerja kode tersedia di
 [BACKEND_CODE_DOCUMENTATION.md](./BACKEND_CODE_DOCUMENTATION.md) serta
 [BACKEND_CODE_DOCUMENTATION.pdf](./BACKEND_CODE_DOCUMENTATION.pdf).
 
+**Phase 1C** selesai secara lokal pada gate C0-C10. Fondasi data dan auth,
+same-origin BFF, Admin CMS, media, Home/About, Product, inbox/activity,
+publishing worker, recovery, serta quality closeout telah lulus tanpa mengubah
+production. Kontrak dan evidence tersedia di
+[PHASE_1C_PLAN.md](./PHASE_1C_PLAN.md) serta
+[PHASE_1C_WALKTHROUGH.md](./PHASE_1C_WALKTHROUGH.md), dan
+[PHASE_1C_RUNBOOK.md](./PHASE_1C_RUNBOOK.md). Hasil quality final ada di
+[PHASE_1C_QUALITY_REPORT.md](./PHASE_1C_QUALITY_REPORT.md).
+
 **Status handoff:** Phase 1A berstatus PRD-complete dan telah tersedia di
 `https://tauco-cap-badak.netlify.app`. Gate G0–G8 sudah lulus dan Phase 1A
 berstatus **Complete** pada 28 Juli 2026. Tidak ada koneksi Supabase atau
@@ -31,9 +40,9 @@ layanan backend. Bukti ada di
 | Privacy notice | Phase 1A |
 | Metadata, canonical, sitemap, robots, JSON-LD | Phase 1A |
 | Go REST API | Phase 1B local complete; public/contact/health/protected metrics aktif lokal |
-| PostgreSQL | Phase 1B local complete; migration v4, durable job, media, retention, dan integration lulus |
+| PostgreSQL | Phase 1B local complete; Phase 1C migration v6 dan role admin lulus lokal |
 | Redis | Phase 1B local complete; cache-aside, atomic limiter, fail-open, dan metrics lulus |
-| Admin CMS | Future |
+| Admin CMS | Phase 1C C0-C10 complete lokal; belum dideploy atau di-cutover |
 | Inventory dan order management | Out of scope Phase 1 |
 
 ## Tech stack
@@ -106,12 +115,41 @@ PowerShell Windows dan tidak terhalang execution policy terhadap `npm.ps1`.
 
 Jangan commit `.env.local`.
 
+### Menjalankan login CMS Phase 1C
+
+CMS hanya aktif lokal. Pastikan `.env.local` berisi:
+
+```dotenv
+ADMIN_CMS_ENABLED=true
+ADMIN_API_ORIGIN=http://127.0.0.1:8080
+```
+
+Kemudian gunakan terminal terpisah:
+
+```powershell
+npm.cmd run backend:compose:up
+npm.cmd run backend:migrate:up
+npm.cmd run backend:admin -- bootstrap email@example.com
+npm.cmd run backend:dev
+```
+
+```powershell
+npm.cmd run dev
+```
+
+Buka `http://localhost:3000/admin/login`, masuk dengan akun bootstrap, lalu
+hubungkan kunci TOTP ke aplikasi autentikator. Command bootstrap cukup sekali
+per akun. Jika akun sudah ada, jalankan backend dan frontend saja. Jangan
+gunakan akun atau key lokal untuk deployment.
+
 ## Environment variables
 
 | Variable | Wajib | Contoh | Keterangan |
 | --- | --- | --- | --- |
 | `NEXT_PUBLIC_SITE_URL` | Ya pada setiap build Netlify | `https://nama-site.netlify.app` | Absolute canonical origin tanpa path dan query |
 | `GOOGLE_SITE_VERIFICATION` | Tidak | Token Search Console | Isi setelah URL-prefix property dibuat |
+| `ADMIN_CMS_ENABLED` | Tidak; default `false` | `true` | Mengaktifkan route CMS hanya untuk development lokal Phase 1C |
+| `ADMIN_API_ORIGIN` | Ya saat CMS aktif | `http://127.0.0.1:8080` | Origin Go API server-only, tanpa path |
 
 Aturan `NEXT_PUBLIC_SITE_URL`:
 
@@ -141,6 +179,7 @@ Jalankan script menggunakan `npm.cmd run <nama>`.
 | `lint` | Menjalankan ESLint |
 | `typecheck` | Memeriksa TypeScript tanpa menulis output |
 | `test:e2e` | Menjalankan Playwright end-to-end test |
+| `test:admin` | Build dan menguji login/TOTP/shell CMS pada fixture HTTP lokal |
 | `test:e2e:ui` | Membuka Playwright UI; jalankan server local secara terpisah |
 | `qa:g4:functional` | Menjalankan Functional QA terhadap Deploy Preview |
 | `qa:g4:seo` | Memeriksa isolasi index preview, canonical, robots, dan sitemap |
@@ -194,7 +233,7 @@ npm.cmd run typecheck
 npm.cmd run build
 npm.cmd run test:e2e
 npm.cmd run lighthouse
-npm.cmd audit
+npm.cmd audit --omit=dev --audit-level=moderate
 ```
 
 Command `check` adalah gate cepat tanpa browser:

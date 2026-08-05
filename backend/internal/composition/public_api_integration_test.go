@@ -63,7 +63,7 @@ func TestPublicAPIWithPostgresAndRedis(t *testing.T) {
 	request.Header.Set("traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")
 	response = httptest.NewRecorder()
 	app.Handler().ServeHTTP(response, request)
-	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "tauco_db_pool_open_connections") || response.Header().Get("traceparent") == "" {
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "tauco_db_pool_open_connections") || !strings.Contains(response.Body.String(), "tauco_publishing_entities") || response.Header().Get("traceparent") == "" {
 		t.Fatalf("metrics status=%d headers=%v body=%s", response.Code, response.Header(), response.Body.String())
 	}
 
@@ -82,6 +82,18 @@ func TestPublicAPIWithPostgresAndRedis(t *testing.T) {
 	app.Handler().ServeHTTP(response, request)
 	if response.Code != http.StatusBadRequest {
 		t.Fatalf("GET body status=%d", response.Code)
+	}
+
+	for _, shadowOnlyRoute := range []struct{ method, path string }{
+		{http.MethodPost, "/api/v1/admin/auth/login"},
+		{http.MethodGet, "/api/v1/media/019bfc80-0000-7000-8000-000000009999/display.webp"},
+	} {
+		request = httptest.NewRequest(shadowOnlyRoute.method, shadowOnlyRoute.path, nil)
+		response = httptest.NewRecorder()
+		app.Handler().ServeHTTP(response, request)
+		if response.Code != http.StatusNotFound {
+			t.Fatalf("C1 contract-only route %s status=%d, want 404", shadowOnlyRoute.path, response.Code)
+		}
 	}
 
 	for attempt := 1; attempt <= 6; attempt++ {

@@ -49,13 +49,14 @@ function requireRuntimeConfiguration() {
   }
 }
 
-function run(command, args, environment = process.env) {
+function run(command, args, environment = process.env, interactive = false) {
   mkdirSync(goCachePath, { recursive: true });
   const result = spawnSync(command, args, {
     cwd: repositoryRoot,
-    encoding: "utf8",
     env: { ...environment, GOCACHE: goCachePath },
-    maxBuffer: 50 * 1024 * 1024,
+    ...(interactive
+      ? { stdio: "inherit" }
+      : { encoding: "utf8", maxBuffer: 50 * 1024 * 1024 }),
     windowsHide: true,
   });
   if (result.stdout) {
@@ -79,6 +80,11 @@ switch (operation) {
       fail("api tidak menerima argument tambahan.");
     }
     run("go", ["-C", "backend", "run", "./cmd/api"]);
+    break;
+  }
+  case "admin": {
+    if (!process.env.ADMIN_DATABASE_URL?.trim()) fail("ADMIN_DATABASE_URL wajib tersedia untuk admin CLI.");
+    run("go", ["-C", "backend", "run", "./cmd/admin", ...operationArguments], process.env, true);
     break;
   }
   case "worker": {
@@ -181,6 +187,6 @@ switch (operation) {
   default:
     fail(
       "usage: run-backend-db.mjs " +
-        "<api|worker|media-import args...|ops args...|loadcheck|migrate args...|seed-phase1a|integration>",
+        "<api|admin args...|worker|media-import args...|ops args...|loadcheck|migrate args...|seed-phase1a|integration>",
     );
 }

@@ -6,7 +6,7 @@ const internalPathPattern =
 const internalHrefPattern =
   /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?(?:\?[a-z0-9-]+=[a-z0-9-]+(?:&[a-z0-9-]+=[a-z0-9-]+)*)?$/;
 const internalImagePattern =
-  /^\/images\/[a-z0-9][a-z0-9/-]*\.(?:avif|jpe?g|png|svg|webp)$/;
+  /^(?:\/images\/[a-z0-9][a-z0-9/-]*\.(?:avif|jpe?g|png|svg|webp)|\/api\/v1\/media\/[0-9a-f-]{36}\/(?:display|variants\/(?:320|640|1280))\.webp)$/;
 
 const shortTextSchema = z.string().trim().min(2).max(120);
 const paragraphSchema = z.string().trim().min(20).max(600);

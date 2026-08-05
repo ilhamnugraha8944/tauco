@@ -14,6 +14,7 @@ import (
 
 	contactapp "github.com/ilhamnugraha8944/tauco/backend/internal/contact/application"
 	contactrepo "github.com/ilhamnugraha8944/tauco/backend/internal/contact/repository"
+	contentapp "github.com/ilhamnugraha8944/tauco/backend/internal/content/application"
 	jobsapp "github.com/ilhamnugraha8944/tauco/backend/internal/jobs/application"
 	jobsdomain "github.com/ilhamnugraha8944/tauco/backend/internal/jobs/domain"
 	jobsrepo "github.com/ilhamnugraha8944/tauco/backend/internal/jobs/repository"
@@ -21,6 +22,7 @@ import (
 	mediaprocessor "github.com/ilhamnugraha8944/tauco/backend/internal/media/processor"
 	mediarepo "github.com/ilhamnugraha8944/tauco/backend/internal/media/repository"
 	mediastorage "github.com/ilhamnugraha8944/tauco/backend/internal/media/storage"
+	platformcache "github.com/ilhamnugraha8944/tauco/backend/internal/platform/cache"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/platform/database"
 	mail "github.com/ilhamnugraha8944/tauco/backend/internal/platform/email"
 	"golang.org/x/sync/errgroup"
@@ -48,6 +50,12 @@ func run() int {
 	}
 	sqlDB, _ := db.DB()
 	defer func() { _ = sqlDB.Close() }()
+	cacheStore, err := platformcache.NewRedis(os.Getenv("REDIS_URL"))
+	if err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, "worker cache configuration error")
+		return 1
+	}
+	defer func() { _ = cacheStore.Close() }()
 
 	contactStore, _ := contactrepo.NewPostgresStore(db)
 	port, _ := strconv.Atoi(os.Getenv("SMTP_PORT"))
@@ -67,7 +75,7 @@ func run() int {
 		return 1
 	}
 	if checkOnly {
-		if err := checkReadiness(ctx, sqlDB, os.Getenv("MEDIA_LOCAL_ROOT"), os.Getenv("SMTP_HOST"), port); err != nil {
+		if err := checkReadiness(ctx, sqlDB, cacheStore, os.Getenv("MEDIA_LOCAL_ROOT"), os.Getenv("SMTP_HOST"), port); err != nil {
 			_, _ = fmt.Fprintln(os.Stderr, "worker is not ready")
 			return 1
 		}
@@ -75,6 +83,7 @@ func run() int {
 		return 0
 	}
 	mediaHandler, _ := mediaapp.NewVariantHandler(mediaRepository, mediaStore, mediaprocessor.Image{})
+	cacheHandler, _ := contentapp.NewCacheInvalidationHandler(cacheStore)
 	jobRepository, _ := jobsrepo.NewPostgresRepository(db)
 	hostname, _ := os.Hostname()
 	config := jobsapp.DefaultConfig(fmt.Sprintf("%s-%d", hostname, os.Getpid()))
@@ -87,6 +96,9 @@ func run() int {
 		},
 		"media.generate_variants": func(ctx context.Context, job jobsdomain.Job) error {
 			return mediaHandler.Handle(ctx, job.Payload)
+		},
+		"content.invalidate_cache": func(ctx context.Context, job jobsdomain.Job) error {
+			return cacheHandler.Handle(ctx, job.Payload)
 		},
 	}, config)
 	if err != nil {
@@ -127,10 +139,13 @@ func runRetention(ctx context.Context, store retentionStore) error {
 	}
 }
 
-func checkReadiness(ctx context.Context, database interface{ PingContext(context.Context) error }, mediaRoot, smtpHost string, smtpPort int) error {
+func checkReadiness(ctx context.Context, database interface{ PingContext(context.Context) error }, cache interface{ Ping(context.Context) error }, mediaRoot, smtpHost string, smtpPort int) error {
 	checkContext, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	if err := database.PingContext(checkContext); err != nil {
+		return err
+	}
+	if err := cache.Ping(checkContext); err != nil {
 		return err
 	}
 	root, err := filepath.Abs(mediaRoot)

@@ -1,0 +1,6 @@
+"use client";
+import { useEffect,useState } from "react";
+import { adminAPI,type AdminRevision } from "@/features/admin/admin-api";
+import { productDetailSchema } from "@/features/content/schemas";
+import { ProductPresentation } from "@/features/content/product-presentation";
+export function ProductPreview({productId,revisionId}:{productId:string;revisionId:string}){const[revision,setRevision]=useState<AdminRevision>();const[message,setMessage]=useState("");useEffect(()=>{adminAPI.getProductRevision(productId,revisionId).then((response)=>setRevision(response.data),(error)=>setMessage(error instanceof Error?error.message:"Preview tidak dapat dimuat."));},[productId,revisionId]);if(!revision)return <p className="admin-preview-loading" aria-live="polite">{message||"Memuat preview..."}</p>;const parsed=productDetailSchema.safeParse(revision.content);if(!parsed.success)return <p className="admin-preview-loading">Konten revision tidak valid.</p>;return <div className="admin-preview-page"><header><strong>Preview produk revision {revision.revisionNumber}</strong><span>Belum mengubah website production</span></header><div className="admin-public-preview"><ProductPresentation product={parsed.data} adminPreview/></div></div>;}

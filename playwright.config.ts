@@ -7,7 +7,12 @@ const reportFolder =
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  testIgnore: ["**/g4-*.spec.ts", "**/g6-*.spec.ts", "**/g7-*.spec.ts"],
+  testIgnore: [
+    "**/g4-*.spec.ts",
+    "**/g6-*.spec.ts",
+    "**/g7-*.spec.ts",
+    "**/phase1c-admin.spec.ts",
+  ],
   outputDir,
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),

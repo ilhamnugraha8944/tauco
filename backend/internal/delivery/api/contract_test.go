@@ -112,31 +112,56 @@ func TestEmbeddedOpenAPIContract(t *testing.T) {
 		t.Fatalf("validate embedded OpenAPI document and examples: %v", err)
 	}
 
-	expectedOperations := map[string]string{
-		"/api/v1/about":            http.MethodGet,
-		"/api/v1/contact-messages": http.MethodPost,
-		"/api/v1/home":             http.MethodGet,
-		"/api/v1/products":         http.MethodGet,
-		"/api/v1/products/{slug}":  http.MethodGet,
-		"/api/v1/tauco-guide":      http.MethodGet,
-		"/health/live":             http.MethodGet,
-		"/health/ready":            http.MethodGet,
-		"/internal/metrics":        http.MethodGet,
-	}
+	expectedOperations := operationSet(
+		"GET /api/v1/about",
+		"POST /api/v1/contact-messages",
+		"GET /api/v1/home",
+		"GET /api/v1/products",
+		"GET /api/v1/products/{slug}",
+		"GET /api/v1/tauco-guide",
+		"GET /health/live",
+		"GET /health/ready",
+		"GET /internal/metrics",
+		"POST /api/v1/admin/auth/login",
+		"POST /api/v1/admin/auth/totp/setup",
+		"POST /api/v1/admin/auth/totp/enable",
+		"POST /api/v1/admin/auth/refresh",
+		"POST /api/v1/admin/auth/logout",
+		"GET /api/v1/admin/auth/me",
+		"POST /api/v1/admin/auth/recovery-codes/regenerate",
+		"GET /api/v1/admin/pages/{key}",
+		"POST /api/v1/admin/pages/{key}/drafts",
+		"GET /api/v1/admin/pages/{key}/revisions/{revisionId}",
+		"POST /api/v1/admin/pages/{key}/revisions/{revisionId}/publish",
+		"POST /api/v1/admin/pages/{key}/unpublish",
+		"GET /api/v1/admin/products",
+		"POST /api/v1/admin/products",
+		"GET /api/v1/admin/products/{id}",
+		"PATCH /api/v1/admin/products/{id}",
+		"POST /api/v1/admin/products/{id}/drafts",
+		"GET /api/v1/admin/products/{id}/revisions/{revisionId}",
+		"POST /api/v1/admin/products/{id}/revisions/{revisionId}/publish",
+		"POST /api/v1/admin/products/{id}/unpublish",
+		"POST /api/v1/admin/products/{id}/archive",
+		"POST /api/v1/admin/products/{id}/unarchive",
+		"GET /api/v1/admin/media",
+		"POST /api/v1/admin/media",
+		"GET /api/v1/admin/media/{id}",
+		"POST /api/v1/admin/media/{id}/retry",
+		"GET /api/v1/media/{id}/display.webp",
+		"GET /api/v1/media/{id}/variants/{width}.webp",
+		"GET /api/v1/admin/contact-messages",
+		"GET /api/v1/admin/contact-messages/{id}",
+		"PATCH /api/v1/admin/contact-messages/{id}/status",
+		"GET /api/v1/admin/activity-logs",
+	)
 
-	actualOperations := make(map[string]string)
+	actualOperations := make(map[string]struct{})
 	operationIDs := make(map[string]string)
 	for route, pathItem := range spec.Paths.Map() {
-		if strings.Contains(route, "/admin") {
-			t.Errorf("unexpected Phase 1B admin route %q", route)
-		}
-
 		operations := pathItem.Operations()
-		if len(operations) != 1 {
-			t.Errorf("%s has %d operations, want exactly 1", route, len(operations))
-		}
 		for method, operation := range operations {
-			actualOperations[route] = method
+			actualOperations[strings.ToUpper(method)+" "+route] = struct{}{}
 			if operation.OperationID == "" {
 				t.Errorf("%s %s has an empty operationId", method, route)
 			} else if previous, exists := operationIDs[operation.OperationID]; exists {
@@ -158,9 +183,56 @@ func TestEmbeddedOpenAPIContract(t *testing.T) {
 	if !reflect.DeepEqual(actualOperations, expectedOperations) {
 		t.Fatalf(
 			"operation inventory mismatch:\n got: %v\nwant: %v",
-			sortedOperationInventory(actualOperations),
-			sortedOperationInventory(expectedOperations),
+			sortedOperationSet(actualOperations),
+			sortedOperationSet(expectedOperations),
 		)
+	}
+}
+
+func TestAdminOpenAPISecurityAndConcurrencyContract(t *testing.T) {
+	t.Parallel()
+
+	spec := mustOpenAPISpec(t)
+	for route, pathItem := range spec.Paths.Map() {
+		if !strings.HasPrefix(route, "/api/v1/admin/") {
+			continue
+		}
+		for method, operation := range pathItem.Operations() {
+			if route == "/api/v1/admin/auth/login" {
+				if operation.Security != nil && len(*operation.Security) != 0 {
+					t.Errorf("%s %s must be public before credential verification", method, route)
+				}
+				continue
+			}
+			if !hasSecurityScheme(operation, "AdminCookie") {
+				t.Errorf("%s %s must require AdminCookie", method, route)
+			}
+			if method != http.MethodGet && !hasSecurityScheme(operation, "AdminCSRF") {
+				t.Errorf("%s %s must require AdminCSRF", method, route)
+			}
+		}
+	}
+
+	for _, route := range []string{
+		"/api/v1/admin/pages/{key}/drafts",
+		"/api/v1/admin/pages/{key}/revisions/{revisionId}/publish",
+		"/api/v1/admin/pages/{key}/unpublish",
+		"/api/v1/admin/products/{id}",
+		"/api/v1/admin/products/{id}/drafts",
+		"/api/v1/admin/products/{id}/revisions/{revisionId}/publish",
+		"/api/v1/admin/products/{id}/unpublish",
+		"/api/v1/admin/products/{id}/archive",
+		"/api/v1/admin/products/{id}/unarchive",
+		"/api/v1/admin/contact-messages/{id}/status",
+	} {
+		operation := onlyMutationOperation(t, spec, route)
+		if !hasParameter(operation, "If-Match", openapi3.ParameterInHeader) {
+			t.Errorf("%s must require If-Match", route)
+		}
+	}
+
+	if spec.Paths.Find("/api/v1/admin/tauco-guide") != nil {
+		t.Error("tauco guide must remain read-only in Phase 1C")
 	}
 }
 
@@ -592,6 +664,22 @@ func onlyOperation(t *testing.T, spec *openapi3.T, route string) *openapi3.Opera
 	panic("unreachable")
 }
 
+func onlyMutationOperation(t *testing.T, spec *openapi3.T, route string) *openapi3.Operation {
+	t.Helper()
+
+	pathItem := spec.Paths.Find(route)
+	if pathItem == nil {
+		t.Fatalf("OpenAPI route %q is missing", route)
+	}
+	for method, operation := range pathItem.Operations() {
+		if method != http.MethodGet {
+			return operation
+		}
+	}
+	t.Fatalf("OpenAPI route %q has no mutation operation", route)
+	return nil
+}
+
 func assertResponseContract(
 	t *testing.T,
 	method string,
@@ -657,6 +745,18 @@ func hasParameter(
 	return false
 }
 
+func hasSecurityScheme(operation *openapi3.Operation, name string) bool {
+	if operation.Security == nil {
+		return false
+	}
+	for _, requirement := range *operation.Security {
+		if _, exists := requirement[name]; exists {
+			return true
+		}
+	}
+	return false
+}
+
 func numericExtension(value any) int {
 	switch typed := value.(type) {
 	case float64:
@@ -685,13 +785,21 @@ func schemaProperty(
 	return propertyRef.Value
 }
 
-func sortedOperationInventory(operations map[string]string) []string {
+func sortedOperationSet(operations map[string]struct{}) []string {
 	inventory := make([]string, 0, len(operations))
-	for route, method := range operations {
-		inventory = append(inventory, method+" "+route)
+	for operation := range operations {
+		inventory = append(inventory, operation)
 	}
 	sort.Strings(inventory)
 	return inventory
+}
+
+func operationSet(operations ...string) map[string]struct{} {
+	result := make(map[string]struct{}, len(operations))
+	for _, operation := range operations {
+		result[operation] = struct{}{}
+	}
+	return result
 }
 
 func readContractFixture(t *testing.T, filename string) []byte {

@@ -33,6 +33,10 @@ func BootstrapRoles(ctx context.Context, cfg MigrationConfig) error {
 	if err != nil {
 		return err
 	}
+	admin, err := parseDatabaseURL("ADMIN_DATABASE_URL", cfg.AdminURL, true)
+	if err != nil {
+		return err
+	}
 
 	conn, err := pgx.Connect(ctx, cfg.MigrationURL)
 	if err != nil {
@@ -43,7 +47,10 @@ func BootstrapRoles(ctx context.Context, cfg MigrationConfig) error {
 	if err := createAuthorizationRoles(ctx, conn); err != nil {
 		return err
 	}
-	if err := revokeRuntimeAuthorizationDatabaseGrants(ctx, conn); err != nil {
+	if err := revokeAuthorizationDatabaseGrants(ctx, conn, RuntimeRole); err != nil {
+		return err
+	}
+	if err := revokeAuthorizationDatabaseGrants(ctx, conn, AdminRuntimeRole); err != nil {
 		return err
 	}
 	if err := assertRuntimeAuthorizationRoleSafe(ctx, conn); err != nil {
@@ -58,23 +65,37 @@ func BootstrapRoles(ctx context.Context, cfg MigrationConfig) error {
 	if err := hardenLocalDatabasePrivileges(ctx, conn, runtime.database); err != nil {
 		return err
 	}
-	if err := assertRuntimeAuthorizationMembersSafe(
+	if err := assertAuthorizationMembersSafe(
 		ctx,
 		conn,
+		RuntimeRole,
 		runtime.username,
 		runtime.database,
 	); err != nil {
 		return err
 	}
-	if err := createRuntimeLogin(ctx, conn, runtime); err != nil {
+	if err := assertAuthorizationMembersSafe(
+		ctx,
+		conn,
+		AdminRuntimeRole,
+		admin.username,
+		admin.database,
+	); err != nil {
+		return err
+	}
+	if err := createRuntimeLogin(ctx, conn, runtime, RuntimeRole); err != nil {
+		return err
+	}
+	if err := createRuntimeLogin(ctx, conn, admin, AdminRuntimeRole); err != nil {
 		return err
 	}
 	return nil
 }
 
-func assertRuntimeAuthorizationMembersSafe(
+func assertAuthorizationMembersSafe(
 	ctx context.Context,
 	conn *pgx.Conn,
+	authorizationRole string,
 	expectedRuntimeLogin string,
 	databaseName string,
 ) error {
@@ -104,14 +125,14 @@ SELECT EXISTS (
                 AND activity.pid <> pg_backend_pid()
           )
       )
-)`, RuntimeRole, expectedRuntimeLogin, databaseName).Scan(&unsafeMember); err != nil {
+)`, authorizationRole, expectedRuntimeLogin, databaseName).Scan(&unsafeMember); err != nil {
 		return fmt.Errorf("inspect runtime authorization members: %w", err)
 	}
 	if unsafeMember {
 		return fmt.Errorf(
 			"refuse to bootstrap database %q with an unsafe %s member",
 			databaseName,
-			RuntimeRole,
+			authorizationRole,
 		)
 	}
 	return nil
@@ -122,6 +143,9 @@ func createAuthorizationRoles(ctx context.Context, conn *pgx.Conn) error {
 		return err
 	}
 	if err := assertRoleSafeForBootstrap(ctx, conn, RuntimeRole, false); err != nil {
+		return err
+	}
+	if err := assertRoleSafeForBootstrap(ctx, conn, AdminRuntimeRole, false); err != nil {
 		return err
 	}
 
@@ -143,6 +167,14 @@ BEGIN
         COMMENT ON ROLE tauco_runtime IS
             'Tauco least-privilege application authorization role';
     END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'tauco_admin_runtime') THEN
+        CREATE ROLE tauco_admin_runtime
+            NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE
+            NOREPLICATION NOBYPASSRLS INHERIT;
+        COMMENT ON ROLE tauco_admin_runtime IS
+            'Tauco least-privilege CMS authorization role';
+    END IF;
 END
 $bootstrap$`
 	if _, err := conn.Exec(ctx, statement); err != nil {
@@ -156,23 +188,27 @@ ALTER ROLE tauco_migrator
          NOREPLICATION NOBYPASSRLS INHERIT;
 ALTER ROLE tauco_runtime
     WITH NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE
+         NOREPLICATION NOBYPASSRLS INHERIT;
+ALTER ROLE tauco_admin_runtime
+    WITH NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE
          NOREPLICATION NOBYPASSRLS INHERIT`); err != nil {
 		return fmt.Errorf("harden fixed database authorization roles: %w", err)
 	}
 	return nil
 }
 
-func revokeRuntimeAuthorizationDatabaseGrants(
+func revokeAuthorizationDatabaseGrants(
 	ctx context.Context,
 	conn *pgx.Conn,
+	authorizationRole string,
 ) error {
 	rows, err := conn.Query(ctx, `
-SELECT format('REVOKE ALL ON DATABASE %I FROM tauco_runtime', database.datname)
+SELECT format('REVOKE ALL ON DATABASE %I FROM %I', database.datname, role.rolname)
 FROM pg_database AS database
 CROSS JOIN LATERAL aclexplode(database.datacl) AS acl
 JOIN pg_roles AS role ON role.oid = acl.grantee
-WHERE role.rolname = 'tauco_runtime'
-GROUP BY database.datname`)
+WHERE role.rolname = $1
+GROUP BY database.datname, role.rolname`, authorizationRole)
 	if err != nil {
 		return fmt.Errorf("inspect runtime authorization database grants: %w", err)
 	}
@@ -339,6 +375,7 @@ func hardenLocalDatabasePrivileges(
 	if _, err := conn.Exec(ctx,
 		"REVOKE CONNECT, TEMPORARY ON DATABASE "+databaseIdentifier+" FROM PUBLIC"+
 			"; REVOKE ALL ON DATABASE "+databaseIdentifier+" FROM "+RuntimeRole+
+			"; REVOKE ALL ON DATABASE "+databaseIdentifier+" FROM "+AdminRuntimeRole+
 			"; GRANT CONNECT, TEMPORARY ON DATABASE "+databaseIdentifier+" TO "+MigratorRole,
 	); err != nil {
 		return fmt.Errorf("harden local database privileges: %w", err)
@@ -352,16 +389,24 @@ CREATE SCHEMA IF NOT EXISTS tauco_app AUTHORIZATION tauco_migrator;
 ALTER SCHEMA tauco_app OWNER TO tauco_migrator;
 REVOKE ALL ON SCHEMA tauco_app FROM PUBLIC;
 REVOKE ALL ON SCHEMA tauco_app FROM tauco_runtime;
+REVOKE ALL ON SCHEMA tauco_app FROM tauco_admin_runtime;
 REVOKE ALL ON SCHEMA public FROM tauco_runtime;
+REVOKE ALL ON SCHEMA public FROM tauco_admin_runtime;
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 GRANT USAGE, CREATE ON SCHEMA tauco_app TO tauco_migrator;
-GRANT USAGE ON SCHEMA tauco_app TO tauco_runtime`); err != nil {
+GRANT USAGE ON SCHEMA tauco_app TO tauco_runtime;
+GRANT USAGE ON SCHEMA tauco_app TO tauco_admin_runtime`); err != nil {
 		return fmt.Errorf("provision private application schema: %w", err)
 	}
 	return nil
 }
 
-func createRuntimeLogin(ctx context.Context, conn *pgx.Conn, runtime databaseEndpoint) error {
+func createRuntimeLogin(
+	ctx context.Context,
+	conn *pgx.Conn,
+	runtime databaseEndpoint,
+	authorizationRole string,
+) error {
 	identifier := pgx.Identifier{runtime.username}.Sanitize()
 	verifier, err := newSCRAMVerifier(runtime.password)
 	if err != nil {
@@ -386,6 +431,7 @@ func createRuntimeLogin(ctx context.Context, conn *pgx.Conn, runtime databaseEnd
 		ctx,
 		conn,
 		runtime,
+		authorizationRole,
 	); err != nil {
 		return err
 	}
@@ -400,8 +446,9 @@ func createRuntimeLogin(ctx context.Context, conn *pgx.Conn, runtime databaseEnd
 	}
 	if _, err := conn.Exec(ctx,
 		"REVOKE "+MigratorRole+" FROM "+identifier+
-			"; REVOKE ADMIN OPTION FOR "+RuntimeRole+" FROM "+identifier+
-			"; GRANT "+RuntimeRole+" TO "+identifier,
+			"; REVOKE "+RuntimeRole+" FROM "+identifier+
+			"; REVOKE "+AdminRuntimeRole+" FROM "+identifier+
+			"; GRANT "+authorizationRole+" TO "+identifier,
 	); err != nil {
 		return fmt.Errorf("grant runtime authorization membership: %w", err)
 	}
@@ -432,6 +479,7 @@ func assertRuntimeRoleHasNoUnexpectedAccess(
 	ctx context.Context,
 	conn *pgx.Conn,
 	runtime databaseEndpoint,
+	authorizationRole string,
 ) error {
 	roleName := runtime.username
 	rows, err := conn.Query(ctx, `
@@ -440,7 +488,7 @@ FROM pg_auth_members AS membership
 JOIN pg_roles AS member ON member.oid = membership.member
 JOIN pg_roles AS granted ON granted.oid = membership.roleid
 WHERE member.rolname = $1
-  AND granted.rolname <> $2`, roleName, RuntimeRole)
+  AND granted.rolname <> $2`, roleName, authorizationRole)
 	if err != nil {
 		return fmt.Errorf("inspect runtime login memberships: %w", err)
 	}

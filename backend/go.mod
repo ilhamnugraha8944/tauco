@@ -11,6 +11,7 @@ require (
 	github.com/gen2brain/webp v0.6.2
 	github.com/getkin/kin-openapi v0.142.0
 	github.com/gin-gonic/gin v1.11.0
+	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.2
@@ -20,6 +21,7 @@ require (
 	golang.org/x/crypto v0.54.0
 	golang.org/x/image v0.35.0
 	golang.org/x/sync v0.22.0
+	golang.org/x/term v0.45.0
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.31.1
 )

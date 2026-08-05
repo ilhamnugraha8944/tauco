@@ -99,6 +99,20 @@ function runApplicationControlFallback(packages) {
       ]);
       if (compile.status !== 0) {
         writeResult(compile);
+        const compileOutput = `${compile.stdout ?? ""}\n${compile.stderr ?? ""}`;
+        const compileBlocked =
+          process.platform === "win32" &&
+          (compileOutput.includes(applicationControlMessage) ||
+            compileOutput.includes(accessDeniedMessage));
+        if (compileBlocked) {
+          const docker = runDockerFallback(packageName);
+          writeResult(docker);
+          if (docker.status !== 0) {
+            throw new Error(`Test gagal: ${packageName}`);
+          }
+          process.stdout.write(`ok  \t${packageName} (Docker fallback)\n`);
+          continue;
+        }
         throw new Error(`Kompilasi test gagal: ${packageName}`);
       }
 

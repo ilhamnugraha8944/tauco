@@ -1,11 +1,11 @@
 openapi: 3.0.3
 info:
-  title: Tauco Cap Badak Public API
-  version: 1.0.0
+  title: Tauco Cap Badak API
+  version: 1.1.0
   description: |
-    Contract-first REST API for the Phase 1B shadow backend.
-    This contract exposes published public content, contact intake, health, and
-    protected metrics only. It intentionally contains no administration routes.
+    Contract-first REST API for the Phase 1B public backend and the Phase 1C
+    local shadow CMS. Administration operations are contractual only in C1 and
+    are not registered by the runtime until their implementation gate.
   license:
     name: Proprietary
 servers:
@@ -22,6 +22,18 @@ tags:
     description: Process and dependency health
   - name: Operations
     description: Protected operational endpoints
+  - name: Admin authentication
+    description: Password, TOTP, session, and recovery-code operations
+  - name: Admin content
+    description: Home and About revision management
+  - name: Admin products
+    description: Product lifecycle and revision management
+  - name: Admin media
+    description: Media upload and processing status
+  - name: Admin inbox
+    description: Contact inbox management
+  - name: Admin activity
+    description: Append-only activity history
 paths:
   /api/v1/home:
     get:
@@ -269,6 +281,849 @@ paths:
           $ref: '#/components/responses/InternalServerError'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/admin/auth/login:
+    post:
+      tags: [Admin authentication]
+      summary: Authenticate an admin with password and mandatory second factor
+      operationId: adminLogin
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminLoginRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/AdminAuthOK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/auth/totp/setup:
+    post:
+      tags: [Admin authentication]
+      summary: Start mandatory TOTP enrollment
+      operationId: adminSetupTotp
+      security:
+        - AdminCookie: []
+          AdminCSRF: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+      responses:
+        '200':
+          $ref: '#/components/responses/AdminTotpSetupOK'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/auth/totp/enable:
+    post:
+      tags: [Admin authentication]
+      summary: Confirm TOTP enrollment and return one-time recovery codes
+      operationId: adminEnableTotp
+      security:
+        - AdminCookie: []
+          AdminCSRF: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminTotpCodeRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/AdminRecoveryCodesOK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/auth/refresh:
+    post:
+      tags: [Admin authentication]
+      summary: Rotate the refresh token and access session
+      operationId: adminRefreshSession
+      security:
+        - AdminCookie: []
+          AdminCSRF: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+      responses:
+        '200':
+          $ref: '#/components/responses/AdminAuthOK'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/auth/logout:
+    post:
+      tags: [Admin authentication]
+      summary: Revoke the current admin session
+      operationId: adminLogout
+      security:
+        - AdminCookie: []
+          AdminCSRF: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+      responses:
+        '204':
+          $ref: '#/components/responses/AdminNoContent'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/auth/me:
+    get:
+      tags: [Admin authentication]
+      summary: Get the authenticated admin and effective permissions
+      operationId: adminGetMe
+      security:
+        - AdminCookie: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+      responses:
+        '200':
+          $ref: '#/components/responses/AdminUserOK'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/auth/recovery-codes/regenerate:
+    post:
+      tags: [Admin authentication]
+      summary: Replace all unused recovery codes after TOTP confirmation
+      operationId: adminRegenerateRecoveryCodes
+      security:
+        - AdminCookie: []
+          AdminCSRF: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminTotpCodeRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/AdminRecoveryCodesOK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/pages/{key}:
+    get:
+      tags: [Admin content]
+      summary: Get Home or About with its revision pointers
+      operationId: adminGetPage
+      security:
+        - AdminCookie: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/PageKeyPath'
+      responses:
+        '200':
+          $ref: '#/components/responses/AdminPageOK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/pages/{key}/drafts:
+    post:
+      tags: [Admin content]
+      summary: Save an immutable Home or About draft revision
+      operationId: adminCreatePageDraft
+      security:
+        - AdminCookie: []
+          AdminCSRF: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/PageKeyPath'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminPageDraftRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/AdminRevisionCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/pages/{key}/revisions/{revisionId}:
+    get:
+      tags: [Admin content]
+      summary: Get one immutable page revision
+      operationId: adminGetPageRevision
+      security:
+        - AdminCookie: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/PageKeyPath'
+        - $ref: '#/components/parameters/RevisionID'
+      responses:
+        '200':
+          $ref: '#/components/responses/AdminRevisionOK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/pages/{key}/revisions/{revisionId}/publish:
+    post:
+      tags: [Admin content]
+      summary: Publish a new immutable snapshot from a page revision
+      operationId: adminPublishPageRevision
+      security:
+        - AdminCookie: []
+          AdminCSRF: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/PageKeyPath'
+        - $ref: '#/components/parameters/RevisionID'
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          $ref: '#/components/responses/AdminRevisionOK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/pages/{key}/unpublish:
+    post:
+      tags: [Admin content]
+      summary: Clear a page public pointer without deleting revisions
+      operationId: adminUnpublishPage
+      security:
+        - AdminCookie: []
+          AdminCSRF: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/PageKeyPath'
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '204':
+          $ref: '#/components/responses/AdminNoContent'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/products:
+    get:
+      tags: [Admin products]
+      summary: List products including unpublished and archived records
+      operationId: adminListProducts
+      security:
+        - AdminCookie: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          $ref: '#/components/responses/AdminProductListOK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags: [Admin products]
+      summary: Create an unpublished product shell
+      operationId: adminCreateProduct
+      security:
+        - AdminCookie: []
+          AdminCSRF: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminProductCreateRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/AdminProductCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/products/{id}:
+    get:
+      tags: [Admin products]
+      summary: Get one product and its revision pointers
+      operationId: adminGetProduct
+      security:
+        - AdminCookie: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/EntityID'
+      responses:
+        '200':
+          $ref: '#/components/responses/AdminProductOK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    patch:
+      tags: [Admin products]
+      summary: Update product identity and ordering fields
+      operationId: adminUpdateProduct
+      security:
+        - AdminCookie: []
+          AdminCSRF: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/EntityID'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminProductUpdateRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/AdminProductOK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/products/{id}/drafts:
+    post:
+      tags: [Admin products]
+      summary: Save an immutable product draft revision
+      operationId: adminCreateProductDraft
+      security:
+        - AdminCookie: []
+          AdminCSRF: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/EntityID'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminProductDraftRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/AdminRevisionCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/products/{id}/revisions/{revisionId}:
+    get:
+      tags: [Admin products]
+      summary: Get one immutable product revision
+      operationId: adminGetProductRevision
+      security:
+        - AdminCookie: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/EntityID'
+        - $ref: '#/components/parameters/RevisionID'
+      responses:
+        '200':
+          $ref: '#/components/responses/AdminRevisionOK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/products/{id}/revisions/{revisionId}/publish:
+    post:
+      tags: [Admin products]
+      summary: Publish a new immutable snapshot from a product revision
+      operationId: adminPublishProductRevision
+      security:
+        - AdminCookie: []
+          AdminCSRF: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/EntityID'
+        - $ref: '#/components/parameters/RevisionID'
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          $ref: '#/components/responses/AdminRevisionOK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/products/{id}/unpublish:
+    post:
+      tags: [Admin products]
+      summary: Clear the product public pointer
+      operationId: adminUnpublishProduct
+      security:
+        - AdminCookie: []
+          AdminCSRF: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/EntityID'
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '204':
+          $ref: '#/components/responses/AdminNoContent'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/products/{id}/archive:
+    post:
+      tags: [Admin products]
+      summary: Archive an unpublished product without deleting history
+      operationId: adminArchiveProduct
+      security:
+        - AdminCookie: []
+          AdminCSRF: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/EntityID'
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '204':
+          $ref: '#/components/responses/AdminNoContent'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/products/{id}/unarchive:
+    post:
+      tags: [Admin products]
+      summary: Restore an archived product
+      operationId: adminUnarchiveProduct
+      security:
+        - AdminCookie: []
+          AdminCSRF: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/EntityID'
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '204':
+          $ref: '#/components/responses/AdminNoContent'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/media:
+    get:
+      tags: [Admin media]
+      summary: List media assets by processing state
+      operationId: adminListMedia
+      security:
+        - AdminCookie: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          $ref: '#/components/responses/AdminMediaListOK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags: [Admin media]
+      summary: Upload one image for asynchronous processing
+      operationId: adminUploadMedia
+      security:
+        - AdminCookie: []
+          AdminCSRF: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+      requestBody:
+        required: true
+        x-max-body-bytes: 10485760
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminMediaUploadRequest'
+      responses:
+        '202':
+          $ref: '#/components/responses/AdminMediaAccepted'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/media/{id}:
+    get:
+      tags: [Admin media]
+      summary: Get media processing state and variants
+      operationId: adminGetMedia
+      security:
+        - AdminCookie: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/EntityID'
+      responses:
+        '200':
+          $ref: '#/components/responses/AdminMediaOK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/media/{id}/retry:
+    post:
+      tags: [Admin media]
+      summary: Retry processing a failed media asset
+      operationId: adminRetryMedia
+      security:
+        - AdminCookie: []
+          AdminCSRF: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/EntityID'
+      responses:
+        '202':
+          $ref: '#/components/responses/AdminMediaAccepted'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/media/{id}/display.webp:
+    get:
+      tags: [Content]
+      summary: Get the ready display media variant
+      operationId: getMediaDisplay
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/EntityID'
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          $ref: '#/components/responses/MediaBinaryOK'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/media/{id}/variants/{width}.webp:
+    get:
+      tags: [Content]
+      summary: Get one ready WebP width variant
+      operationId: getMediaVariant
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/EntityID'
+        - $ref: '#/components/parameters/MediaWidth'
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          $ref: '#/components/responses/MediaBinaryOK'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/contact-messages:
+    get:
+      tags: [Admin inbox]
+      summary: List contact messages without exposing retention internals
+      operationId: adminListContactMessages
+      security:
+        - AdminCookie: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/ContactStatus'
+      responses:
+        '200':
+          $ref: '#/components/responses/AdminContactListOK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/contact-messages/{id}:
+    get:
+      tags: [Admin inbox]
+      summary: Read one contact message
+      operationId: adminGetContactMessage
+      security:
+        - AdminCookie: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/EntityID'
+      responses:
+        '200':
+          $ref: '#/components/responses/AdminContactOK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/contact-messages/{id}/status:
+    patch:
+      tags: [Admin inbox]
+      summary: Change contact message workflow status
+      operationId: adminUpdateContactMessageStatus
+      security:
+        - AdminCookie: []
+          AdminCSRF: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/EntityID'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminContactStatusRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/AdminContactOK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/activity-logs:
+    get:
+      tags: [Admin activity]
+      summary: List append-only administration activity
+      operationId: adminListActivityLogs
+      security:
+        - AdminCookie: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/ActivityEventType'
+        - $ref: '#/components/parameters/ActivityEntityType'
+      responses:
+        '200':
+          $ref: '#/components/responses/AdminActivityListOK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /health/live:
     get:
       tags:
@@ -363,6 +1218,16 @@ components:
       scheme: bearer
       bearerFormat: opaque
       description: A dedicated rotatable operations token; never an admin JWT.
+    AdminCookie:
+      type: apiKey
+      in: cookie
+      name: tauco_admin_access
+      description: Short-lived HttpOnly, Secure, SameSite=Strict admin access cookie.
+    AdminCSRF:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+      description: Double-submit token required with AdminCookie on unsafe methods.
   parameters:
     XRequestID:
       name: X-Request-ID
@@ -428,6 +1293,69 @@ components:
         maxLength: 128
         pattern: '^[ -~]{16,128}$'
       example: contact-20260728-000001
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: Strong ETag for optimistic concurrency control.
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 160
+      example: '"revision-7"'
+    PageKeyPath:
+      name: key
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [home, about]
+    EntityID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RevisionID:
+      name: revisionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    MediaWidth:
+      name: width
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 160
+        maximum: 2560
+    ContactStatus:
+      name: status
+      in: query
+      required: false
+      schema:
+        $ref: '#/components/schemas/ContactMessageStatus'
+    ActivityEventType:
+      name: eventType
+      in: query
+      required: false
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 100
+        pattern: '^[a-z][a-z0-9]*([._-][a-z0-9]+)*$'
+    ActivityEntityType:
+      name: entityType
+      in: query
+      required: false
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 80
+        pattern: '^[a-z][a-z0-9]*([._-][a-z0-9]+)*$'
   headers:
     XRequestID:
       description: Request trace identifier.
@@ -661,6 +1589,180 @@ components:
                 instance: /api/v1/contact-messages
                 code: RATE_LIMIT_EXCEEDED
                 requestId: 98a70ee8a919423b883c23ea275d468a
+    AdminAuthOK:
+      description: Authenticated session; secure cookies are rotated by the server
+      headers:
+        X-Request-ID: { $ref: '#/components/headers/XRequestID' }
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AdminAuthResponse' }
+    AdminTotpSetupOK:
+      description: Pending TOTP enrollment material
+      headers:
+        X-Request-ID: { $ref: '#/components/headers/XRequestID' }
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AdminTotpSetupResponse' }
+    AdminRecoveryCodesOK:
+      description: One-time recovery codes; the plaintext list is never returned again
+      headers:
+        X-Request-ID: { $ref: '#/components/headers/XRequestID' }
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AdminRecoveryCodesResponse' }
+    AdminUserOK:
+      description: Authenticated admin identity and permissions
+      headers:
+        X-Request-ID: { $ref: '#/components/headers/XRequestID' }
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AdminUserResponse' }
+    AdminPageOK:
+      description: Editable page and revision pointers
+      headers:
+        X-Request-ID: { $ref: '#/components/headers/XRequestID' }
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+        ETag: { $ref: '#/components/headers/ETag' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AdminPageResponse' }
+    AdminRevisionOK:
+      description: Immutable content revision
+      headers:
+        X-Request-ID: { $ref: '#/components/headers/XRequestID' }
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+        ETag: { $ref: '#/components/headers/ETag' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AdminRevisionResponse' }
+    AdminRevisionCreated:
+      description: Immutable draft revision created
+      headers:
+        X-Request-ID: { $ref: '#/components/headers/XRequestID' }
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+        ETag: { $ref: '#/components/headers/ETag' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AdminRevisionResponse' }
+    AdminProductListOK:
+      description: Cursor page of CMS products
+      headers:
+        X-Request-ID: { $ref: '#/components/headers/XRequestID' }
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AdminProductListResponse' }
+    AdminProductOK:
+      description: CMS product and revision pointers
+      headers:
+        X-Request-ID: { $ref: '#/components/headers/XRequestID' }
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+        ETag: { $ref: '#/components/headers/ETag' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AdminProductResponse' }
+    AdminProductCreated:
+      description: Unpublished product shell created
+      headers:
+        X-Request-ID: { $ref: '#/components/headers/XRequestID' }
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+        ETag: { $ref: '#/components/headers/ETag' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AdminProductResponse' }
+    AdminMediaListOK:
+      description: Cursor page of media assets
+      headers:
+        X-Request-ID: { $ref: '#/components/headers/XRequestID' }
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AdminMediaListResponse' }
+    AdminMediaOK:
+      description: Media processing record
+      headers:
+        X-Request-ID: { $ref: '#/components/headers/XRequestID' }
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AdminMediaResponse' }
+    AdminMediaAccepted:
+      description: Media processing accepted or retried
+      headers:
+        X-Request-ID: { $ref: '#/components/headers/XRequestID' }
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AdminMediaResponse' }
+    AdminContactListOK:
+      description: Cursor page of inbox messages
+      headers:
+        X-Request-ID: { $ref: '#/components/headers/XRequestID' }
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AdminContactListResponse' }
+    AdminContactOK:
+      description: Contact inbox record
+      headers:
+        X-Request-ID: { $ref: '#/components/headers/XRequestID' }
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+        ETag: { $ref: '#/components/headers/ETag' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AdminContactResponse' }
+    AdminActivityListOK:
+      description: Cursor page of append-only activity records
+      headers:
+        X-Request-ID: { $ref: '#/components/headers/XRequestID' }
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AdminActivityListResponse' }
+    AdminNoContent:
+      description: Operation completed with no response body
+      headers:
+        X-Request-ID: { $ref: '#/components/headers/XRequestID' }
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+    MediaBinaryOK:
+      description: Ready WebP media bytes
+      headers:
+        X-Request-ID: { $ref: '#/components/headers/XRequestID' }
+        ETag: { $ref: '#/components/headers/ETag' }
+        Cache-Control: { $ref: '#/components/headers/PublicCacheControl' }
+      content:
+        image/webp:
+          schema:
+            type: string
+            format: binary
+    NotFound:
+      description: Requested administration resource does not exist
+      headers:
+        X-Request-ID: { $ref: '#/components/headers/XRequestID' }
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Conflict:
+      description: Current resource state conflicts with the requested operation
+      headers:
+        X-Request-ID: { $ref: '#/components/headers/XRequestID' }
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    PreconditionFailed:
+      description: If-Match no longer identifies the current base revision
+      headers:
+        X-Request-ID: { $ref: '#/components/headers/XRequestID' }
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
     Unauthorized:
       description: Missing or invalid operations token
       headers:
@@ -1606,6 +2708,516 @@ components:
             - degraded
         dependencies:
           $ref: '#/components/schemas/ReadinessDependencies'
+    AdminLoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      x-invariant: at-most-one-of-totpCode-or-recoveryCode
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 3
+          maxLength: 160
+        password:
+          type: string
+          format: password
+          minLength: 12
+          maxLength: 256
+        totpCode:
+          type: string
+          pattern: '^[0-9]{6}$'
+        recoveryCode:
+          type: string
+          pattern: '^[A-Z0-9]{4}(?:-[A-Z0-9]{4}){2}$'
+    AdminTotpCodeRequest:
+      type: object
+      additionalProperties: false
+      required: [totpCode]
+      properties:
+        totpCode:
+          type: string
+          pattern: '^[0-9]{6}$'
+    AdminUser:
+      type: object
+      additionalProperties: false
+      required: [id, email, status, mfaEnabled, roles, permissions]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        status:
+          type: string
+          enum: [active, disabled]
+        mfaEnabled:
+          type: boolean
+        roles:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            pattern: '^[a-z][a-z0-9_]*$'
+        permissions:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            pattern: '^[a-z][a-z0-9]*([.:_-][a-z0-9]+)*$'
+    AdminAuthData:
+      type: object
+      additionalProperties: false
+      required: [status, user, expiresAt]
+      properties:
+        status:
+          type: string
+          enum: [authenticated, mfa_setup_required]
+        user:
+          $ref: '#/components/schemas/AdminUser'
+        expiresAt:
+          type: string
+          format: date-time
+    AdminAuthResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/AdminAuthData' }
+        meta: { $ref: '#/components/schemas/ResponseMeta' }
+    AdminUserResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/AdminUser' }
+        meta: { $ref: '#/components/schemas/ResponseMeta' }
+    AdminTotpSetupData:
+      type: object
+      additionalProperties: false
+      required: [otpauthUri, manualKey, expiresAt]
+      properties:
+        otpauthUri:
+          type: string
+          format: uri
+          maxLength: 2048
+        manualKey:
+          type: string
+          pattern: '^[A-Z2-7]{16,64}$'
+        expiresAt:
+          type: string
+          format: date-time
+    AdminTotpSetupResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/AdminTotpSetupData' }
+        meta: { $ref: '#/components/schemas/ResponseMeta' }
+    AdminRecoveryCodesData:
+      type: object
+      additionalProperties: false
+      required: [codes]
+      properties:
+        codes:
+          type: array
+          minItems: 8
+          maxItems: 12
+          uniqueItems: true
+          items:
+            type: string
+            pattern: '^[A-Z0-9]{4}(?:-[A-Z0-9]{4}){2}$'
+    AdminRecoveryCodesResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/AdminRecoveryCodesData' }
+        meta: { $ref: '#/components/schemas/ResponseMeta' }
+    AdminPageContent:
+      oneOf:
+        - $ref: '#/components/schemas/HomeContent'
+        - $ref: '#/components/schemas/AboutContent'
+    AdminProductContent:
+      $ref: '#/components/schemas/ProductDetail'
+    AdminRevisionContent:
+      oneOf:
+        - $ref: '#/components/schemas/HomeContent'
+        - $ref: '#/components/schemas/AboutContent'
+        - $ref: '#/components/schemas/ProductDetail'
+    AdminPageDraftRequest:
+      type: object
+      additionalProperties: false
+      required: [baseRevisionId, content]
+      properties:
+        baseRevisionId:
+          type: string
+          format: uuid
+        content:
+          $ref: '#/components/schemas/AdminPageContent'
+    AdminProductDraftRequest:
+      type: object
+      additionalProperties: false
+      required: [baseRevisionId, content]
+      properties:
+        baseRevisionId:
+          type: string
+          format: uuid
+        content:
+          $ref: '#/components/schemas/AdminProductContent'
+    AdminRevision:
+      type: object
+      additionalProperties: false
+      required: [id, ownerId, revisionNumber, status, schemaVersion, content, createdBy, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        ownerId:
+          type: string
+          format: uuid
+        revisionNumber:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum: [draft, published, archived]
+        schemaVersion:
+          type: integer
+          minimum: 1
+        content:
+          $ref: '#/components/schemas/AdminRevisionContent'
+        createdBy:
+          type: string
+          format: uuid
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+    AdminRevisionResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/AdminRevision' }
+        meta: { $ref: '#/components/schemas/ResponseMeta' }
+    AdminRevisionSummary:
+      type: object
+      additionalProperties: false
+      required: [id, revisionNumber, status, createdBy, createdAt, publishedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        revisionNumber:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum: [draft, published, archived]
+        createdBy:
+          type: string
+          format: uuid
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+    AdminPage:
+      type: object
+      additionalProperties: false
+      required: [id, key, latestRevision, revisions, publishedRevisionId, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+          enum: [home, about]
+        latestRevision:
+          $ref: '#/components/schemas/AdminRevision'
+        revisions:
+          type: array
+          description: Latest 100 immutable revisions ordered newest first.
+          maxItems: 100
+          items: { $ref: '#/components/schemas/AdminRevisionSummary' }
+        publishedRevisionId:
+          type: string
+          format: uuid
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+    AdminPageResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/AdminPage' }
+        meta: { $ref: '#/components/schemas/ResponseMeta' }
+    AdminProductCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [slug, sortOrder]
+      properties:
+        slug: { $ref: '#/components/schemas/Slug' }
+        sku:
+          type: string
+          nullable: true
+          minLength: 1
+          maxLength: 80
+        sortOrder:
+          type: integer
+          minimum: 0
+    AdminProductUpdateRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        slug: { $ref: '#/components/schemas/Slug' }
+        sku:
+          type: string
+          nullable: true
+          minLength: 1
+          maxLength: 80
+        sortOrder:
+          type: integer
+          minimum: 0
+    AdminProduct:
+      type: object
+      additionalProperties: false
+      required: [id, slug, sortOrder, revisions, publishedRevisionId, archivedAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug: { $ref: '#/components/schemas/Slug' }
+        sku:
+          type: string
+          nullable: true
+        sortOrder:
+          type: integer
+          minimum: 0
+        revisions:
+          type: array
+          description: Latest 100 immutable revisions ordered newest first.
+          maxItems: 100
+          items: { $ref: '#/components/schemas/AdminRevisionSummary' }
+        publishedRevisionId:
+          type: string
+          format: uuid
+          nullable: true
+        archivedAt:
+          type: string
+          format: date-time
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+    AdminProductResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/AdminProduct' }
+        meta: { $ref: '#/components/schemas/ResponseMeta' }
+    AdminProductListResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/AdminProduct' }
+        meta: { $ref: '#/components/schemas/ListResponseMeta' }
+    AdminMediaUploadRequest:
+      type: object
+      additionalProperties: false
+      required: [file, altText, decorative]
+      properties:
+        file:
+          type: string
+          format: binary
+        altText:
+          type: string
+          maxLength: 300
+        decorative:
+          type: boolean
+    AdminMediaVariant:
+      type: object
+      additionalProperties: false
+      required: [width, height, url, bytes]
+      properties:
+        width:
+          type: integer
+          minimum: 1
+        height:
+          type: integer
+          minimum: 1
+        url:
+          type: string
+          pattern: '^/api/v1/media/[0-9a-f-]+/variants/[0-9]+\.webp$'
+        bytes:
+          type: integer
+          format: int64
+          minimum: 1
+    AdminMedia:
+      type: object
+      additionalProperties: false
+      required: [id, status, mimeType, width, height, bytes, altText, decorative, variants, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [processing, ready, failed]
+        mimeType:
+          type: string
+          pattern: '^image/[a-z0-9.+-]+$'
+        width:
+          type: integer
+          minimum: 1
+        height:
+          type: integer
+          minimum: 1
+        bytes:
+          type: integer
+          format: int64
+          minimum: 1
+        altText:
+          type: string
+          maxLength: 300
+        decorative:
+          type: boolean
+        lastErrorCode:
+          type: string
+          nullable: true
+        variants:
+          type: array
+          items: { $ref: '#/components/schemas/AdminMediaVariant' }
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    AdminMediaResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/AdminMedia' }
+        meta: { $ref: '#/components/schemas/ResponseMeta' }
+    AdminMediaListResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/AdminMedia' }
+        meta: { $ref: '#/components/schemas/ListResponseMeta' }
+    ContactMessageStatus:
+      type: string
+      enum: [unread, read, archived]
+    AdminContactStatusRequest:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: { $ref: '#/components/schemas/ContactMessageStatus' }
+    AdminContactMessage:
+      type: object
+      additionalProperties: false
+      required: [id, name, email, subject, message, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          nullable: true
+        subject:
+          type: string
+        message:
+          type: string
+        status: { $ref: '#/components/schemas/ContactMessageStatus' }
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    AdminContactResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/AdminContactMessage' }
+        meta: { $ref: '#/components/schemas/ResponseMeta' }
+    AdminContactListResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/AdminContactMessage' }
+        meta: { $ref: '#/components/schemas/ListResponseMeta' }
+    AdminActivity:
+      type: object
+      additionalProperties: false
+      required: [id, eventType, entityType, actorType, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        eventType:
+          type: string
+        entityType:
+          type: string
+        entityId:
+          type: string
+          format: uuid
+          nullable: true
+        actorType:
+          type: string
+          enum: [system, visitor, admin]
+        actorId:
+          type: string
+          format: uuid
+          nullable: true
+        requestId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    AdminActivityListResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/AdminActivity' }
+        meta: { $ref: '#/components/schemas/ListResponseMeta' }
   examples:
     HomeResponse:
       summary: Published homepage
