@@ -26,6 +26,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"gorm.io/gorm"
 
+	auditapp "github.com/ilhamnugraha8944/tauco/backend/internal/audit/application"
+	auditrepo "github.com/ilhamnugraha8944/tauco/backend/internal/audit/repository"
 	authapp "github.com/ilhamnugraha8944/tauco/backend/internal/auth/application"
 	authdomain "github.com/ilhamnugraha8944/tauco/backend/internal/auth/domain"
 	authrepo "github.com/ilhamnugraha8944/tauco/backend/internal/auth/repository"
@@ -347,6 +349,7 @@ WHERE slug = 'cross-table-seed-collision'`).Error; err != nil {
 	assertMediaPipeline(t, ctx, runtimeGORM, adminGORM)
 	assertAdminContentLifecycle(t, ctx, adminGORM, plan)
 	assertAdminProductLifecycle(t, ctx, adminGORM, runtimeGORM, plan)
+	assertAdminInboxActivity(t, ctx, adminGORM)
 	assertCatalogPaginationProbe(
 		t,
 		ctx,
@@ -417,6 +420,47 @@ func assertAdminProductLifecycle(t *testing.T, ctx context.Context, adminDatabas
 	adminDatabase.Raw(`SELECT count(*) FROM tauco_app.activity_logs WHERE entity_id=?::uuid AND event_type LIKE 'product.%'`, product.ID).Scan(&activities)
 	if invalidations != 2 || activities < 6 {
 		t.Fatalf("product invalidations=%d activities=%d", invalidations, activities)
+	}
+}
+
+func assertAdminInboxActivity(t *testing.T, ctx context.Context, adminDatabase *gorm.DB) {
+	t.Helper()
+	codec, _ := catalogcursor.NewHMACSHA256([]byte("integration-inbox-cursor-secret-32-bytes"))
+	inboxRepository, _ := contactrepo.NewPostgresStore(adminDatabase)
+	inbox, _ := contactapp.NewAdminMessageService(inboxRepository, codec)
+	status := "unread"
+	page, err := inbox.List(ctx, nil, intPointer(20), &status)
+	if err != nil || len(page.Messages) == 0 {
+		t.Fatalf("list admin inbox=%d err=%v", len(page.Messages), err)
+	}
+	before, err := inbox.Get(ctx, page.Messages[0].ID)
+	if err != nil {
+		t.Fatalf("get admin inbox: %v", err)
+	}
+	afterRead, err := inbox.Get(ctx, before.ID)
+	if err != nil || !afterRead.UpdatedAt.Equal(before.UpdatedAt) || afterRead.Status != "unread" {
+		t.Fatalf("GET mutated inbox before=%+v after=%+v err=%v", before, afterRead, err)
+	}
+	var actorID string
+	adminDatabase.Raw(`SELECT id::text FROM tauco_app.admin_users ORDER BY created_at LIMIT 1`).Scan(&actorID)
+	updated, err := inbox.UpdateStatus(ctx, before.ID, before.ETag(), "read", actorID)
+	if err != nil || updated.Status != "read" {
+		t.Fatalf("update inbox=%+v err=%v", updated, err)
+	}
+	if _, err := inbox.UpdateStatus(ctx, before.ID, before.ETag(), "archived", actorID); !errors.Is(err, contactapp.ErrAdminMessageConflict) {
+		t.Fatalf("stale inbox ETag err=%v", err)
+	}
+	activityRepository, _ := auditrepo.NewAdminPostgres(adminDatabase)
+	activity, _ := auditapp.NewAdminService(activityRepository, codec)
+	eventType, entityType := "contact.status_changed", "contact_message"
+	activityPage, err := activity.List(ctx, nil, intPointer(20), auditapp.ActivityFilter{EventType: &eventType, EntityType: &entityType})
+	if err != nil || len(activityPage.Activities) != 1 || activityPage.Activities[0].EntityID == nil {
+		t.Fatalf("activity filter=%+v err=%v", activityPage, err)
+	}
+	var metadata string
+	adminDatabase.Raw(`SELECT metadata_json::text FROM tauco_app.activity_logs WHERE id=?`, activityPage.Activities[0].ID).Scan(&metadata)
+	if strings.Contains(metadata, before.Email) || strings.Contains(metadata, before.Name) || !strings.Contains(metadata, "fromStatus") {
+		t.Fatalf("activity metadata allowlist violated: %s", metadata)
 	}
 }
 

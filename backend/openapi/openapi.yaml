@@ -1111,6 +1111,8 @@ paths:
         - $ref: '#/components/parameters/XRequestID'
         - $ref: '#/components/parameters/Cursor'
         - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/ActivityEventType'
+        - $ref: '#/components/parameters/ActivityEntityType'
       responses:
         '200':
           $ref: '#/components/responses/AdminActivityListOK'
@@ -1336,6 +1338,24 @@ components:
       required: false
       schema:
         $ref: '#/components/schemas/ContactMessageStatus'
+    ActivityEventType:
+      name: eventType
+      in: query
+      required: false
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 100
+        pattern: '^[a-z][a-z0-9]*([._-][a-z0-9]+)*$'
+    ActivityEntityType:
+      name: entityType
+      in: query
+      required: false
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 80
+        pattern: '^[a-z][a-z0-9]*([._-][a-z0-9]+)*$'
   headers:
     XRequestID:
       description: Request trace identifier.

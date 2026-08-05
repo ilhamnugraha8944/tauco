@@ -33,9 +33,9 @@ Delivery dibagi agar website publik dapat diluncurkan lebih cepat:
   gate. Delivery
   dilakukan local-first dalam shadow-mode sehingga production Phase 1A tetap
   memakai konten lokal dan Netlify Forms.
-- **Phase 1C — implementing lokal:** C0-C7 complete. Fondasi data, auth API,
+- **Phase 1C — implementing lokal:** C0-C8 complete. Fondasi data, auth API,
   same-origin BFF, shell CMS, media CMS, editor dan publishing Home/About,
-  serta Product CMS tersedia lokal. C8-C10 melanjutkan inbox, operations, dan closeout
+  Product CMS, inbox, dan activity tersedia lokal. C9-C10 melanjutkan operations dan closeout
   dalam shadow-mode lokal.
 - **Phase 1D — future:** remote deployment, hardening, migration/cutover konten
   lokal dan contact, load/security test, backup, dan operational readiness.
@@ -172,7 +172,7 @@ inbox, dan audit trail.
 | Admin authentication | `IMPLEMENTING-1C-LOCAL` | C1-C4 complete lokal; password, TOTP, auth API, BFF, dan account shell aktif |
 | CMS homepage/about | `IMPLEMENTING-1C-LOCAL` | Runtime C6 complete lokal; production tetap memakai konten Phase 1A |
 | Product/media CMS | `IMPLEMENTING-1C-LOCAL` | Media runtime C5 dan product runtime C7 complete lokal |
-| Inbox dan activity log | `IMPLEMENTING-1C-LOCAL` | C1 contract dan privilege foundation complete; runtime C8 |
+| Inbox dan activity log | `IMPLEMENTING-1C-LOCAL` | Runtime C8 complete lokal; inbox production tetap Netlify Forms |
 | Inventory dan order | `OUT-OF-SCOPE` | Phase 2 |
 
 ## 6. Functional Requirements — Phase 1A
@@ -477,7 +477,7 @@ Jika berpindah ke custom domain:
 ## 11. Backend Architecture — Phase 1B dan 1C
 
 Phase 1B berstatus `IMPLEMENTED-1B-LOCAL`. Phase 1C berstatus
-`IMPLEMENTING-1C-LOCAL`: C0-C7 complete dan runtime C8-C10 masih pending.
+`IMPLEMENTING-1C-LOCAL`: C0-C8 complete dan runtime C9-C10 masih pending.
 Admin CMS tetap bukan dependency runtime Phase 1A.
 
 ### 11.0 Boundary delivery
@@ -563,7 +563,7 @@ menggunakan opaque cursor.
 ### 11.4 Admin REST API
 
 **Status:** `IMPLEMENTING-1C-LOCAL`; auth C2-C4, media C5, serta page content C6
-complete lokal. Product C7 complete; inbox dan operations C8-C9 masih pending.
+complete lokal. Product C7 serta inbox/activity C8 complete; operations C9 masih pending.
 
 - login, refresh, logout, current user;
 - setup/enable TOTP serta recovery/reset melalui CLI;

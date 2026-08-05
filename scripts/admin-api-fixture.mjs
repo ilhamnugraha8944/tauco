@@ -30,6 +30,10 @@ function initialProductState() {
   return [{ id: productId, slug: content.slug, sku: "TAUCO-001", sortOrder: 0, publishedRevisionId: revision.id, archivedAt: null, updatedAt: revision.createdAt, revisions: [revision] }];
 }
 let productState = initialProductState();
+function initialInboxState() { const now = new Date().toISOString(); return [{ id:"019cf000-0000-7000-8000-000000000950", name:"Pengunjung Test", email:"visitor@example.test", phone:null, subject:"Pertanyaan umum", message:"Pesan fixture untuk menguji inbox lokal tanpa data pelanggan production.", status:"unread", createdAt:now, updatedAt:now }]; }
+function initialActivityState() { return [{ id:"019cf000-0000-7000-8000-000000000951", eventType:"contact.received", entityType:"contact_message", entityId:"019cf000-0000-7000-8000-000000000950", actorType:"visitor", actorId:null, requestId:"c8-fixture-request", createdAt:new Date().toISOString() }]; }
+let inboxState = initialInboxState();
+let activityState = initialActivityState();
 
 function revisionSummary(revision) {
   return { id: revision.id, revisionNumber: revision.revisionNumber, status: revision.status, createdBy: revision.createdBy, createdAt: revision.createdAt, publishedAt: revision.publishedAt };
@@ -60,7 +64,8 @@ async function body(request) {
 }
 
 const server = createServer(async (request, response) => {
-  const path = new URL(request.url ?? "/", `http://127.0.0.1:${port}`).pathname;
+  const requestURL = new URL(request.url ?? "/", `http://127.0.0.1:${port}`);
+  const path = requestURL.pathname;
   const cookie = request.headers.cookie ?? "";
 
   if (request.method === "POST" && !request.headers.origin) {
@@ -79,6 +84,8 @@ const server = createServer(async (request, response) => {
     revisionSequence = 10;
     pageState = initialPageState();
     productState = initialProductState();
+    inboxState = initialInboxState();
+    activityState = initialActivityState();
     json(response, 200, { data: { status: "mfa_setup_required", expiresAt: new Date(Date.now() + 600_000).toISOString(), user }, meta: { apiVersion: "v1", requestId: "c4-fixture-request" } }, {
       "Set-Cookie": [
         "tauco_admin_access=password-session; Path=/; HttpOnly; SameSite=Strict",
@@ -90,7 +97,7 @@ const server = createServer(async (request, response) => {
   }
 
   const csrfValid = request.headers["x-csrf-token"] === csrf && cookie.includes(`tauco_admin_csrf=${csrf}`);
-  if (request.method === "POST" && !csrfValid) {
+  if (["POST", "PATCH"].includes(request.method ?? "") && !csrfValid) {
     problem(response, 403, "CSRF_REJECTED");
     return;
   }
@@ -277,6 +284,36 @@ const server = createServer(async (request, response) => {
     response.writeHead(204, { "Cache-Control": "no-store" }); response.end(); return;
   }
 
+  if (path === "/api/v1/admin/contact-messages" && request.method === "GET" && cookie.includes("tauco_admin_access=mfa-session")) {
+    const status = requestURL.searchParams.get("status");
+    const items = status ? inboxState.filter((item) => item.status === status) : inboxState;
+    json(response, 200, { data:items, meta:{ apiVersion:"v1", requestId:"c8-fixture-request", page:{ hasMore:false, limit:20, nextCursor:null } } }); return;
+  }
+
+  const inboxMatch = /^\/api\/v1\/admin\/contact-messages\/([0-9a-f-]{36})$/.exec(path);
+  if (inboxMatch && request.method === "GET" && cookie.includes("tauco_admin_access=mfa-session")) {
+    const item = inboxState.find((message) => message.id === inboxMatch[1]);
+    if (!item) { problem(response,404,"CONTACT_NOT_FOUND"); return; }
+    json(response,200,{data:item,meta:{apiVersion:"v1",requestId:"c8-fixture-request"}},{ETag:messageETag(item)}); return;
+  }
+
+  const inboxStatusMatch = /^\/api\/v1\/admin\/contact-messages\/([0-9a-f-]{36})\/status$/.exec(path);
+  if (inboxStatusMatch && request.method === "PATCH" && cookie.includes("tauco_admin_access=mfa-session")) {
+    const item = inboxState.find((message) => message.id === inboxStatusMatch[1]);
+    if (!item) { problem(response,404,"CONTACT_NOT_FOUND"); return; }
+    if (request.headers["if-match"] !== messageETag(item)) { problem(response,412,"PRECONDITION_FAILED"); return; }
+    const input = await body(request); const previous = item.status;
+    item.status = input.status; item.updatedAt = new Date(Date.now()+10).toISOString();
+    activityState.unshift({id:`019cf000-0000-7000-8000-${String(++revisionSequence).padStart(12,"0")}`,eventType:"contact.status_changed",entityType:"contact_message",entityId:item.id,actorType:"admin",actorId:user.id,requestId:"c8-fixture-request",createdAt:item.updatedAt});
+    json(response,200,{data:item,meta:{apiVersion:"v1",requestId:"c8-fixture-request"}},{ETag:messageETag(item),"X-Fixture-Previous-Status":previous}); return;
+  }
+
+  if (path === "/api/v1/admin/activity-logs" && request.method === "GET" && cookie.includes("tauco_admin_access=mfa-session")) {
+    const eventType=requestURL.searchParams.get("eventType"),entityType=requestURL.searchParams.get("entityType");
+    const items=activityState.filter((item)=>(!eventType||item.eventType===eventType)&&(!entityType||item.entityType===entityType));
+    json(response,200,{data:items,meta:{apiVersion:"v1",requestId:"c8-fixture-request",page:{hasMore:false,limit:20,nextCursor:null}}}); return;
+  }
+
   if (path === "/api/v1/admin/auth/logout" && request.method === "POST") {
     response.writeHead(204, {
       "Cache-Control": "no-store",
@@ -304,3 +341,5 @@ function newProductRevision(product, content, status) {
   const now = new Date().toISOString();
   return { id: `019cf000-0000-7000-8000-${String(revisionSequence).padStart(12, "0")}`, ownerId: product.id, revisionNumber: (product.revisions[0]?.revisionNumber ?? 0) + 1, status, schemaVersion: 1, content, createdAt: now, ...(status === "published" ? { publishedAt: now } : {}) };
 }
+
+function messageETag(message){return `"message-${message.id}-${Date.parse(message.updatedAt)*1000}"`;}

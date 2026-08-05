@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	auditapp "github.com/ilhamnugraha8944/tauco/backend/internal/audit/application"
+	auditrepo "github.com/ilhamnugraha8944/tauco/backend/internal/audit/repository"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/auth"
 	authapp "github.com/ilhamnugraha8944/tauco/backend/internal/auth/application"
 	authrepo "github.com/ilhamnugraha8944/tauco/backend/internal/auth/repository"
@@ -165,6 +167,7 @@ func NewPublicAPI(
 	var adminMediaServer *api.AdminMediaServer
 	var adminContentServer *api.AdminContentServer
 	var adminProductServer *api.AdminProductServer
+	var adminInboxActivityServer *api.AdminInboxActivityServer
 	if options := infrastructure.AdminAuth; options != nil {
 		adminGORM, openErr := database.OpenAdminGORM(ctx, options.Database)
 		if openErr != nil {
@@ -249,6 +252,31 @@ func NewPublicAPI(
 			closeAll()
 			return nil, productErr
 		}
+		adminContactRepository, inboxErr := contactrepo.NewPostgresStore(adminGORM)
+		if inboxErr != nil {
+			closeAll()
+			return nil, inboxErr
+		}
+		adminInbox, inboxErr := contactapp.NewAdminMessageService(adminContactRepository, cursorCodec)
+		if inboxErr != nil {
+			closeAll()
+			return nil, inboxErr
+		}
+		adminActivityRepository, inboxErr := auditrepo.NewAdminPostgres(adminGORM)
+		if inboxErr != nil {
+			closeAll()
+			return nil, inboxErr
+		}
+		adminActivity, inboxErr := auditapp.NewAdminService(adminActivityRepository, cursorCodec)
+		if inboxErr != nil {
+			closeAll()
+			return nil, inboxErr
+		}
+		adminInboxActivityServer, inboxErr = api.NewAdminInboxActivityServer(adminInbox, adminActivity)
+		if inboxErr != nil {
+			closeAll()
+			return nil, inboxErr
+		}
 	}
 	publicLimit, err := httpmiddleware.RateLimit(limiter, secrets.RateHMAC, httpmiddleware.RatePolicy{
 		Name: "public-read", Limit: 60, Window: time.Minute,
@@ -280,6 +308,7 @@ func NewPublicAPI(
 			api.RegisterSafeMediaHandlers(router, adminMediaServer, adminAuthHandler, publicLimit)
 			api.RegisterSafeAdminContentHandlers(router, adminContentServer, adminAuthHandler)
 			api.RegisterSafeAdminProductHandlers(router, adminProductServer, adminAuthHandler)
+			api.RegisterSafeAdminInboxActivityHandlers(router, adminInboxActivityServer, adminAuthHandler)
 		}
 		api.RegisterSafePublicReadHandlers(
 			router,

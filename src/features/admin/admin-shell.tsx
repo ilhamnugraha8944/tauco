@@ -20,8 +20,8 @@ const modules = [
   { label: "Konten", href: "/admin/content", icon: Article, available: true },
   { label: "Produk", href: "/admin/products", icon: Package, available: true },
   { label: "Media", href: "/admin/media", icon: Images, available: true },
-  { label: "Inbox", icon: EnvelopeSimple, available: false },
-  { label: "Aktivitas", icon: ClockCounterClockwise, available: false },
+  { label: "Inbox", href: "/admin/inbox", icon: EnvelopeSimple, available: true },
+  { label: "Aktivitas", href: "/admin/activity", icon: ClockCounterClockwise, available: true },
   { label: "Akun", href: "/admin/account", icon: UserCircle, available: true },
 ] as const;
 

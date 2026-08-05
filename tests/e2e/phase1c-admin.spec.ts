@@ -124,6 +124,32 @@ test("admin login, TOTP setup, shell, account, and logout", async ({ page }) => 
   const productAccessibility = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   expect(productAccessibility.violations).toEqual([]);
 
+  await page.getByRole("link", { name: "Inbox" }).click();
+  await expect(page.getByRole("heading", { name: "Inbox kontak" })).toBeVisible();
+  await expect(page.locator(".admin-status-chip")).toHaveText("unread");
+  await page.getByRole("link", { name: "Buka pesan" }).click();
+  await expect(page.getByRole("heading", { name: "Pertanyaan umum" })).toBeVisible();
+  await expect(page.getByText("unread", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("unread", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Tandai read" }).click();
+  await expect(page.getByText("Status diubah menjadi read.")).toBeVisible();
+
+  const inboxAccessibility = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+  expect(inboxAccessibility.violations).toEqual([]);
+
+  await page.getByRole("link", { name: "Aktivitas" }).click();
+  await expect(page.getByRole("heading", { name: "Aktivitas CMS" })).toBeVisible();
+  await expect(page.getByText("contact.status_changed")).toBeVisible();
+  await page.getByLabel("Event type").fill("contact.status_changed");
+  await page.getByLabel("Entity type").fill("contact_message");
+  await page.getByRole("button", { name: "Terapkan filter" }).click();
+  await expect(page.locator(".admin-activity-list li")).toHaveCount(1);
+  await expect(page.locator(".admin-activity-list")).not.toContainText("visitor@example.test");
+
+  const activityAccessibility = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+  expect(activityAccessibility.violations).toEqual([]);
+
   const shellAccessibility = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   expect(shellAccessibility.violations).toEqual([]);
 
@@ -137,6 +163,7 @@ test("BFF rejects unknown paths and unsupported methods", async ({ request }) =>
   expect(response.status()).toBe(405);
   expect(response.headers().allow).toBe("POST");
   expect((await request.post("/admin-api/pages/tauco-guide/drafts")).status()).toBe(404);
+  expect((await request.post("/admin-api/contact-messages/019cf000-0000-7000-8000-000000000950/status")).status()).toBe(405);
 });
 
 test("admin auth remains readable in dark mode", async ({ page }) => {

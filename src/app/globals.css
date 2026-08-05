@@ -18,6 +18,33 @@
   --header-height: 72px;
 }
 
+.admin-filter { display: grid; gap: .35rem; min-width: 10rem; }
+.admin-filter span,.admin-message-detail dt { color: var(--admin-muted); font-size: .78rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.admin-filter select { background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: .7rem; color: inherit; min-height: 2.75rem; padding-inline: .8rem; }
+.admin-inbox-list,.admin-activity-list { display: grid; gap: .65rem; list-style: none; margin: 0; padding: 0; }
+.admin-inbox-list article,.admin-message-detail,.admin-activity-list li { background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: 1rem; }
+.admin-inbox-list article { align-items: center; display: flex; gap: 1rem; justify-content: space-between; padding: 1rem 1.1rem; }
+.admin-inbox-list h2,.admin-inbox-list p,.admin-activity-list h2,.admin-activity-list p { margin: .25rem 0; }
+.admin-status-chip { border: 1px solid currentColor; border-radius: 999px; display: inline-block; font-size: .72rem; font-weight: 800; padding: .15rem .5rem; text-transform: uppercase; }
+.admin-status-chip.is-read { color: var(--admin-muted); }
+.admin-status-chip.is-archived { color: #8a5228; }
+.admin-message-detail { display: grid; gap: 1.25rem; padding: clamp(1rem,3vw,2rem); }
+.admin-message-detail dl { display: grid; gap: .8rem; margin: 0; }
+.admin-message-detail dl div { display: grid; gap: .2rem; grid-template-columns: minmax(6rem,9rem) 1fr; }
+.admin-message-detail dd { margin: 0; overflow-wrap: anywhere; }
+.admin-message-body { border-block: 1px solid var(--admin-border); padding-block: 1.2rem; }
+.admin-message-body p { line-height: 1.7; margin-bottom: 0; white-space: pre-wrap; }
+.admin-filter-row { align-items: end; display: grid; gap: .8rem; grid-template-columns: repeat(2,minmax(10rem,1fr)) auto; }
+.admin-activity-list li { display: grid; gap: .85rem; grid-template-columns: .7rem 1fr; padding: 1rem 1.1rem; }
+.admin-activity-marker { background: var(--admin-accent); border-radius: 999px; height: .7rem; margin-top: .4rem; width: .7rem; }
+.admin-load-more { justify-self: start; }
+
+@media (max-width: 760px) {
+  .admin-filter-row { grid-template-columns: 1fr; }
+  .admin-inbox-list article { align-items: flex-start; flex-direction: column; }
+  .admin-message-detail dl div { grid-template-columns: 1fr; }
+}
+
 @theme inline {
   --font-sans: var(--font-geist), sans-serif;
   --color-page: var(--background);

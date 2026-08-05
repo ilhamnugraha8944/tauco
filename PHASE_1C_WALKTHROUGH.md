@@ -7,7 +7,7 @@
 | Tanggal mulai | 4 Agustus 2026 |
 | Branch | `feature/phase-1c` |
 | Baseline | `520d315` |
-| Status | C0-C7 complete; C8-C10 pending |
+| Status | C0-C8 complete; C9-C10 pending |
 | Production | Tidak berubah |
 
 Dokumen ini menjadi ledger pelaksanaan Phase 1C. Setiap gate diperbarui setelah
@@ -837,15 +837,49 @@ Windows Application Control: native test blocked; container fallback PASS
 
 ## C8 Checklist: Inbox dan Activity Log
 
-- [ ] Inbox cursor/filter.
-- [ ] Message detail.
-- [ ] Explicit status mutation.
-- [ ] GET remains read-only.
-- [ ] Activity cursor/filter.
-- [ ] Metadata allowlist.
-- [ ] PII redaction.
-- [ ] Local inbox limitation documented.
-- [ ] Walkthrough update C8.
+**Tanggal:** 5 Agustus 2026
+
+**Status:** Complete
+
+### Hasil C8
+
+- Inbox memiliki list ber-cursor, filter status, detail, dan explicit status
+  mutation `unread`, `read`, atau `archived`.
+- GET inbox murni read-only. Status berubah hanya lewat PATCH dengan CSRF dan
+  strong ETag; update stale mendapat `412`.
+- Activity viewer memiliki cursor serta filter exact `eventType` dan
+  `entityType` yang terikat pada signature cursor.
+- API activity hanya memilih field allowlist dan sengaja tidak membaca atau
+  mengirim `metadata_json`. Audit status hanya menyimpan status lama/baru.
+- UI Inbox dan Activity responsif, keyboard-accessible, dan axe-clean pada
+  desktop serta mobile.
+
+### Verifikasi C8
+
+```text
+OpenAPI generated drift, Go build, typecheck, ESLint, Next build: PASS
+PostgreSQL repository integration via Linux container: PASS
+GET read-only, ETag conflict, status/filter, PII allowlist: PASS
+Admin Playwright desktop/mobile: 6 passed
+Inbox dan Activity axe A/AA: PASS
+```
+
+- [x] Inbox cursor/filter.
+- [x] Message detail.
+- [x] Explicit status mutation.
+- [x] GET remains read-only.
+- [x] Activity cursor/filter.
+- [x] Metadata allowlist.
+- [x] PII redaction.
+- [x] Local inbox limitation documented.
+- [x] Walkthrough update C8.
+
+### Limitation dan next gate
+
+- Inbox ini hanya membaca `contact_messages` lokal. Pesan production masih
+  berada di Netlify Forms dan tidak disalin otomatis selama Phase 1C.
+- Contact cutover dan migrasi inbox production tetap menjadi Phase 1D.
+- Gate berikutnya: C9 publishing worker, recovery, runbook, dan operations.
 
 ## C9 Checklist: Publishing, Recovery, dan Operations
 

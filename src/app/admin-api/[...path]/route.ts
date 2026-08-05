@@ -32,6 +32,10 @@ const dynamicRoutes = [
   { match: /^products\/[0-9a-f-]{36}\/revisions\/[0-9a-f-]{36}$/, methods: new Set(["GET"]), target: (path: string) => `/api/v1/admin/${path}` },
   { match: /^products\/[0-9a-f-]{36}\/revisions\/[0-9a-f-]{36}\/publish$/, methods: new Set(["POST"]), target: (path: string) => `/api/v1/admin/${path}` },
   { match: /^products\/[0-9a-f-]{36}\/(unpublish|archive|unarchive)$/, methods: new Set(["POST"]), target: (path: string) => `/api/v1/admin/${path}` },
+  { match: /^contact-messages$/, methods: new Set(["GET"]), target: (path: string) => `/api/v1/admin/${path}` },
+  { match: /^contact-messages\/[0-9a-f-]{36}$/, methods: new Set(["GET"]), target: (path: string) => `/api/v1/admin/${path}` },
+  { match: /^contact-messages\/[0-9a-f-]{36}\/status$/, methods: new Set(["PATCH"]), target: (path: string) => `/api/v1/admin/${path}` },
+  { match: /^activity-logs$/, methods: new Set(["GET"]), target: (path: string) => `/api/v1/admin/${path}` },
 ] as const;
 
 const forwardedRequestHeaders = [

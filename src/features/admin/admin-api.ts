@@ -162,6 +162,27 @@ export const adminAPI = {
   unpublishProduct(id: string, etag: string) { return send<void>(`products/${id}/unpublish`, { method: "POST", headers: { "If-Match": etag } }); },
   archiveProduct(id: string, etag: string) { return send<void>(`products/${id}/archive`, { method: "POST", headers: { "If-Match": etag } }); },
   unarchiveProduct(id: string, etag: string) { return send<void>(`products/${id}/unarchive`, { method: "POST", headers: { "If-Match": etag } }); },
+  listContactMessages(input: { status?: AdminContactStatus; cursor?: string } = {}) {
+    const query = new URLSearchParams({ limit: "20" });
+    if (input.status) query.set("status", input.status);
+    if (input.cursor) query.set("cursor", input.cursor);
+    return send<{ data: AdminContactMessage[]; meta: { page: AdminPageMeta } }>(`contact-messages?${query}`, { method: "GET" });
+  },
+  async getContactMessage(id: string) {
+    const response = await sendWithResponse<{ data: AdminContactMessage }>(`contact-messages/${id}`, { method: "GET" });
+    return { ...response.body, etag: response.headers.get("etag") ?? "" };
+  },
+  async updateContactMessageStatus(id: string, etag: string, status: AdminContactStatus) {
+    const response = await sendWithResponse<{ data: AdminContactMessage }>(`contact-messages/${id}/status`, { method: "PATCH", headers: { "If-Match": etag }, body: JSON.stringify({ status }) });
+    return { ...response.body, etag: response.headers.get("etag") ?? "" };
+  },
+  listActivities(input: { eventType?: string; entityType?: string; cursor?: string } = {}) {
+    const query = new URLSearchParams({ limit: "20" });
+    if (input.eventType) query.set("eventType", input.eventType);
+    if (input.entityType) query.set("entityType", input.entityType);
+    if (input.cursor) query.set("cursor", input.cursor);
+    return send<{ data: AdminActivity[]; meta: { page: AdminPageMeta } }>(`activity-logs?${query}`, { method: "GET" });
+  },
 };
 
 export type AdminMedia = {
@@ -210,3 +231,7 @@ export type AdminProduct = {
   updatedAt: string;
   revisions: Array<Omit<AdminRevision, "ownerId" | "schemaVersion" | "content">>;
 };
+export type AdminPageMeta = { hasMore: boolean; limit: number; nextCursor?: string | null };
+export type AdminContactStatus = "unread" | "read" | "archived";
+export type AdminContactMessage = { id:string; name:string; email:string; phone?:string|null; subject:string; message:string; status:AdminContactStatus; createdAt:string; updatedAt:string };
+export type AdminActivity = { id:string; eventType:string; entityType:string; entityId?:string|null; actorType:"system"|"visitor"|"admin"; actorId?:string|null; requestId?:string|null; createdAt:string };
