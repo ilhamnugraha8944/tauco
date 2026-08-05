@@ -7,7 +7,7 @@
 | Tanggal mulai | 4 Agustus 2026 |
 | Branch | `feature/phase-1c` |
 | Baseline | `520d315` |
-| Status | C0-C6 complete; C7-C10 pending |
+| Status | C0-C7 complete; C8-C10 pending |
 | Production | Tidak berubah |
 
 Dokumen ini menjadi ledger pelaksanaan Phase 1C. Setiap gate diperbarui setelah
@@ -789,17 +789,51 @@ dan public exclusion.
 
 ## C7 Checklist: Product CMS
 
-- [ ] Product list/create/detail.
-- [ ] Identity update.
-- [ ] Structured product editor.
-- [ ] Draft/history/preview.
-- [ ] Publish/unpublish.
-- [ ] Archive/unarchive.
-- [ ] Stable slug after first publish.
-- [ ] SKU/sort validation.
-- [ ] Media/canonical validation.
-- [ ] Archived public exclusion.
-- [ ] Walkthrough update C7.
+**Tanggal:** 5 Agustus 2026
+
+**Status:** Complete
+
+### Hasil C7
+
+- Go API dan Next.js CMS menyediakan list, create, detail, identity update,
+  structured editor, immutable draft, history, preview, publish/unpublish,
+  serta archive/unarchive produk.
+- Slug menjadi immutable setelah publish pertama; SKU uppercase dan sort order
+  divalidasi pada browser dan service.
+- Canonical path wajib mengikuti identity slug. Referensi media divalidasi dan
+  publish menolak asset yang belum `ready`.
+- Publish/unpublish mencatat audit dan mengantrekan invalidasi untuk tag
+  `products` serta `product:{slug}` dalam transaction yang sama.
+- Query public mengecualikan produk archived.
+- Preview memakai presentation component yang sama dengan halaman publik.
+
+### Verifikasi C7
+
+```text
+OpenAPI drift, format, typecheck, ESLint, Go build, Next build: PASS
+Repository integration via Linux container: PASS
+Admin Playwright desktop/mobile: 6 passed
+Product editor dan preview axe A/AA: PASS
+Windows Application Control: native test blocked; container fallback PASS
+```
+
+- [x] Product list/create/detail.
+- [x] Identity update.
+- [x] Structured product editor.
+- [x] Draft/history/preview.
+- [x] Publish/unpublish.
+- [x] Archive/unarchive.
+- [x] Stable slug after first publish.
+- [x] SKU/sort validation.
+- [x] Media/canonical validation.
+- [x] Archived public exclusion.
+- [x] Walkthrough update C7.
+
+### Limitation dan next gate
+
+- Handler worker untuk job invalidasi tetap menjadi scope C9.
+- Deployment dan public content cutover tetap menjadi scope Phase 1D.
+- Gate berikutnya: C8 Inbox dan Activity Log lokal.
 
 ## C8 Checklist: Inbox dan Activity Log
 

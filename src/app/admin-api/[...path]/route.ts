@@ -26,6 +26,12 @@ const dynamicRoutes = [
   { match: /^pages\/(home|about)\/revisions\/[0-9a-f-]{36}$/, methods: new Set(["GET"]), target: (path: string) => `/api/v1/admin/${path}` },
   { match: /^pages\/(home|about)\/revisions\/[0-9a-f-]{36}\/publish$/, methods: new Set(["POST"]), target: (path: string) => `/api/v1/admin/${path}` },
   { match: /^pages\/(home|about)\/unpublish$/, methods: new Set(["POST"]), target: (path: string) => `/api/v1/admin/${path}` },
+  { match: /^products$/, methods: new Set(["GET", "POST"]), target: (path: string) => `/api/v1/admin/${path}` },
+  { match: /^products\/[0-9a-f-]{36}$/, methods: new Set(["GET", "PATCH"]), target: (path: string) => `/api/v1/admin/${path}` },
+  { match: /^products\/[0-9a-f-]{36}\/drafts$/, methods: new Set(["POST"]), target: (path: string) => `/api/v1/admin/${path}` },
+  { match: /^products\/[0-9a-f-]{36}\/revisions\/[0-9a-f-]{36}$/, methods: new Set(["GET"]), target: (path: string) => `/api/v1/admin/${path}` },
+  { match: /^products\/[0-9a-f-]{36}\/revisions\/[0-9a-f-]{36}\/publish$/, methods: new Set(["POST"]), target: (path: string) => `/api/v1/admin/${path}` },
+  { match: /^products\/[0-9a-f-]{36}\/(unpublish|archive|unarchive)$/, methods: new Set(["POST"]), target: (path: string) => `/api/v1/admin/${path}` },
 ] as const;
 
 const forwardedRequestHeaders = [

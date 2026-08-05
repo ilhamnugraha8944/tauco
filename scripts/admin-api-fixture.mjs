@@ -10,7 +10,7 @@ const user = {
   status: "active",
   mfaEnabled: true,
   roles: ["super_admin"],
-  permissions: ["account.manage", "media.read", "media.write", "content.read", "content.write", "content.publish"],
+  permissions: ["account.manage", "media.read", "media.write", "content.read", "content.write", "content.publish", "product.read", "product.write", "product.publish", "inbox.read", "inbox.write", "activity.read"],
 };
 const media = [];
 const mediaId = "019cf000-0000-7000-8000-000000000905";
@@ -22,6 +22,14 @@ function initialPageState() { return Object.fromEntries(["home", "about"].map((k
   return [key, { id: pageId, key, latestRevision: revision, publishedRevisionId: revision.id, revisions: [revision] }];
 })); }
 let pageState = initialPageState();
+function initialProductState() {
+  const content = JSON.parse(readFileSync(resolve("content/products.json"), "utf8")).products[0];
+  delete content.status;
+  const productId = "019cf000-0000-7000-8000-000000000940";
+  const revision = { id: "019cf000-0000-7000-8000-000000000941", ownerId: productId, revisionNumber: 1, status: "published", schemaVersion: 1, content, createdAt: new Date().toISOString(), publishedAt: new Date().toISOString() };
+  return [{ id: productId, slug: content.slug, sku: "TAUCO-001", sortOrder: 0, publishedRevisionId: revision.id, archivedAt: null, updatedAt: revision.createdAt, revisions: [revision] }];
+}
+let productState = initialProductState();
 
 function revisionSummary(revision) {
   return { id: revision.id, revisionNumber: revision.revisionNumber, status: revision.status, createdBy: revision.createdBy, createdAt: revision.createdAt, publishedAt: revision.publishedAt };
@@ -70,6 +78,7 @@ const server = createServer(async (request, response) => {
     media.length = 0;
     revisionSequence = 10;
     pageState = initialPageState();
+    productState = initialProductState();
     json(response, 200, { data: { status: "mfa_setup_required", expiresAt: new Date(Date.now() + 600_000).toISOString(), user }, meta: { apiVersion: "v1", requestId: "c4-fixture-request" } }, {
       "Set-Cookie": [
         "tauco_admin_access=password-session; Path=/; HttpOnly; SameSite=Strict",
@@ -193,6 +202,81 @@ const server = createServer(async (request, response) => {
     response.writeHead(204, { "Cache-Control": "no-store" }); response.end(); return;
   }
 
+  if (path === "/api/v1/admin/products" && request.method === "GET" && cookie.includes("tauco_admin_access=mfa-session")) {
+    json(response, 200, { data: productState.map(productResponse), meta: { apiVersion: "v1", requestId: "c7-fixture-request", page: { hasMore: false, limit: 50, nextCursor: null } } });
+    return;
+  }
+
+  if (path === "/api/v1/admin/products" && request.method === "POST" && cookie.includes("tauco_admin_access=mfa-session")) {
+    const input = await body(request);
+    const id = `019cf000-0000-7000-8000-${String(++revisionSequence).padStart(12, "0")}`;
+    const product = { id, slug: input.slug, sku: input.sku, sortOrder: input.sortOrder, publishedRevisionId: null, archivedAt: null, updatedAt: new Date().toISOString(), revisions: [] };
+    productState.push(product);
+    json(response, 201, { data: productResponse(product), meta: { apiVersion: "v1", requestId: "c7-fixture-request" } }, { ETag: `"revision-${id}"` });
+    return;
+  }
+
+  const productMatch = /^\/api\/v1\/admin\/products\/([0-9a-f-]{36})$/.exec(path);
+  if (productMatch && cookie.includes("tauco_admin_access=mfa-session")) {
+    const product = productState.find((item) => item.id === productMatch[1]);
+    if (!product) { problem(response, 404, "PRODUCT_NOT_FOUND"); return; }
+    const latest = product.revisions[0];
+    const etag = `"revision-${latest?.id ?? product.id}"`;
+    if (request.method === "GET") {
+      json(response, 200, { data: productResponse(product), meta: { apiVersion: "v1", requestId: "c7-fixture-request" } }, { ETag: etag }); return;
+    }
+    if (request.method === "PATCH") {
+      if (request.headers["if-match"] !== etag) { problem(response, 412, "PRECONDITION_FAILED"); return; }
+      const input = await body(request);
+      if (product.revisions.some((item) => item.status === "published") && input.slug && input.slug !== product.slug) { problem(response, 409, "PRODUCT_CONFLICT"); return; }
+      Object.assign(product, input, { updatedAt: new Date().toISOString() });
+      json(response, 200, { data: productResponse(product), meta: { apiVersion: "v1", requestId: "c7-fixture-request" } }, { ETag: etag }); return;
+    }
+  }
+
+  const productDraftMatch = /^\/api\/v1\/admin\/products\/([0-9a-f-]{36})\/drafts$/.exec(path);
+  if (productDraftMatch && request.method === "POST" && cookie.includes("tauco_admin_access=mfa-session")) {
+    const product = productState.find((item) => item.id === productDraftMatch[1]);
+    if (!product) { problem(response, 404, "PRODUCT_NOT_FOUND"); return; }
+    const latest = product.revisions[0];
+    if (request.headers["if-match"] !== `"revision-${latest?.id ?? product.id}"`) { problem(response, 412, "PRECONDITION_FAILED"); return; }
+    const input = await body(request);
+    const revision = newProductRevision(product, input.content, "draft");
+    product.revisions.unshift(revision); product.updatedAt = revision.createdAt;
+    json(response, 201, { data: revision, meta: { apiVersion: "v1", requestId: "c7-fixture-request" } }, { ETag: `"revision-${revision.id}"` }); return;
+  }
+
+  const productRevisionMatch = /^\/api\/v1\/admin\/products\/([0-9a-f-]{36})\/revisions\/([0-9a-f-]{36})$/.exec(path);
+  if (productRevisionMatch && request.method === "GET" && cookie.includes("tauco_admin_access=mfa-session")) {
+    const product = productState.find((item) => item.id === productRevisionMatch[1]);
+    const revision = product?.revisions.find((item) => item.id === productRevisionMatch[2]);
+    if (!revision) { problem(response, 404, "PRODUCT_REVISION_NOT_FOUND"); return; }
+    json(response, 200, { data: revision, meta: { apiVersion: "v1", requestId: "c7-fixture-request" } }, { ETag: `"revision-${revision.id}"` }); return;
+  }
+
+  const productPublishMatch = /^\/api\/v1\/admin\/products\/([0-9a-f-]{36})\/revisions\/([0-9a-f-]{36})\/publish$/.exec(path);
+  if (productPublishMatch && request.method === "POST" && cookie.includes("tauco_admin_access=mfa-session")) {
+    const product = productState.find((item) => item.id === productPublishMatch[1]);
+    const latest = product?.revisions[0]; const source = product?.revisions.find((item) => item.id === productPublishMatch[2]);
+    if (!product || !source) { problem(response, 404, "PRODUCT_REVISION_NOT_FOUND"); return; }
+    if (request.headers["if-match"] !== `"revision-${latest.id}"`) { problem(response, 412, "PRECONDITION_FAILED"); return; }
+    const revision = newProductRevision(product, source.content, "published");
+    product.revisions.unshift(revision); product.publishedRevisionId = revision.id; product.updatedAt = revision.createdAt;
+    json(response, 200, { data: revision, meta: { apiVersion: "v1", requestId: "c7-fixture-request" } }, { ETag: `"revision-${revision.id}"` }); return;
+  }
+
+  const productStateMatch = /^\/api\/v1\/admin\/products\/([0-9a-f-]{36})\/(unpublish|archive|unarchive)$/.exec(path);
+  if (productStateMatch && request.method === "POST" && cookie.includes("tauco_admin_access=mfa-session")) {
+    const product = productState.find((item) => item.id === productStateMatch[1]);
+    const latest = product?.revisions[0];
+    if (!product || !latest) { problem(response, 404, "PRODUCT_NOT_FOUND"); return; }
+    if (request.headers["if-match"] !== `"revision-${latest.id}"`) { problem(response, 412, "PRECONDITION_FAILED"); return; }
+    if (productStateMatch[2] === "unpublish") product.publishedRevisionId = null;
+    if (productStateMatch[2] === "archive") product.archivedAt = new Date().toISOString();
+    if (productStateMatch[2] === "unarchive") product.archivedAt = null;
+    response.writeHead(204, { "Cache-Control": "no-store" }); response.end(); return;
+  }
+
   if (path === "/api/v1/admin/auth/logout" && request.method === "POST") {
     response.writeHead(204, {
       "Cache-Control": "no-store",
@@ -210,3 +294,13 @@ const server = createServer(async (request, response) => {
 });
 
 server.listen(port, "127.0.0.1", () => process.stdout.write(`Admin fixture listening on ${port}\n`));
+
+function productResponse(product) {
+  return { ...product, revisions: product.revisions.map(revisionSummary) };
+}
+
+function newProductRevision(product, content, status) {
+  revisionSequence += 1;
+  const now = new Date().toISOString();
+  return { id: `019cf000-0000-7000-8000-${String(revisionSequence).padStart(12, "0")}`, ownerId: product.id, revisionNumber: (product.revisions[0]?.revisionNumber ?? 0) + 1, status, schemaVersion: 1, content, createdAt: now, ...(status === "published" ? { publishedAt: now } : {}) };
+}

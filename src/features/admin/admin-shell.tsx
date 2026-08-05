@@ -18,7 +18,7 @@ import { adminAPI, type AdminUser } from "@/features/admin/admin-api";
 
 const modules = [
   { label: "Konten", href: "/admin/content", icon: Article, available: true },
-  { label: "Produk", icon: Package, available: false },
+  { label: "Produk", href: "/admin/products", icon: Package, available: true },
   { label: "Media", href: "/admin/media", icon: Images, available: true },
   { label: "Inbox", icon: EnvelopeSimple, available: false },
   { label: "Aktivitas", icon: ClockCounterClockwise, available: false },

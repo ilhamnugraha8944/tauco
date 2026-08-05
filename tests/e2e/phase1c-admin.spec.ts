@@ -88,6 +88,42 @@ test("admin login, TOTP setup, shell, account, and logout", async ({ page }) => 
   await page.getByRole("button", { name: "Save Draft" }).click();
   await expect(page.getByText(/Draft revision \d+ tersimpan/)).toBeVisible();
 
+  await page.getByRole("link", { name: "Produk" }).click();
+  await expect(page.getByRole("heading", { name: "Pengelolaan produk" })).toBeVisible();
+  await page.getByLabel("Slug").fill("produk-baru");
+  await page.getByLabel("SKU opsional").fill("BARU-001");
+  await page.getByLabel("Urutan").fill("20");
+  await page.getByRole("button", { name: "Buat produk" }).click();
+  await expect(page.getByText("Produk baru dibuat. Lengkapi draft sebelum publish.")).toBeVisible();
+  await expect(page.locator(".admin-product-list article")).toHaveCount(2);
+
+  await page.locator(".admin-product-list article").filter({ hasText: "tauco-cap-badak" }).getByRole("link", { name: "Kelola" }).click();
+  await expect(page.getByRole("heading", { name: "Editor produk" })).toBeVisible();
+  await expect(page.getByLabel("Slug").first()).toHaveAttribute("readonly", "");
+  await page.getByLabel("Ringkasan", { exact: true }).fill("Produk tauco Cianjur untuk bumbu masakan rumahan.");
+  await page.getByLabel("Fact-check dikonfirmasi").check();
+  await page.getByRole("button", { name: "Save Draft" }).click();
+  await expect(page.getByText(/Draft revision \d+ tersimpan/)).toBeVisible();
+
+  const productPreviewPromise = page.waitForEvent("popup");
+  await page.getByRole("link", { name: "Preview" }).click();
+  const productPreview = await productPreviewPromise;
+  await expect(productPreview.getByRole("heading", { name: "Tauco Cap Badak" })).toBeVisible();
+  await productPreview.close();
+
+  await page.getByLabel("Fact-check dikonfirmasi").check();
+  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await expect(page.getByText("Produk dipublikasikan pada API lokal.")).toBeVisible();
+  await page.getByRole("button", { name: "Unpublish", exact: true }).click();
+  await expect(page.getByText("Produk di-unpublish dari API lokal.")).toBeVisible();
+  await page.getByRole("button", { name: "Archive", exact: true }).click();
+  await expect(page.getByText("Produk diarsipkan.")).toBeVisible();
+  await page.getByRole("button", { name: "Unarchive", exact: true }).click();
+  await expect(page.getByText("Produk dipulihkan dari arsip.")).toBeVisible();
+
+  const productAccessibility = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+  expect(productAccessibility.violations).toEqual([]);
+
   const shellAccessibility = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   expect(shellAccessibility.violations).toEqual([]);
 

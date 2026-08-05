@@ -79,6 +79,7 @@ func (repository *PostgresRepository) FindPublishedProduct(
 	result := repository.db.WithContext(ctx).Raw(
 		publishedProductProjection+`
 WHERE product.slug = ?
+  AND product.archived_at IS NULL
   AND revision.status = 'published'
 LIMIT 1`,
 		slug,
@@ -114,7 +115,8 @@ func (repository *PostgresRepository) ListPublishedProducts(
 	}
 
 	statement := publishedProductProjection + `
-WHERE revision.status = 'published'`
+WHERE product.archived_at IS NULL
+  AND revision.status = 'published'`
 	arguments := make([]any, 0, 3)
 	if after != nil {
 		if after.SortOrder < 0 {

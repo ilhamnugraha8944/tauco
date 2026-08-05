@@ -87,7 +87,7 @@ func (service *AdminService) SaveDraft(ctx context.Context, key, ifMatch, baseRe
 	if !EditableKey(key) {
 		return AdminRevision{}, ErrAdminPageNotFound
 	}
-	expected, err := revisionFromETag(ifMatch)
+	expected, err := RevisionFromETag(ifMatch)
 	if err != nil || expected != baseRevisionID {
 		return AdminRevision{}, ErrPrecondition
 	}
@@ -95,14 +95,14 @@ func (service *AdminService) SaveDraft(ctx context.Context, key, ifMatch, baseRe
 	if err != nil {
 		return AdminRevision{}, ErrInvalidPage
 	}
-	return service.repository.CreateDraft(ctx, key, expected, actorID, canonical, string(checksum), extractMediaReferences(canonical))
+	return service.repository.CreateDraft(ctx, key, expected, actorID, canonical, string(checksum), ExtractMediaReferences(canonical))
 }
 
 func (service *AdminService) Publish(ctx context.Context, key, revisionID, ifMatch, actorID string) (AdminRevision, error) {
 	if !EditableKey(key) {
 		return AdminRevision{}, ErrAdminPageNotFound
 	}
-	expected, err := revisionFromETag(ifMatch)
+	expected, err := RevisionFromETag(ifMatch)
 	if err != nil {
 		return AdminRevision{}, ErrPrecondition
 	}
@@ -113,7 +113,7 @@ func (service *AdminService) Unpublish(ctx context.Context, key, ifMatch, actorI
 	if !EditableKey(key) {
 		return ErrAdminPageNotFound
 	}
-	expected, err := revisionFromETag(ifMatch)
+	expected, err := RevisionFromETag(ifMatch)
 	if err != nil {
 		return ErrPrecondition
 	}
@@ -122,7 +122,7 @@ func (service *AdminService) Unpublish(ctx context.Context, key, ifMatch, actorI
 
 func RevisionETag(revisionID string) string { return `"revision-` + revisionID + `"` }
 
-func revisionFromETag(value string) (string, error) {
+func RevisionFromETag(value string) (string, error) {
 	if !strings.HasPrefix(value, `"revision-`) || !strings.HasSuffix(value, `"`) {
 		return "", ErrPrecondition
 	}
@@ -136,7 +136,7 @@ func revisionFromETag(value string) (string, error) {
 var mediaIDPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 var mediaSourcePattern = regexp.MustCompile(`^/api/v1/media/([0-9a-f-]{36})/(?:display|variants/[0-9]+)\.webp$`)
 
-func extractMediaReferences(raw json.RawMessage) []MediaReference {
+func ExtractMediaReferences(raw json.RawMessage) []MediaReference {
 	var value any
 	if json.Unmarshal(raw, &value) != nil {
 		return nil

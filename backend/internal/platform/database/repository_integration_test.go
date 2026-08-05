@@ -346,6 +346,7 @@ WHERE slug = 'cross-table-seed-collision'`).Error; err != nil {
 	assertDurableJobClaims(t, ctx, runtimeGORM, migrationGORM)
 	assertMediaPipeline(t, ctx, runtimeGORM, adminGORM)
 	assertAdminContentLifecycle(t, ctx, adminGORM, plan)
+	assertAdminProductLifecycle(t, ctx, adminGORM, runtimeGORM, plan)
 	assertCatalogPaginationProbe(
 		t,
 		ctx,
@@ -353,6 +354,70 @@ WHERE slug = 'cross-table-seed-collision'`).Error; err != nil {
 		productRepository,
 		plan,
 	)
+}
+
+func assertAdminProductLifecycle(t *testing.T, ctx context.Context, adminDatabase, runtimeDatabase *gorm.DB, plan contentapp.SeedPlan) {
+	t.Helper()
+	repository, err := catalogrepo.NewAdminPostgres(adminDatabase)
+	if err != nil {
+		t.Fatalf("NewAdminPostgres(catalog): %v", err)
+	}
+	codec, err := catalogcursor.NewHMACSHA256([]byte("integration-product-cursor-secret-32-bytes"))
+	if err != nil {
+		t.Fatalf("NewHMACSHA256(product admin): %v", err)
+	}
+	service, err := catalogapp.NewAdminProductService(repository, codec)
+	if err != nil {
+		t.Fatalf("NewAdminProductService: %v", err)
+	}
+	var actorID string
+	if err := adminDatabase.Raw(`SELECT id::text FROM tauco_app.admin_users ORDER BY created_at LIMIT 1`).Scan(&actorID).Error; err != nil || actorID == "" {
+		t.Fatalf("load product actor: %v", err)
+	}
+	sku := "INTEGRATION-001"
+	product, err := service.Create(ctx, "produk-integration", &sku, 90, actorID)
+	if err != nil || product.CurrentRevisionID() != product.ID {
+		t.Fatalf("create product=%+v err=%v", product, err)
+	}
+	if len(plan.Products) == 0 {
+		t.Fatal("product seed content missing")
+	}
+	raw := bytes.ReplaceAll(plan.Products[0].Revision.ContentJSON, []byte(`"tauco-cap-badak"`), []byte(`"produk-integration"`))
+	raw = bytes.ReplaceAll(raw, []byte(`/produk/tauco-cap-badak`), []byte(`/produk/produk-integration`))
+	draft, err := service.SaveDraft(ctx, product.ID, contentapp.RevisionETag(product.ID), product.ID, actorID, raw)
+	if err != nil || draft.Status != "draft" {
+		t.Fatalf("save product draft=%+v err=%v", draft, err)
+	}
+	published, err := service.Publish(ctx, product.ID, draft.ID, contentapp.RevisionETag(draft.ID), actorID)
+	if err != nil || published.Status != "published" {
+		t.Fatalf("publish product=%+v err=%v", published, err)
+	}
+	changedSlug := "slug-terlarang-setelah-publish"
+	if _, err := service.Update(ctx, product.ID, contentapp.RevisionETag(published.ID), &changedSlug, nil, nil, actorID); !errors.Is(err, catalogapp.ErrProductConflict) {
+		t.Fatalf("stable product slug err=%v", err)
+	}
+	publicRepository, _ := catalogrepo.NewPostgresRepository(runtimeDatabase)
+	if _, err := publicRepository.FindPublishedProduct(ctx, "produk-integration"); err != nil {
+		t.Fatalf("published product unavailable publicly: %v", err)
+	}
+	if err := service.Unpublish(ctx, product.ID, contentapp.RevisionETag(published.ID), actorID); err != nil {
+		t.Fatalf("unpublish product: %v", err)
+	}
+	if err := service.Archive(ctx, product.ID, contentapp.RevisionETag(published.ID), actorID); err != nil {
+		t.Fatalf("archive product: %v", err)
+	}
+	if _, err := publicRepository.FindPublishedProduct(ctx, "produk-integration"); !errors.Is(err, catalogapp.ErrPublishedProductNotFound) {
+		t.Fatalf("archived product public error=%v", err)
+	}
+	if err := service.Unarchive(ctx, product.ID, contentapp.RevisionETag(published.ID), actorID); err != nil {
+		t.Fatalf("unarchive product: %v", err)
+	}
+	var invalidations, activities int64
+	adminDatabase.Raw(`SELECT count(*) FROM tauco_app.background_jobs WHERE kind='content.invalidate_cache' AND idempotency_key LIKE 'product.invalidate:%'`).Scan(&invalidations)
+	adminDatabase.Raw(`SELECT count(*) FROM tauco_app.activity_logs WHERE entity_id=?::uuid AND event_type LIKE 'product.%'`, product.ID).Scan(&activities)
+	if invalidations != 2 || activities < 6 {
+		t.Fatalf("product invalidations=%d activities=%d", invalidations, activities)
+	}
 }
 
 func assertAdminAuthLifecycle(t *testing.T, ctx context.Context, db, migrationDB *gorm.DB) {

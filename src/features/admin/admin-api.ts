@@ -132,6 +132,36 @@ export const adminAPI = {
   unpublishPage(key: AdminPageKey, etag: string) {
     return send<void>(`pages/${key}/unpublish`, { method: "POST", headers: { "If-Match": etag } });
   },
+  listProducts() {
+    return send<{ data: AdminProduct[] }>("products?limit=50", { method: "GET" });
+  },
+  async createProduct(input: { slug: string; sku?: string; sortOrder: number }) {
+    const response = await sendWithResponse<{ data: AdminProduct }>("products", { method: "POST", body: JSON.stringify({ slug: input.slug, sku: input.sku || null, sortOrder: input.sortOrder }) });
+    return { ...response.body, etag: response.headers.get("etag") ?? "" };
+  },
+  async getProduct(id: string) {
+    const response = await sendWithResponse<{ data: AdminProduct }>(`products/${id}`, { method: "GET" });
+    return { ...response.body, etag: response.headers.get("etag") ?? "" };
+  },
+  async updateProduct(id: string, etag: string, input: { slug?: string; sku?: string; sortOrder?: number }) {
+    const response = await sendWithResponse<{ data: AdminProduct }>(`products/${id}`, { method: "PATCH", headers: { "If-Match": etag }, body: JSON.stringify(input) });
+    return { ...response.body, etag: response.headers.get("etag") ?? "" };
+  },
+  async getProductRevision(id: string, revisionId: string) {
+    const response = await sendWithResponse<{ data: AdminRevision }>(`products/${id}/revisions/${revisionId}`, { method: "GET" });
+    return { ...response.body, etag: response.headers.get("etag") ?? "" };
+  },
+  async saveProductDraft(id: string, etag: string, baseRevisionId: string, content: EditableContent) {
+    const response = await sendWithResponse<{ data: AdminRevision }>(`products/${id}/drafts`, { method: "POST", headers: { "If-Match": etag }, body: JSON.stringify({ baseRevisionId, content }) });
+    return { ...response.body, etag: response.headers.get("etag") ?? "" };
+  },
+  async publishProduct(id: string, revisionId: string, etag: string) {
+    const response = await sendWithResponse<{ data: AdminRevision }>(`products/${id}/revisions/${revisionId}/publish`, { method: "POST", headers: { "If-Match": etag } });
+    return { ...response.body, etag: response.headers.get("etag") ?? "" };
+  },
+  unpublishProduct(id: string, etag: string) { return send<void>(`products/${id}/unpublish`, { method: "POST", headers: { "If-Match": etag } }); },
+  archiveProduct(id: string, etag: string) { return send<void>(`products/${id}/archive`, { method: "POST", headers: { "If-Match": etag } }); },
+  unarchiveProduct(id: string, etag: string) { return send<void>(`products/${id}/unarchive`, { method: "POST", headers: { "If-Match": etag } }); },
 };
 
 export type AdminMedia = {
@@ -169,4 +199,14 @@ export type AdminPage = {
   publishedRevisionId?: string | null;
   revisions: Array<Omit<AdminRevision, "ownerId" | "schemaVersion" | "content">>;
   updatedAt: string;
+};
+export type AdminProduct = {
+  id: string;
+  slug: string;
+  sku?: string | null;
+  sortOrder: number;
+  publishedRevisionId?: string | null;
+  archivedAt?: string | null;
+  updatedAt: string;
+  revisions: Array<Omit<AdminRevision, "ownerId" | "schemaVersion" | "content">>;
 };

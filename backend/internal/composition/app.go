@@ -164,6 +164,7 @@ func NewPublicAPI(
 	var adminAuthHandler *api.AdminAuthHandler
 	var adminMediaServer *api.AdminMediaServer
 	var adminContentServer *api.AdminContentServer
+	var adminProductServer *api.AdminProductServer
 	if options := infrastructure.AdminAuth; options != nil {
 		adminGORM, openErr := database.OpenAdminGORM(ctx, options.Database)
 		if openErr != nil {
@@ -233,6 +234,21 @@ func NewPublicAPI(
 			closeAll()
 			return nil, contentErr
 		}
+		productAdminRepository, productErr := catalogrepo.NewAdminPostgres(adminGORM)
+		if productErr != nil {
+			closeAll()
+			return nil, productErr
+		}
+		productAdmin, productErr := catalogapp.NewAdminProductService(productAdminRepository, cursorCodec)
+		if productErr != nil {
+			closeAll()
+			return nil, productErr
+		}
+		adminProductServer, productErr = api.NewAdminProductServer(productAdmin)
+		if productErr != nil {
+			closeAll()
+			return nil, productErr
+		}
 	}
 	publicLimit, err := httpmiddleware.RateLimit(limiter, secrets.RateHMAC, httpmiddleware.RatePolicy{
 		Name: "public-read", Limit: 60, Window: time.Minute,
@@ -263,6 +279,7 @@ func NewPublicAPI(
 			adminAuthHandler.Register(router)
 			api.RegisterSafeMediaHandlers(router, adminMediaServer, adminAuthHandler, publicLimit)
 			api.RegisterSafeAdminContentHandlers(router, adminContentServer, adminAuthHandler)
+			api.RegisterSafeAdminProductHandlers(router, adminProductServer, adminAuthHandler)
 		}
 		api.RegisterSafePublicReadHandlers(
 			router,
