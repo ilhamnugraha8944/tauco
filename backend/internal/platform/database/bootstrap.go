@@ -330,15 +330,26 @@ SELECT
         WHERE acl.grantee = runtime_role.oid
           AND NOT (
               namespace.nspname = 'tauco_app'
-              AND procedure.proname IN (
-                  'tauco_set_updated_at',
-                  'tauco_reject_published_revision_mutation',
-                  'tauco_assert_page_published_revision',
-                  'tauco_assert_product_published_revision',
-                  'tauco_reject_activity_log_mutation'
+              AND (
+                  (
+                      procedure.proname IN (
+                          'tauco_set_updated_at',
+                          'tauco_reject_published_revision_mutation',
+                          'tauco_assert_page_published_revision',
+                          'tauco_assert_product_published_revision',
+                          'tauco_reject_activity_log_mutation'
+                      )
+                      AND procedure.pronargs = 0
+                      AND procedure.prorettype = 'trigger'::regtype
+                  )
+                  OR (
+                      procedure.proname = 'tauco_purge_expired_contact_messages'
+                      AND procedure.pronargs = 2
+                      AND procedure.proargtypes[0] = 'timestamptz'::regtype
+                      AND procedure.proargtypes[1] = 'integer'::regtype
+                      AND procedure.prorettype = 'bigint'::regtype
+                  )
               )
-              AND procedure.pronargs = 0
-              AND procedure.prorettype = 'trigger'::regtype
               AND acl.privilege_type = 'EXECUTE'
               AND NOT acl.is_grantable
           )

@@ -47,7 +47,7 @@ layanan backend. Bukti ada di
 | Privacy notice | Phase 1A |
 | Metadata, canonical, sitemap, robots, JSON-LD | Phase 1A |
 | Go REST API | Phase 1B local complete; public/contact/health/protected metrics aktif lokal |
-| PostgreSQL | Phase 1B local complete; Phase 1C migration v6 dan role admin lulus lokal |
+| PostgreSQL | Phase 1B/1C local complete; Phase 1D migration v7 memperbaiki bounded worker retention |
 | Redis | Phase 1B local complete; cache-aside, atomic limiter, fail-open, dan metrics lulus |
 | Admin CMS | Phase 1C C0-C10 complete lokal; belum dideploy atau di-cutover |
 | Remote pilot/cutover | Phase 1D D0 complete; D1-D10 belum diimplementasikan |

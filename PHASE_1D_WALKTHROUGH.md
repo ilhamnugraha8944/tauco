@@ -118,6 +118,86 @@ melanjutkan branch; production tidak terdampak.
 D1: production configuration, Ed25519 JWT, BFF trust boundary, dan
 Supabase-safe database role profile.
 
+## Maintenance Update D0.1: Local Worker Retention Fix
+
+**Tanggal:** 6 Agustus 2026
+**Status:** Complete
+
+### Tujuan
+
+Memperbaiki worker lokal yang berhenti segera setelah startup walaupun
+readiness awal lulus.
+
+### Root cause
+
+Worker langsung menjalankan purge retensi saat startup. Repository mencoba
+`DELETE` pada `contact_messages`, sedangkan least-privilege `tauco_runtime`
+secara sengaja tidak memiliki privilege `DELETE`. Error dari retention
+goroutine kemudian menghentikan seluruh worker dan hanya ditampilkan sebagai
+pesan generik.
+
+### Perubahan
+
+- Migration v7 membuat bounded `SECURITY DEFINER` retention function.
+- Public tidak mendapat `EXECUTE`; hanya `tauco_runtime` yang diizinkan.
+- Fungsi menolak limit di luar 1-1000, nilai null, serta cutoff masa depan.
+- Repository memanggil fungsi tersebut dan tetap tidak memiliki direct table
+  `DELETE`.
+- Worker readiness memeriksa capability retention.
+- Startup error sekarang menyertakan penyebab internal yang aman.
+- Bootstrap allowlist hanya menerima signature fungsi retensi yang tepat.
+- Existing migration integration test memverifikasi direct delete ditolak,
+  expired record dihapus, dan future cutoff ditolak.
+
+### Command yang dijalankan
+
+```powershell
+npm.cmd run backend:worker:ready
+npm.cmd run backend:test
+npm.cmd run backend:test:integration
+docker run ... go test -count=1 -run ^TestMigrationRoundTripAndRuntimePrivileges$ ./internal/platform/database
+npm.cmd run backend:migrate:version
+npm.cmd run backend:migrate:up
+npm.cmd run backend:worker:ready
+npm.cmd run backend:worker
+npm.cmd run backend:vet
+npm.cmd run backend:build
+git diff --check
+```
+
+### Hasil pengujian
+
+```text
+targeted migration/privilege integration: PASS
+migration local: version 6 -> 7, dirty=false
+worker readiness setelah migration: PASS
+worker process smoke: tetap hidup; tidak berhenti unexpectedly
+direct DELETE contact_messages: false
+bounded retention function EXECUTE: true
+go vet: PASS
+backend build: PASS
+```
+
+### Known limitations
+
+- Repo-wide format checker melaporkan baseline CRLF/LF pada banyak file Go
+  lama. File yang berubah sudah diformat dengan `gofmt`; tidak dilakukan
+  rewrite massal.
+- Full suite mengalami Windows Application Control dan satu Redis timeout
+  fluktuatif. Targeted database integration, vet, build, readiness, dan live
+  worker smoke lulus.
+- Perbaikan ini hanya lokal dan tidak mengubah production.
+
+### Rollback
+
+Rollback membutuhkan code rollback dan migration down v7 secara bersamaan.
+Menurunkan migration tanpa mengembalikan repository akan membuat worker gagal
+readiness, sehingga mismatch tidak dapat berjalan diam-diam.
+
+### Next gate
+
+D1 tetap pending dan tidak diperluas oleh maintenance fix ini.
+
 ## Gate Checklist
 
 | Gate | Status | Exit utama |

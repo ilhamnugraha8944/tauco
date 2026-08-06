@@ -230,7 +230,7 @@ func TestMigrationRoundTripAndRuntimePrivileges(t *testing.T) {
 	if err := migrator.Up(); err != nil {
 		t.Fatalf("migration Up() error = %v", err)
 	}
-	assertMigrationVersion(t, migrator, 6)
+	assertMigrationVersion(t, migrator, 7)
 	if err := BootstrapRoles(ctx, cfg); err != nil {
 		t.Fatalf("post-migration idempotent BootstrapRoles() error = %v", err)
 	}
@@ -272,15 +272,15 @@ func TestMigrationRoundTripAndRuntimePrivileges(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewMigrator(rotated login) error = %v", err)
 	}
-	assertMigrationVersion(t, rotatedMigrator, 6)
+	assertMigrationVersion(t, rotatedMigrator, 7)
 	if err := rotatedMigrator.DownOne(); err != nil {
 		t.Fatalf("rotated migration DownOne() error = %v", err)
 	}
-	assertMigrationVersion(t, rotatedMigrator, 5)
+	assertMigrationVersion(t, rotatedMigrator, 6)
 	if err := rotatedMigrator.Up(); err != nil {
 		t.Fatalf("rotated migration Up() error = %v", err)
 	}
-	assertMigrationVersion(t, rotatedMigrator, 6)
+	assertMigrationVersion(t, rotatedMigrator, 7)
 	if err := rotatedMigrator.Close(); err != nil {
 		t.Fatalf("close rotated migrator: %v", err)
 	}
@@ -364,7 +364,7 @@ func TestMigrationRoundTripAndRuntimePrivileges(t *testing.T) {
 	if err := migrator.Up(); err != nil {
 		t.Fatalf("second migration Up() error = %v", err)
 	}
-	assertMigrationVersion(t, migrator, 6)
+	assertMigrationVersion(t, migrator, 7)
 	if err := migrator.DownAll(); err != nil {
 		t.Fatalf("second migration DownAll() error = %v", err)
 	}
@@ -740,6 +740,53 @@ INSERT INTO tauco_app.contact_messages (
 	if err != nil {
 		t.Fatalf("runtime insert contact message: %v", err)
 	}
+
+	assertPostgresCode(t, "runtime direct contact purge", "42501", func() error {
+		_, err := conn.Exec(ctx, `
+DELETE FROM tauco_app.contact_messages
+WHERE id = '019bfc80-0000-7000-8000-000000009901'`)
+		return err
+	})
+
+	_, err = conn.Exec(ctx, `
+INSERT INTO tauco_app.contact_messages (
+    id, idempotency_key_hash, request_payload_hash, name, email, phone,
+    subject, message, privacy_consent, privacy_notice_version,
+    consent_at, retention_delete_at, created_at, updated_at
+) VALUES (
+    '019bfc80-0000-7000-8000-000000009902',
+    repeat('c', 64), repeat('d', 64), 'Expired Integration Test',
+    'expired@example.test', NULL, 'Pertanyaan umum',
+    'Pesan kedaluwarsa untuk menguji fungsi retensi worker.',
+    true, 'phase-1b',
+    statement_timestamp() - interval '13 months',
+    statement_timestamp() - interval '1 month',
+    statement_timestamp() - interval '13 months',
+    statement_timestamp() - interval '13 months'
+)`)
+	if err != nil {
+		t.Fatalf("runtime insert expired contact message: %v", err)
+	}
+
+	var deleted int64
+	if err := conn.QueryRow(ctx, `
+SELECT tauco_app.tauco_purge_expired_contact_messages(
+    statement_timestamp(),
+    100
+)`).Scan(&deleted); err != nil {
+		t.Fatalf("runtime execute contact retention function: %v", err)
+	}
+	if deleted != 1 {
+		t.Fatalf("retention deleted = %d, want 1", deleted)
+	}
+	assertPostgresCode(t, "runtime future retention cutoff", "22023", func() error {
+		_, err := conn.Exec(ctx, `
+SELECT tauco_app.tauco_purge_expired_contact_messages(
+    statement_timestamp() + interval '1 day',
+    100
+)`)
+		return err
+	})
 }
 
 func assertAdminPrivileges(t *testing.T, ctx context.Context, conn *pgx.Conn) {

@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net"
 	"os"
@@ -108,7 +109,7 @@ func run() int {
 	group.Go(func() error { return worker.Run(groupContext) })
 	group.Go(func() error { return runRetention(groupContext, contactStore) })
 	if err := group.Wait(); err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, "worker stopped unexpectedly")
+		_, _ = fmt.Fprintf(os.Stderr, "worker stopped unexpectedly: %v\n", err)
 		return 1
 	}
 	return 0
@@ -139,11 +140,24 @@ func runRetention(ctx context.Context, store retentionStore) error {
 	}
 }
 
-func checkReadiness(ctx context.Context, database interface{ PingContext(context.Context) error }, cache interface{ Ping(context.Context) error }, mediaRoot, smtpHost string, smtpPort int) error {
+func checkReadiness(ctx context.Context, database *sql.DB, cache interface{ Ping(context.Context) error }, mediaRoot, smtpHost string, smtpPort int) error {
 	checkContext, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	if err := database.PingContext(checkContext); err != nil {
 		return err
+	}
+	var canPurgeExpiredContacts bool
+	if err := database.QueryRowContext(checkContext, `
+		SELECT has_function_privilege(
+			current_user,
+			'tauco_app.tauco_purge_expired_contact_messages(timestamptz,integer)',
+			'EXECUTE'
+		)
+	`).Scan(&canPurgeExpiredContacts); err != nil {
+		return fmt.Errorf("check contact retention privilege: %w", err)
+	}
+	if !canPurgeExpiredContacts {
+		return fmt.Errorf("contact retention privilege is unavailable")
 	}
 	if err := cache.Ping(checkContext); err != nil {
 		return err

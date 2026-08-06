@@ -115,20 +115,14 @@ func (store *PostgresStore) PurgeExpired(
 	if limit < 1 || limit > 1000 {
 		return 0, errors.New("purge limit must be between 1 and 1000")
 	}
-	result := store.database.WithContext(ctx).Exec(`
-		DELETE FROM tauco_app.contact_messages
-		WHERE id IN (
-			SELECT id FROM tauco_app.contact_messages
-			WHERE retention_delete_at <= ?
-			ORDER BY retention_delete_at, id
-			LIMIT ?
-			FOR UPDATE SKIP LOCKED
-		)
-	`, before.UTC(), limit)
+	var deleted int64
+	result := store.database.WithContext(ctx).Raw(`
+		SELECT tauco_app.tauco_purge_expired_contact_messages(?, ?)
+	`, before.UTC(), limit).Scan(&deleted)
 	if result.Error != nil {
 		return 0, fmt.Errorf("purge expired contact messages: %w", result.Error)
 	}
-	return result.RowsAffected, nil
+	return deleted, nil
 }
 
 func (store *PostgresStore) LoadNotification(
