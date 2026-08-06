@@ -23,6 +23,13 @@ production. Kontrak dan evidence tersedia di
 [PHASE_1C_RUNBOOK.md](./PHASE_1C_RUNBOOK.md). Hasil quality final ada di
 [PHASE_1C_QUALITY_REPORT.md](./PHASE_1C_QUALITY_REPORT.md).
 
+**Phase 1D** sedang berjalan. Gate D0 telah membekukan remote pilot Netlify,
+Supabase PostgreSQL/Storage, Upstash Redis, staged content/admin cutover,
+verified Netlify Forms Inbox sync, rollback, dan backup/restore boundary.
+Production belum diubah oleh D0. Kontrak delivery serta evidence ledger ada di
+[PHASE_1D_PLAN.md](./PHASE_1D_PLAN.md) dan
+[PHASE_1D_WALKTHROUGH.md](./PHASE_1D_WALKTHROUGH.md).
+
 **Status handoff:** Phase 1A berstatus PRD-complete dan telah tersedia di
 `https://tauco-cap-badak.netlify.app`. Gate G0–G8 sudah lulus dan Phase 1A
 berstatus **Complete** pada 28 Juli 2026. Tidak ada koneksi Supabase atau
@@ -43,6 +50,7 @@ layanan backend. Bukti ada di
 | PostgreSQL | Phase 1B local complete; Phase 1C migration v6 dan role admin lulus lokal |
 | Redis | Phase 1B local complete; cache-aside, atomic limiter, fail-open, dan metrics lulus |
 | Admin CMS | Phase 1C C0-C10 complete lokal; belum dideploy atau di-cutover |
+| Remote pilot/cutover | Phase 1D D0 complete; D1-D10 belum diimplementasikan |
 | Inventory dan order management | Out of scope Phase 1 |
 
 ## Tech stack

@@ -4,9 +4,9 @@
 
 | Atribut | Nilai |
 | --- | --- |
-| Versi dokumen | 1.4 |
-| Tanggal | 5 Agustus 2026 |
-| Status produk | Phase 1A complete production; Phase 1B dan 1C complete lokal; Phase 1D planned |
+| Versi dokumen | 1.5 |
+| Tanggal | 6 Agustus 2026 |
+| Status produk | Phase 1A complete production; Phase 1B dan 1C complete lokal; Phase 1D implementing |
 | Bahasa produk | Indonesia |
 | Target pasar awal | Indonesia |
 | Target deployment Phase 1A | Implemented di `https://tauco-cap-badak.netlify.app` |
@@ -37,8 +37,11 @@ Delivery dibagi agar website publik dapat diluncurkan lebih cepat:
   same-origin BFF, shell CMS, media CMS, editor dan publishing Home/About,
   Product CMS, inbox/activity, worker publishing, recovery, metrics, dan quality
   closeout tersedia dalam shadow-mode lokal.
-- **Phase 1D — future:** remote deployment, hardening, migration/cutover konten
-  lokal dan contact, load/security test, backup, dan operational readiness.
+- **Phase 1D — implementing:** D0 complete. Remote pilot memakai Netlify,
+  Supabase PostgreSQL/Storage, dan Upstash Redis dengan staged content/admin
+  cutover, verified Netlify Forms Inbox sync, rollback, backup, serta
+  operational readiness. Netlify Forms tetap menjadi contact transport dan
+  pengirim email.
 - **Phase 2 — out of scope:** inventory, warehouse, order, payment, dan
   transaction processing.
 
@@ -52,6 +55,9 @@ Label status dalam dokumen ini:
 - `IMPLEMENTED-1C-LOCAL`: gate C0-C10 selesai dan tercatat pada
   `PHASE_1C_PLAN.md`, `PHASE_1C_WALKTHROUGH.md`, serta
   `PHASE_1C_QUALITY_REPORT.md`; belum dideploy.
+- `IMPLEMENTING-1D`: scope dan provider sudah dibekukan pada D0; implementasi
+  remote runtime serta staged production cutover berjalan melalui
+  `PHASE_1D_PLAN.md` dan `PHASE_1D_WALKTHROUGH.md`.
 - `PLANNED`: desain target yang belum diimplementasikan pada Phase 1A.
 - `OUT-OF-SCOPE`: bukan bagian delivery Phase 1.
 
@@ -798,11 +804,9 @@ Daftar status rinci berada di [FACT_CHECK.md](./FACT_CHECK.md).
 - Bahasa Phase 1 hanya Indonesia; kontrak konten dibuat agar locale dapat
   ditambahkan kemudian.
 - Phase 1A tidak memiliki database, API Go, Redis, login, atau CMS.
-- Netlify Forms tetap menjadi transport kontak production sepanjang Phase 1B
-  dan Phase 1C.
-  Contact endpoint Go dibangun dalam shadow-mode dan baru dapat menggantikannya
-  pada Phase 1D setelah anti-spam, email, retensi, privacy, dan rollback gate
-  lulus.
+- Netlify Forms tetap menjadi transport kontak production pada Phase 1D dan
+  tetap mengirim email utama. Submission yang sudah verified disalin secara
+  idempotent ke Inbox CMS setelah D8 lulus; Go contact intake tetap disabled.
 - Konten awal dapat diperbarui melalui repository oleh developer.
 - Harga dan order online tidak termasuk Phase 1A.
 - Availability 99,9% adalah aspirasi arsitektur, bukan SLA free-tier.
