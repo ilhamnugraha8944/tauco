@@ -2,18 +2,37 @@
 
 import { ArrowClockwise, ImageSquare, UploadSimple } from "@phosphor-icons/react";
 import Image from "next/image";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { adminAPI, type AdminMedia } from "@/features/admin/admin-api";
+import {
+  AdminAPIError,
+  adminAPI,
+  type AdminMedia,
+} from "@/features/admin/admin-api";
 
 const maxBytes = 10 * 1024 * 1024;
+const supportedMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+const intentPollInitialMilliseconds = 5_000;
+const intentPollMaximumMilliseconds = 15_000;
+const intentPollDeadlineMilliseconds = 15 * 60_000;
+const mediaPollMilliseconds = 15_000;
+const mediaPollDeadlineMilliseconds = 15 * 60_000;
 
-export function MediaManager() {
+async function fileSHA256(file: File): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+
+  return Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, "0")).join("");
+}
+
+export function MediaManager({ allowLegacyUpload }: { allowLegacyUpload: boolean }) {
   const [items, setItems] = useState<AdminMedia[]>([]);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
+  const [activeIntentId, setActiveIntentId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [decorative, setDecorative] = useState(false);
+  const mediaPollStartedAt = useRef<number | null>(null);
+  const busy = pending || activeIntentId !== null;
 
   const load = useCallback(async () => {
     try {
@@ -36,10 +55,69 @@ export function MediaManager() {
     return () => { active = false; };
   }, []);
   useEffect(() => {
-    if (!items.some((item) => item.status === "processing")) return;
-    const timer = window.setInterval(() => { void load(); }, 2000);
+    if (!items.some((item) => item.status === "processing")) {
+      mediaPollStartedAt.current = null;
+      return;
+    }
+    mediaPollStartedAt.current ??= Date.now();
+    const timer = window.setInterval(() => {
+      if (Date.now() - (mediaPollStartedAt.current ?? Date.now()) >= mediaPollDeadlineMilliseconds) {
+        window.clearInterval(timer);
+        setMessage("Pemrosesan media belum selesai. Gunakan Muat ulang untuk memeriksa kembali.");
+        return;
+      }
+      void load();
+    }, mediaPollMilliseconds);
     return () => window.clearInterval(timer);
   }, [items, load]);
+  useEffect(() => {
+    if (!activeIntentId) return;
+    let active = true;
+    let timer: number | undefined;
+    let delay = intentPollInitialMilliseconds;
+    const deadline = Date.now() + intentPollDeadlineMilliseconds;
+
+    const poll = async () => {
+      try {
+        const { data: intent } = await adminAPI.getMediaUploadIntent(activeIntentId);
+
+        if (!active) return;
+        if (intent.status === "completed") {
+          if (!intent.mediaAssetId) throw new Error("Upload selesai tanpa referensi media.");
+          const { data: media } = await adminAPI.getMedia(intent.mediaAssetId);
+          if (!active) return;
+          setItems((current) => [media, ...current.filter((item) => item.id !== media.id)]);
+          setActiveIntentId(null);
+          setMessage(media.status === "ready" ? "Media siap digunakan." : "Upload selesai. Varian media masih diproses.");
+          return;
+        }
+        if (intent.status === "failed" || intent.status === "expired") {
+          setActiveIntentId(null);
+          setMessage(intent.status === "expired"
+            ? "Upload kedaluwarsa. Silakan unggah ulang."
+            : `Pemrosesan media gagal${intent.lastErrorCode ? ` (${intent.lastErrorCode})` : ""}.`);
+          return;
+        }
+        if (Date.now() >= deadline) {
+          setActiveIntentId(null);
+          setMessage("Media masih diproses. Muat ulang pustaka beberapa saat lagi.");
+          return;
+        }
+        timer = window.setTimeout(() => { void poll(); }, delay);
+        delay = Math.min(delay * 2, intentPollMaximumMilliseconds);
+      } catch (error) {
+        if (!active) return;
+        setActiveIntentId(null);
+        setMessage(error instanceof Error ? error.message : "Status upload tidak dapat diperiksa.");
+      }
+    };
+
+    void poll();
+    return () => {
+      active = false;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [activeIntentId]);
 
   async function upload(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -49,11 +127,37 @@ export function MediaManager() {
     const altText = String(data.get("altText") ?? "");
     if (!(file instanceof File) || file.size === 0) { setMessage("Pilih gambar terlebih dahulu."); return; }
     if (file.size > maxBytes) { setMessage("Ukuran gambar maksimal 10 MiB."); return; }
+    if (!supportedMimeTypes.has(file.type)) { setMessage("Gunakan JPEG, PNG, atau WebP statis."); return; }
     if (!decorative && !altText.trim()) { setMessage("Alt text wajib untuk gambar informatif."); return; }
     setPending(true);
     try {
-      const response = await adminAPI.uploadMedia({ file, altText: decorative ? "" : altText.trim(), decorative });
-      setItems((current) => [response.data, ...current.filter((item) => item.id !== response.data.id)]);
+      const canonicalAltText = decorative ? "" : altText.trim();
+      const sha256 = await fileSHA256(file);
+      let created;
+
+      try {
+        created = await adminAPI.createMediaUploadIntent({
+          mimeType: file.type,
+          bytes: file.size,
+          sha256,
+          altText: canonicalAltText,
+          decorative,
+        });
+      } catch (error) {
+        if (!(allowLegacyUpload && error instanceof AdminAPIError && error.status === 404)) {
+          throw error;
+        }
+        const response = await adminAPI.uploadMedia({ file, altText: canonicalAltText, decorative });
+        setItems((current) => [response.data, ...current.filter((item) => item.id !== response.data.id)]);
+        setMessage("Upload diterima. Varian WebP diproses oleh worker.");
+        form.reset();
+        setDecorative(false);
+        return;
+      }
+
+      await adminAPI.putMediaUpload(created.data.upload, file);
+      const finalized = await adminAPI.finalizeMediaUploadIntent(created.data.intent.id);
+      setActiveIntentId(finalized.data.id);
       setMessage("Upload diterima. Varian WebP diproses oleh worker.");
       form.reset();
       setDecorative(false);
@@ -77,13 +181,13 @@ export function MediaManager() {
       <header className="admin-page-header">
         <p className="admin-kicker">Gate C5</p>
         <h1>Pustaka media</h1>
-        <p>Upload satu sumber, lalu worker membuat varian WebP tanpa menahan respons browser.</p>
+        <p>Upload satu sumber, lalu worker membuat varian WebP secara asinkron.</p>
       </header>
 
       <form className="admin-media-upload" onSubmit={upload}>
         <div>
           <h2>Tambah gambar</h2>
-          <p>JPEG, PNG, atau WebP statis. Maksimal 10 MiB.</p>
+          <p>JPEG, PNG, atau WebP statis. Maksimal 10 MiB, 12,5 MP, dan sisi 6000 px.</p>
         </div>
         <label className="admin-field">
           <span>File gambar</span>
@@ -97,8 +201,8 @@ export function MediaManager() {
           <span>Alt text</span>
           <input name="altText" type="text" maxLength={300} disabled={decorative} required={!decorative} placeholder="Jelaskan isi dan fungsi gambar" />
         </label>
-        <button className="admin-primary-button" disabled={pending} type="submit">
-          <UploadSimple size={19} aria-hidden="true" /> {pending ? "Mengirim..." : "Upload gambar"}
+        <button className="admin-primary-button" disabled={busy} type="submit">
+          <UploadSimple size={19} aria-hidden="true" /> {pending ? "Mengirim..." : activeIntentId ? "Memproses..." : "Upload gambar"}
         </button>
       </form>
 

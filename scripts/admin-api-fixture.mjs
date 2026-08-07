@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const port = Number(process.env.ADMIN_FIXTURE_PORT ?? "18081");
+const bffSecret = process.env.ADMIN_BFF_SHARED_SECRET ?? "";
+const uploadOrigins = new Set(["http://localhost:3100", "http://localhost:3101"]);
 const csrf = "c4-fixture-csrf-token";
 const user = {
   id: "019cf000-0000-7000-8000-000000000901",
@@ -14,6 +16,13 @@ const user = {
 };
 const media = [];
 const mediaId = "019cf000-0000-7000-8000-000000000905";
+const uploadIntentId = "019cf000-0000-7000-8000-000000000906";
+let uploadIntent = null;
+let uploadReceived = false;
+let uploadPolls = 0;
+let directUploadEnabled = true;
+let directPutCount = 0;
+let legacyPostCount = 0;
 let revisionSequence = 10;
 function initialPageState() { return Object.fromEntries(["home", "about"].map((key, index) => {
   const content = JSON.parse(readFileSync(resolve(`content/${key}.json`), "utf8"));
@@ -63,10 +72,73 @@ async function body(request) {
   return chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : {};
 }
 
+function fixtureMedia(intent) {
+  return {
+    id: mediaId,
+    status: "ready",
+    mimeType: "image/png",
+    width: 900,
+    height: 1200,
+    bytes: intent?.bytes ?? 8192,
+    altText: intent?.altText ?? "Tumis tahu dan sayuran dengan bumbu tauco",
+    decorative: intent?.decorative ?? false,
+    variants: [{ width: 320, height: 427, bytes: 2048, url: `/api/v1/media/${mediaId}/variants/320.webp` }],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 const server = createServer(async (request, response) => {
   const requestURL = new URL(request.url ?? "/", `http://127.0.0.1:${port}`);
   const path = requestURL.pathname;
   const cookie = request.headers.cookie ?? "";
+
+  if (path === "/__fixture/media-upload-evidence" && request.method === "GET") {
+    if (requestURL.searchParams.has("enabled")) {
+      directUploadEnabled = requestURL.searchParams.get("enabled") === "true";
+    }
+    json(response, 200, { directUploadEnabled, directPutCount, legacyPostCount });
+    return;
+  }
+
+  if (path === `/__fixture/media-uploads/${uploadIntentId}` && request.method === "OPTIONS") {
+    const origin = request.headers.origin ?? "";
+    response.writeHead(204, {
+      ...(uploadOrigins.has(origin) ? { "Access-Control-Allow-Origin": origin } : {}),
+      "Access-Control-Allow-Methods": "PUT",
+      "Access-Control-Allow-Headers": "content-type,x-fixture-upload-token",
+      "Access-Control-Max-Age": "60",
+    });
+    response.end();
+    return;
+  }
+
+  if (path === `/__fixture/media-uploads/${uploadIntentId}` && request.method === "PUT") {
+    const chunks = [];
+    for await (const chunk of request) chunks.push(chunk);
+    const uploaded = Buffer.concat(chunks);
+    const origin = request.headers.origin ?? "";
+    const valid = uploadIntent &&
+      uploadOrigins.has(origin) &&
+      request.headers["x-fixture-upload-token"] === "direct-put-only" &&
+      request.headers["content-type"] === uploadIntent.mimeType &&
+      uploaded.length === uploadIntent.bytes;
+    if (!valid) {
+      response.writeHead(422, uploadOrigins.has(origin) ? { "Access-Control-Allow-Origin": origin } : {});
+      response.end();
+      return;
+    }
+    uploadReceived = true;
+    directPutCount += 1;
+    response.writeHead(204, { "Access-Control-Allow-Origin": origin });
+    response.end();
+    return;
+  }
+
+  if (path.startsWith("/api/v1/admin/") && request.headers["x-tauco-admin-bff-secret"] !== bffSecret) {
+    problem(response, 404, "ROUTE_NOT_FOUND");
+    return;
+  }
 
   if (request.method === "POST" && !request.headers.origin) {
     problem(response, 403, "ORIGIN_MISSING");
@@ -81,6 +153,12 @@ const server = createServer(async (request, response) => {
     }
     user.mfaEnabled = false;
     media.length = 0;
+    uploadIntent = null;
+    uploadReceived = false;
+    uploadPolls = 0;
+    directUploadEnabled = true;
+    directPutCount = 0;
+    legacyPostCount = 0;
     revisionSequence = 10;
     pageState = initialPageState();
     productState = initialProductState();
@@ -135,6 +213,80 @@ const server = createServer(async (request, response) => {
     return;
   }
 
+  if (path === "/api/v1/admin/media/upload-intents" && request.method === "POST" && cookie.includes("tauco_admin_access=mfa-session")) {
+    if (!directUploadEnabled) {
+      problem(response, 404, "ROUTE_NOT_FOUND");
+      return;
+    }
+    const input = await body(request);
+    if (!["image/jpeg", "image/png", "image/webp"].includes(input.mimeType) ||
+      !Number.isInteger(input.bytes) || input.bytes < 1 || input.bytes > 10 * 1024 * 1024 ||
+      !/^[0-9a-f]{64}$/.test(input.sha256 ?? "")) {
+      problem(response, 422, "VALIDATION_FAILED");
+      return;
+    }
+    const now = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + 10 * 60_000).toISOString();
+    uploadIntent = {
+      id: uploadIntentId,
+      status: "pending",
+      mimeType: input.mimeType,
+      bytes: input.bytes,
+      sha256: input.sha256,
+      altText: input.altText,
+      decorative: input.decorative,
+      expiresAt,
+      createdAt: now,
+      updatedAt: now,
+    };
+    uploadReceived = false;
+    uploadPolls = 0;
+    json(response, 201, {
+      data: {
+        intent: uploadIntent,
+        upload: {
+          url: `http://127.0.0.1:${port}/__fixture/media-uploads/${uploadIntentId}`,
+          method: "PUT",
+          headers: { "Content-Type": input.mimeType, "X-Fixture-Upload-Token": "direct-put-only" },
+          expiresAt,
+        },
+      },
+      meta: { apiVersion: "v1", requestId: "d2-fixture-request" },
+    });
+    return;
+  }
+
+  const uploadIntentMatch = /^\/api\/v1\/admin\/media\/upload-intents\/([0-9a-f-]{36})$/.exec(path);
+  if (uploadIntentMatch && request.method === "GET" && cookie.includes("tauco_admin_access=mfa-session")) {
+    if (!uploadIntent || uploadIntentMatch[1] !== uploadIntent.id) {
+      problem(response, 404, "MEDIA_UPLOAD_INTENT_NOT_FOUND");
+      return;
+    }
+    uploadPolls += 1;
+    uploadIntent = { ...uploadIntent, status: uploadPolls === 1 ? "queued" : "completed", updatedAt: new Date().toISOString() };
+    if (uploadIntent.status === "completed") {
+      uploadIntent.mediaAssetId = mediaId;
+      media.splice(0, media.length, fixtureMedia(uploadIntent));
+    }
+    json(response, 200, { data: uploadIntent, meta: { apiVersion: "v1", requestId: "d2-fixture-request" } });
+    return;
+  }
+
+  const finalizeUploadMatch = /^\/api\/v1\/admin\/media\/upload-intents\/([0-9a-f-]{36})\/finalize$/.exec(path);
+  if (finalizeUploadMatch && request.method === "POST" && cookie.includes("tauco_admin_access=mfa-session")) {
+    if (!uploadIntent || finalizeUploadMatch[1] !== uploadIntent.id) {
+      problem(response, 404, "MEDIA_UPLOAD_INTENT_NOT_FOUND");
+      return;
+    }
+    if (!uploadReceived) {
+      problem(response, 409, "MEDIA_UPLOAD_MISSING");
+      return;
+    }
+    uploadIntent = { ...uploadIntent, status: "queued", updatedAt: new Date().toISOString() };
+    json(response, 202, { data: uploadIntent, meta: { apiVersion: "v1", requestId: "d2-fixture-request" } });
+    return;
+  }
+
   if (path === "/api/v1/admin/media" && request.method === "POST" && cookie.includes("tauco_admin_access=mfa-session")) {
     const chunks = [];
     for await (const chunk of request) chunks.push(chunk);
@@ -142,7 +294,8 @@ const server = createServer(async (request, response) => {
       problem(response, 422, "VALIDATION_FAILED");
       return;
     }
-    const item = { id: mediaId, status: "ready", mimeType: "image/png", width: 900, height: 1200, bytes: 8192, altText: "Tumis tahu dan sayuran dengan bumbu tauco", decorative: false, variants: [{ width: 320, height: 427, bytes: 2048, url: `/api/v1/media/${mediaId}/variants/320.webp` }], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    legacyPostCount += 1;
+    const item = fixtureMedia();
     media.splice(0, media.length, item);
     json(response, 202, { data: item, meta: { apiVersion: "v1", requestId: "c5-fixture-request" } });
     return;
@@ -330,7 +483,7 @@ const server = createServer(async (request, response) => {
   problem(response, 401, "UNAUTHORIZED");
 });
 
-server.listen(port, "127.0.0.1", () => process.stdout.write(`Admin fixture listening on ${port}\n`));
+server.listen(port, "0.0.0.0", () => process.stdout.write(`Admin fixture listening on ${port}\n`));
 
 function productResponse(product) {
   return { ...product, revisions: product.revisions.map(revisionSummary) };

@@ -7,12 +7,12 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	api "github.com/ilhamnugraha8944/tauco/backend/internal/delivery/api"
+	mediaapp "github.com/ilhamnugraha8944/tauco/backend/internal/media/application"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/platform/httpserver"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/platform/observability"
 )
@@ -25,7 +25,7 @@ type operationsDependencies struct {
 	Database      *sql.DB
 	AdminDatabase *sql.DB
 	Cache         readinessCache
-	MediaRoot     string
+	Storage       mediaapp.HealthStore
 	MetricsToken  []byte
 	Metrics       *observability.Registry
 }
@@ -54,9 +54,9 @@ func readinessHandler(dependencies operationsDependencies) gin.HandlerFunc {
 		if dependencies.Cache == nil || dependencies.Cache.Ping(checkContext) != nil {
 			redisState = api.DependencyStateDegraded
 		}
-		storageState := api.DependencyStateDegraded
-		if info, err := os.Stat(dependencies.MediaRoot); err == nil && info.IsDir() {
-			storageState = api.DependencyStateHealthy
+		storageState := api.DependencyStateHealthy
+		if dependencies.Storage == nil || dependencies.Storage.Health(checkContext) != nil {
+			storageState = api.DependencyStateDegraded
 		}
 		status := api.ReadinessResponseStatusReady
 		if redisState == api.DependencyStateDegraded || storageState == api.DependencyStateDegraded {

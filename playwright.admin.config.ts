@@ -13,7 +13,12 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   projects: [
-    { name: "chromium-desktop", use: { ...devices["Desktop Chrome"] } },
-    { name: "mobile-chrome", use: { ...devices["Pixel 7"] } },
+    { name: "chromium-desktop", grepInvert: /remote-origin BFF/, use: { ...devices["Desktop Chrome"] } },
+    { name: "mobile-chrome", grepInvert: /remote-origin BFF/, use: { ...devices["Pixel 7"] } },
+    {
+      name: "remote-bff",
+      grep: /remote-origin BFF/,
+      use: { ...devices["Desktop Chrome"], baseURL: "http://localhost:3101" },
+    },
   ],
 });

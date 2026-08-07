@@ -1,7 +1,12 @@
 import { notFound } from "next/navigation";
 import type { NextRequest } from "next/server";
 
-import { getAdminAPIOrigin, isAdminCMSEnabled } from "@/features/admin/config";
+import {
+  getAdminAPIOrigin,
+  getAdminBFFSecret,
+  isAdminCMSEnabled,
+  isLocalAdminAPIOrigin,
+} from "@/features/admin/config";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +22,9 @@ const exactRoutes = new Map<string, ReadonlySet<string>>([
 
 const dynamicRoutes = [
   { match: /^media$/, methods: new Set(["GET", "POST"]), target: (path: string) => `/api/v1/admin/${path}` },
+  { match: /^media\/upload-intents$/, methods: new Set(["POST"]), target: (path: string) => `/api/v1/admin/${path}` },
+  { match: /^media\/upload-intents\/[0-9a-f-]{36}$/, methods: new Set(["GET"]), target: (path: string) => `/api/v1/admin/${path}` },
+  { match: /^media\/upload-intents\/[0-9a-f-]{36}\/finalize$/, methods: new Set(["POST"]), target: (path: string) => `/api/v1/admin/${path}` },
   { match: /^media\/[0-9a-f-]{36}$/, methods: new Set(["GET"]), target: (path: string) => `/api/v1/admin/${path}` },
   { match: /^media\/[0-9a-f-]{36}\/retry$/, methods: new Set(["POST"]), target: (path: string) => `/api/v1/admin/${path}` },
   { match: /^public-media\/[0-9a-f-]{36}\/display\.webp$/, methods: new Set(["GET"]), target: (path: string) => `/api/v1/${path.replace("public-media", "media")}` },
@@ -105,6 +113,10 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<Respo
     });
   }
 
+  if (path === "media" && request.method === "POST" && !isLocalAdminAPIOrigin()) {
+    notFound();
+  }
+
   const payloadLimit = path === "media" && request.method === "POST" ? 10 * 1024 * 1024 + 64 * 1024 : 64 * 1024;
   const contentLength = Number(request.headers.get("content-length") ?? "0");
 
@@ -129,6 +141,11 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<Respo
   }
 
   const targetPath = dynamicRoute?.target(path) ?? `/api/v1/admin/${path}`;
+
+  if (targetPath.startsWith("/api/v1/admin/")) {
+    headers.set("X-Tauco-Admin-BFF-Secret", getAdminBFFSecret());
+  }
+
   const target = new URL(targetPath, getAdminAPIOrigin());
   target.search = request.nextUrl.search;
 

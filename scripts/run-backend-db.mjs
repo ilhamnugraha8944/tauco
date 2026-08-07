@@ -30,15 +30,19 @@ function requireMigrationURL() {
 }
 
 function requireRuntimeConfiguration() {
-  const missing = [
+  const required = [
     "DATABASE_URL",
     "CURSOR_HMAC_SECRET",
-    "CONTACT_HMAC_SECRET",
     "RATE_LIMIT_HMAC_SECRET",
     "METRICS_BEARER_TOKEN",
     "REDIS_URL",
     "CORS_ALLOWED_ORIGINS",
-  ].filter(
+  ];
+  if (process.env.CONTACT_API_ENABLED === "true") required.push("CONTACT_HMAC_SECRET");
+  if (process.env.ADMIN_REMOTE_ENABLED === "true") {
+    required.push("ADMIN_DATABASE_URL", "ADMIN_ALLOWED_ORIGINS", "ADMIN_BFF_SHARED_SECRET");
+  }
+  const missing = required.filter(
     (name) => !process.env[name]?.trim(),
   );
   if (missing.length > 0) {
@@ -83,16 +87,31 @@ switch (operation) {
     break;
   }
   case "admin": {
-    if (!process.env.ADMIN_DATABASE_URL?.trim()) fail("ADMIN_DATABASE_URL wajib tersedia untuk admin CLI.");
+    if (
+      !["keygen", "keygen-ed25519"].includes(operationArguments[0]) &&
+      !process.env.ADMIN_DATABASE_URL?.trim()
+    ) {
+      fail("ADMIN_DATABASE_URL wajib tersedia untuk admin CLI.");
+    }
     run("go", ["-C", "backend", "run", "./cmd/admin", ...operationArguments], process.env, true);
     break;
   }
   case "worker": {
     requireRuntimeConfiguration();
-    if (operationArguments.length > 1 || (operationArguments.length === 1 && operationArguments[0] !== "--check")) {
-      fail("worker hanya menerima argument opsional --check.");
+    const workerModes = new Set(["--check", "--once", "--cleanup-media"]);
+    if (operationArguments.length > 1 || (operationArguments.length === 1 && !workerModes.has(operationArguments[0]))) {
+      fail("worker hanya menerima salah satu: --check, --once, atau --cleanup-media.");
     }
-    for (const name of ["SMTP_HOST", "SMTP_PORT", "SMTP_FROM", "SMTP_TO", "MEDIA_LOCAL_ROOT"]) {
+    const workerRequired = [];
+    if (process.env.CONTACT_API_ENABLED === "true") {
+      workerRequired.push("SMTP_HOST", "SMTP_PORT", "SMTP_FROM", "SMTP_TO");
+    }
+    if ((process.env.MEDIA_STORAGE_DRIVER ?? "local") === "s3") {
+      workerRequired.push("MEDIA_S3_ENDPOINT", "MEDIA_S3_REGION", "MEDIA_S3_BUCKET", "MEDIA_S3_ACCESS_KEY_ID", "MEDIA_S3_SECRET_ACCESS_KEY");
+    } else {
+      workerRequired.push("MEDIA_LOCAL_ROOT");
+    }
+    for (const name of workerRequired) {
       if (!process.env[name]?.trim()) {
         fail(`${name} wajib tersedia untuk worker.`);
       }
@@ -131,6 +150,12 @@ switch (operation) {
       "./cmd/migrate",
       ...operationArguments,
     ]);
+    break;
+  }
+  case "provision": {
+    if (!process.env.PROVISION_DATABASE_URL?.trim()) fail("PROVISION_DATABASE_URL wajib tersedia hanya selama provisioning.");
+    if (operationArguments.length !== 0) fail("provision tidak menerima argument tambahan.");
+    run("go", ["-C", "backend", "run", "./cmd/provision"], process.env, true);
     break;
   }
   case "seed-phase1a": {
@@ -187,6 +212,6 @@ switch (operation) {
   default:
     fail(
       "usage: run-backend-db.mjs " +
-        "<api|admin args...|worker|media-import args...|ops args...|loadcheck|migrate args...|seed-phase1a|integration>",
+        "<api|admin args...|worker [--check|--once|--cleanup-media]|media-import args...|ops args...|loadcheck|migrate args...|seed-phase1a|integration>",
     );
 }

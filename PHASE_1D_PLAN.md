@@ -4,9 +4,9 @@
 
 | Atribut | Nilai |
 | --- | --- |
-| Versi | 1.0 |
-| Tanggal | 6 Agustus 2026 |
-| Status | D0 complete; D1-D10 planned |
+| Versi | 1.1 |
+| Tanggal | 7 Agustus 2026 |
+| Status | D0-D2 complete lokal; D3-D10 planned |
 | Branch | `feature/phase-1d` |
 | Baseline | Phase 1C merge commit `216c6f9` |
 | Mode | Remote pilot bertahap dengan rollback lokal |
@@ -97,6 +97,7 @@ case. Current public URL, canonical, sitemap origin, dan route Phase 1A tetap.
 
 ### D1: Production Configuration dan Security
 
+- **Status:** Complete lokal pada 7 Agustus 2026; belum dideploy.
 - Production config fail-closed untuk HTTPS origin, secure cookie, secret,
   storage, contact flag, dan environment byte budget.
 - Ed25519 JWT production dengan local RSA fallback.
@@ -107,11 +108,24 @@ case. Current public URL, canonical, sitemap origin, dan route Phase 1A tetap.
 
 ### D2: Direct Media Upload dan Scheduled Worker
 
-- Migration upload intent/quarantine.
-- Presigned direct PUT, finalize, validation, ingest, variant, dan cleanup.
-- S3 adapter menambah presign, head, delete, dan health operation.
-- Worker one-shot setiap dua menit, batch satu, budget sekitar 25 detik.
-- Daily cleanup untuk intent dan quarantine kedaluwarsa.
+- **Status:** Complete lokal pada 7 Agustus 2026; provider dan schedule belum
+  dipasang.
+- Migration v8 menyimpan upload intent, quarantine key, checksum, lifecycle,
+  job linkage, dan cleanup marker.
+- Presigned direct PUT, finalize idempotent, validation, ingest, variant,
+  polling, dan cleanup sudah tersedia.
+- S3 adapter mendukung presign, bounded read, head, delete, serta health check;
+  local adapter tetap menjadi fallback development.
+- Worker one-shot memakai batch satu dan budget sekitar 25 detik sebagai target
+  invocation schedule setiap dua menit pada D4.
+- Source image dibatasi 12,5 megapiksel dan sisi 6000 px; acceptance fixture
+  batas membuktikan normalisasi serta variant masing-masing di bawah 10 detik.
+- Cleanup intent/quarantine kedaluwarsa dibatasi per batch dan siap dipanggil
+  oleh daily schedule pada D4.
+- Browser remote tidak mengirim binary melalui Admin BFF; multipart lama hanya
+  menjadi fallback loopback lokal.
+- Polling Admin memakai backoff dan deadline 15 menit agar tidak berjalan tanpa
+  batas pada free tier.
 
 ### D3: Remote Provider Provisioning
 

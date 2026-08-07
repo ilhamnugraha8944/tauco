@@ -3,12 +3,16 @@ package database
 import (
 	"bytes"
 	"context"
-	"crypto/rsa"
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
 	"image/color"
+	"image/jpeg"
 	"image/png"
 	"net/http"
 	"net/http/cookiejar"
@@ -28,6 +32,7 @@ import (
 
 	auditapp "github.com/ilhamnugraha8944/tauco/backend/internal/audit/application"
 	auditrepo "github.com/ilhamnugraha8944/tauco/backend/internal/audit/repository"
+	authruntime "github.com/ilhamnugraha8944/tauco/backend/internal/auth"
 	authapp "github.com/ilhamnugraha8944/tauco/backend/internal/auth/application"
 	authdomain "github.com/ilhamnugraha8944/tauco/backend/internal/auth/domain"
 	authrepo "github.com/ilhamnugraha8944/tauco/backend/internal/auth/repository"
@@ -47,6 +52,7 @@ import (
 	jobsdomain "github.com/ilhamnugraha8944/tauco/backend/internal/jobs/domain"
 	jobsrepo "github.com/ilhamnugraha8944/tauco/backend/internal/jobs/repository"
 	mediaapp "github.com/ilhamnugraha8944/tauco/backend/internal/media/application"
+	mediadomain "github.com/ilhamnugraha8944/tauco/backend/internal/media/domain"
 	mediaprocessor "github.com/ilhamnugraha8944/tauco/backend/internal/media/processor"
 	mediarepo "github.com/ilhamnugraha8944/tauco/backend/internal/media/repository"
 	mediastorage "github.com/ilhamnugraha8944/tauco/backend/internal/media/storage"
@@ -54,6 +60,70 @@ import (
 )
 
 const repositoryIntegrationLock int64 = 839_103_221_702
+
+func TestD1SupabaseConnectionPolicy(t *testing.T) {
+	values := map[string]string{
+		"DATABASE_DEPLOYMENT_PROFILE": "supabase",
+		"MIGRATION_BOOTSTRAP_ROLES":   "false",
+		"MIGRATION_DATABASE_URL":      "postgres://tauco_migration_login.ref:secret@session.example:5432/postgres?sslmode=require",
+		"DATABASE_URL":                "postgres://tauco_public_login.ref:secret@pool.example:6543/postgres?sslmode=require",
+		"ADMIN_DATABASE_URL":          "postgres://tauco_admin_login.ref:secret@pool.example:6543/postgres?sslmode=require",
+	}
+	lookup := func(key string) (string, bool) { value, ok := values[key]; return value, ok }
+	migration, err := LoadMigrationConfig(lookup)
+	if err != nil || migration.Profile != ProfileSupabase || migration.BootstrapRoles {
+		t.Fatalf("supabase migration config = %+v, %v", migration, err)
+	}
+	runtime, err := LoadRuntimeConfig(lookup)
+	if err != nil || runtime.MaxOpenConns != 1 || runtime.MaxIdleConns != 0 || !runtime.PreferSimpleQuery {
+		t.Fatalf("supabase runtime config = %+v, %v", runtime, err)
+	}
+
+	values["MIGRATION_BOOTSTRAP_ROLES"] = "true"
+	if _, err := LoadMigrationConfig(lookup); err == nil {
+		t.Fatal("supabase profile accepted local role bootstrap")
+	}
+	values["MIGRATION_BOOTSTRAP_ROLES"] = "false"
+	values["DATABASE_MAX_OPEN_CONNS"] = "3"
+	if _, err := LoadRuntimeConfig(lookup); err == nil {
+		t.Fatal("supabase profile accepted an oversized runtime pool")
+	}
+	delete(values, "DATABASE_MAX_OPEN_CONNS")
+	values["DATABASE_URL"] = "postgres://tauco_public_login.ref:secret@pool.example:5432/postgres?sslmode=require"
+	if _, err := LoadRuntimeConfig(lookup); err == nil {
+		t.Fatal("supabase runtime accepted the session-pooler port")
+	}
+	values["DATABASE_URL"] = "postgres://tauco_public_login.ref:secret@pool.example:6543/postgres?sslmode=disable"
+	if _, err := LoadRuntimeConfig(lookup); err == nil {
+		t.Fatal("supabase runtime accepted disabled TLS")
+	}
+	values["DATABASE_URL"] = "postgres://tauco_public_login.other:secret@pool.example:6543/postgres?sslmode=require"
+	if _, err := LoadMigrationConfig(lookup); err == nil {
+		t.Fatal("supabase migration config accepted a runtime URL for another project")
+	}
+	values["DATABASE_URL"] = "postgres://unexpected.ref:secret@pool.example:6543/postgres?sslmode=require"
+	if _, err := LoadMigrationConfig(lookup); err == nil {
+		t.Fatal("supabase migration config accepted an unexpected runtime login")
+	}
+	values["DATABASE_URL"] = "postgres://tauco_public_login.ref:secret@pool.example:6543/postgres?sslmode=require"
+	values["ADMIN_DATABASE_URL"] = "postgres://tauco_admin_login.other:secret@pool.example:6543/postgres?sslmode=require"
+	if _, err := LoadMigrationConfig(lookup); err == nil {
+		t.Fatal("supabase migration config accepted an admin URL for another project")
+	}
+}
+
+func TestD1ProductionEd25519RuntimeAndJWTPolicy(t *testing.T) {
+	_, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager, err := authdomain.NewEd25519TokenManager(privateKey, "integration", "admin", "test-key", authapp.AccessTTL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertJWTRejections(t, manager, privateKey)
+	assertProductionAuthRuntime(t, privateKey)
+}
 
 func TestPhase1ASeedAndPublishedRepositories(t *testing.T) {
 	baseURL := strings.TrimSpace(os.Getenv("MIGRATION_TEST_DATABASE_URL"))
@@ -499,13 +569,13 @@ func assertAdminAuthLifecycle(t *testing.T, ctx context.Context, db, migrationDB
 	if err != nil {
 		t.Fatalf("NewPostgres(auth) error = %v", err)
 	}
-	privateKey, publicKey, err := authdomain.GenerateRSAKeyPair()
+	_, privateKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
-		t.Fatalf("GenerateRSAKeyPair() error = %v", err)
+		t.Fatalf("GenerateKey() error = %v", err)
 	}
-	tokens, err := authdomain.NewTokenManager(privateKey, publicKey, "integration", "admin", "test-key", authapp.AccessTTL)
+	tokens, err := authdomain.NewEd25519TokenManager(privateKey, "integration", "admin", "test-key", authapp.AccessTTL)
 	if err != nil {
-		t.Fatalf("NewTokenManager() error = %v", err)
+		t.Fatalf("NewEd25519TokenManager() error = %v", err)
 	}
 	assertJWTRejections(t, tokens, privateKey)
 	box, err := authdomain.NewSecretBox([]byte("0123456789abcdef0123456789abcdef"), "test-key")
@@ -567,7 +637,42 @@ func assertAdminAuthLifecycle(t *testing.T, ctx context.Context, db, migrationDB
 	assertAdminAuthHTTP(t, ctx, db, migrationDB, service)
 }
 
-func assertJWTRejections(t *testing.T, manager *authdomain.TokenManager, privateKey *rsa.PrivateKey) {
+func assertProductionAuthRuntime(t *testing.T, privateKey ed25519.PrivateKey) {
+	t.Helper()
+	values := map[string]string{
+		"APP_ENV":                        "production",
+		"JWT_ED25519_PRIVATE_KEY_BASE64": base64.RawStdEncoding.EncodeToString(privateKey),
+		"JWT_PRIVATE_KEY_FILE":           "must-not-be-read.pem",
+		"JWT_PUBLIC_KEY_FILE":            "must-not-be-read.pem",
+		"JWT_ISSUER":                     "integration",
+		"JWT_AUDIENCE":                   "admin",
+		"JWT_KEY_ID":                     "test-key",
+		"MFA_ENCRYPTION_KEY":             base64.RawStdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef")),
+		"MFA_ENCRYPTION_KEY_ID":          "test-key",
+		"RECOVERY_CODE_HMAC_SECRET":      "integration-recovery-secret-32-bytes-minimum",
+	}
+	lookup := func(key string) (string, bool) { value, ok := values[key]; return value, ok }
+	runtime, err := authruntime.LoadRuntime(lookup)
+	if err != nil {
+		t.Fatalf("production Ed25519 runtime error = %v", err)
+	}
+	userID, _ := uuid.NewV7()
+	sessionID, _ := uuid.NewV7()
+	raw, _, err := runtime.Tokens.Sign(userID, sessionID, true)
+	if err != nil || !strings.HasPrefix(raw, "ey") {
+		t.Fatalf("production Ed25519 sign error = %v", err)
+	}
+	values["JWT_ED25519_PRIVATE_KEY_BASE64"] += "="
+	if _, err := authruntime.LoadRuntime(lookup); err == nil {
+		t.Fatal("production runtime accepted padded Ed25519 private key")
+	}
+	delete(values, "JWT_ED25519_PRIVATE_KEY_BASE64")
+	if _, err := authruntime.LoadRuntime(lookup); err == nil {
+		t.Fatal("production runtime accepted RSA-file-only configuration")
+	}
+}
+
+func assertJWTRejections(t *testing.T, manager *authdomain.TokenManager, privateKey ed25519.PrivateKey) {
 	t.Helper()
 	userID, _ := uuid.NewV7()
 	sessionID, _ := uuid.NewV7()
@@ -578,14 +683,14 @@ func assertJWTRejections(t *testing.T, manager *authdomain.TokenManager, private
 			IssuedAt: jwt.NewNumericDate(now), NotBefore: jwt.NewNumericDate(now.Add(-time.Second)), ExpiresAt: jwt.NewNumericDate(expires),
 		}}
 	}
-	sign := func(value authdomain.AccessClaims, typ, kid string, key *rsa.PrivateKey) string {
-		token := jwt.NewWithClaims(jwt.SigningMethodRS256, value)
+	sign := func(value authdomain.AccessClaims, typ, kid string, key ed25519.PrivateKey) string {
+		token := jwt.NewWithClaims(jwt.SigningMethodEdDSA, value)
 		token.Header["typ"] = typ
 		token.Header["kid"] = kid
 		raw, _ := token.SignedString(key)
 		return raw
 	}
-	otherPrivate, _, _ := authdomain.GenerateRSAKeyPair()
+	_, otherPrivate, _ := ed25519.GenerateKey(rand.Reader)
 	cases := []string{
 		sign(claims("wrong", jwt.ClaimStrings{"admin"}, now.Add(time.Minute)), "JWT", "test-key", privateKey),
 		sign(claims("integration", jwt.ClaimStrings{"wrong"}, now.Add(time.Minute)), "JWT", "test-key", privateKey),
@@ -594,6 +699,29 @@ func assertJWTRejections(t *testing.T, manager *authdomain.TokenManager, private
 		sign(claims("integration", jwt.ClaimStrings{"admin"}, now.Add(time.Minute)), "JWT", "test-key", otherPrivate),
 		sign(claims("integration", jwt.ClaimStrings{"admin"}, now.Add(-time.Minute)), "JWT", "test-key", privateKey),
 	}
+	missingIssuedAt := claims("integration", jwt.ClaimStrings{"admin"}, now.Add(time.Minute))
+	missingIssuedAt.IssuedAt = nil
+	missingNotBefore := claims("integration", jwt.ClaimStrings{"admin"}, now.Add(time.Minute))
+	missingNotBefore.NotBefore = nil
+	missingID := claims("integration", jwt.ClaimStrings{"admin"}, now.Add(time.Minute))
+	missingID.ID = ""
+	invalidSubject := claims("integration", jwt.ClaimStrings{"admin"}, now.Add(time.Minute))
+	invalidSubject.Subject = "not-a-uuid"
+	invalidSession := claims("integration", jwt.ClaimStrings{"admin"}, now.Add(time.Minute))
+	invalidSession.SessionID = "not-a-uuid"
+	cases = append(cases,
+		sign(missingIssuedAt, "JWT", "test-key", privateKey),
+		sign(missingNotBefore, "JWT", "test-key", privateKey),
+		sign(missingID, "JWT", "test-key", privateKey),
+		sign(invalidSubject, "JWT", "test-key", privateKey),
+		sign(invalidSession, "JWT", "test-key", privateKey),
+	)
+	rsaPrivate, _, _ := authdomain.GenerateRSAKeyPair()
+	rsaToken := jwt.NewWithClaims(jwt.SigningMethodRS256, claims("integration", jwt.ClaimStrings{"admin"}, now.Add(time.Minute)))
+	rsaToken.Header["typ"] = "JWT"
+	rsaToken.Header["kid"] = "test-key"
+	rawRSA, _ := rsaToken.SignedString(rsaPrivate)
+	cases = append(cases, rawRSA)
 	hs := jwt.NewWithClaims(jwt.SigningMethodHS256, claims("integration", jwt.ClaimStrings{"admin"}, now.Add(time.Minute)))
 	hs.Header["typ"] = "JWT"
 	hs.Header["kid"] = "test-key"
@@ -615,7 +743,8 @@ func assertAdminAuthHTTP(t *testing.T, ctx context.Context, db, migrationDB *gor
 	local, _ := ratelimit.NewLocal(1_000)
 	limiter, _ := ratelimit.New(nil, local)
 	handler, err := api.NewAdminAuthHandler(service, limiter, api.AdminAuthConfig{
-		AllowedOrigins: []string{origin}, RateSecret: []byte("integration-rate-secret-at-least-32-bytes"), SecureCookies: false,
+		AllowedOrigins: []string{origin}, RateSecret: []byte("integration-rate-secret-at-least-32-bytes"),
+		BFFSecret: []byte("integration-admin-bff-secret-at-least-32-bytes"), SecureCookies: false,
 	})
 	if err != nil {
 		t.Fatalf("NewAdminAuthHandler() error = %v", err)
@@ -644,6 +773,7 @@ func assertAdminAuthHTTP(t *testing.T, ctx context.Context, db, migrationDB *gor
 		if fetchSite != "" {
 			request.Header.Set("Sec-Fetch-Site", fetchSite)
 		}
+		request.Header.Set("X-Tauco-Admin-BFF-Secret", "integration-admin-bff-secret-at-least-32-bytes")
 		response, requestErr := client.Do(request)
 		if requestErr != nil {
 			t.Fatalf("auth request: %v", requestErr)
@@ -651,6 +781,17 @@ func assertAdminAuthHTTP(t *testing.T, ctx context.Context, db, migrationDB *gor
 		return response
 	}
 	loginBody := `{"email":"` + email + `","password":"` + password + `"}`
+	directRequest, _ := http.NewRequest(http.MethodPost, server.URL+"/api/v1/admin/auth/login", bytes.NewBufferString(loginBody))
+	directRequest.Header.Set("Content-Type", "application/json")
+	directRequest.Header.Set("Origin", origin)
+	directResponse, directErr := client.Do(directRequest)
+	if directErr != nil {
+		t.Fatalf("direct admin bypass request error=%v", directErr)
+	}
+	if directResponse.StatusCode != http.StatusNotFound {
+		t.Fatalf("direct admin bypass status=%v", directResponse.StatusCode)
+	}
+	directResponse.Body.Close()
 	response := do(http.MethodPost, "/api/v1/admin/auth/login", loginBody, origin, "", "same-origin")
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("login status = %d", response.StatusCode)
@@ -846,6 +987,7 @@ func assertMediaPipeline(t *testing.T, ctx context.Context, runtimeDatabase, adm
 	if _, err := processor.Normalize(make([]byte, mediaapp.MaxUploadBytes+1)); err == nil {
 		t.Fatal("oversized image upload unexpectedly accepted")
 	}
+	assertImageWorkerBudget(t, processor)
 
 	fixture.SetNRGBA(0, 0, color.NRGBA{R: 1, G: 2, B: 3, A: 255})
 	encoded.Reset()
@@ -868,7 +1010,370 @@ func assertMediaPipeline(t *testing.T, ctx context.Context, runtimeDatabase, adm
 	if _, err := adminService.Retry(ctx, assetID, actorID); !errors.Is(err, mediaapp.ErrRetryConflict) {
 		t.Fatalf("retry ready media err=%v, want conflict", err)
 	}
+	assertUploadIntentLifecycle(t, ctx, repository, adminRepository, adminDatabase, actorID, assetID, failedID, encoded.Bytes())
 }
+
+func assertImageWorkerBudget(t *testing.T, processor mediaprocessor.Image) {
+	t.Helper()
+	const processingLimit = 10 * time.Second
+
+	fixture := image.NewNRGBA(image.Rect(0, 0, 4000, 3125))
+	state := uint32(0x9e3779b9)
+	for offset := 0; offset < len(fixture.Pix); offset += 4 {
+		state ^= state << 13
+		state ^= state >> 17
+		state ^= state << 5
+		fixture.Pix[offset] = byte(state)
+		fixture.Pix[offset+1] = byte(state >> 8)
+		fixture.Pix[offset+2] = byte(state >> 16)
+		fixture.Pix[offset+3] = 255
+	}
+	var source bytes.Buffer
+	if err := jpeg.Encode(&source, fixture, &jpeg.Options{Quality: 75}); err != nil {
+		t.Fatalf("encode maximum image fixture: %v", err)
+	}
+	if source.Len() > mediaapp.MaxUploadBytes {
+		t.Fatalf("maximum image fixture is %d bytes, want <= %d", source.Len(), mediaapp.MaxUploadBytes)
+	}
+
+	started := time.Now()
+	normalized, err := processor.Normalize(source.Bytes())
+	normalizeDuration := time.Since(started)
+	if err != nil {
+		t.Fatalf("normalize maximum image fixture: %v", err)
+	}
+	if len(normalized.Data) > mediaapp.MaxStoredObjectBytes {
+		t.Fatalf("normalized maximum image is %d bytes, want <= %d", len(normalized.Data), mediaapp.MaxStoredObjectBytes)
+	}
+	if normalizeDuration >= processingLimit {
+		t.Fatalf("normalize maximum image took %s, budget %s", normalizeDuration, processingLimit)
+	}
+
+	started = time.Now()
+	if _, _, err := processor.Variants(normalized.Data); err != nil {
+		t.Fatalf("generate maximum image variants: %v", err)
+	}
+	variantDuration := time.Since(started)
+	if variantDuration >= processingLimit {
+		t.Fatalf("maximum image variants took %s, budget %s", variantDuration, processingLimit)
+	}
+	t.Logf("maximum image processing: normalize=%s variants=%s source=%dB normalized=%dB", normalizeDuration, variantDuration, source.Len(), len(normalized.Data))
+}
+
+func assertUploadIntentLifecycle(
+	t *testing.T,
+	ctx context.Context,
+	runtimeRepository, adminRepository *mediarepo.Postgres,
+	adminDatabase *gorm.DB,
+	actorID, assetID, recoveryAssetID string,
+	source []byte,
+) {
+	t.Helper()
+	digest := sha256.Sum256(source)
+	draft := mediadomain.UploadIntentDraft{
+		ExpectedMIME: "image/png", ExpectedBytes: int64(len(source)),
+		ExpectedSHA256: fmt.Sprintf("%x", digest), AltText: "Ilustrasi upload intent",
+		CreatedBy: actorID, ExpiresAt: time.Now().UTC().Add(10 * time.Minute),
+	}
+	intent, err := adminRepository.CreateUploadIntent(ctx, draft)
+	if err != nil || intent.Status != mediadomain.UploadStatusPending || intent.QuarantineKey != "quarantine/"+intent.ID {
+		t.Fatalf("create upload intent = %+v, err=%v", intent, err)
+	}
+	if got, err := runtimeRepository.GetUploadIntent(ctx, intent.ID); err != nil || got.ID != intent.ID {
+		t.Fatalf("runtime get upload intent = %+v, err=%v", got, err)
+	}
+	if _, _, err := adminRepository.QueueUploadIntent(
+		ctx, intent.ID, draft.ExpectedMIME, draft.ExpectedBytes, strings.Repeat("0", 64),
+	); !errors.Is(err, mediaapp.ErrUploadIntentMetadata) {
+		t.Fatalf("queue mismatched upload intent err=%v", err)
+	}
+	queued, replayed, err := adminRepository.QueueUploadIntent(
+		ctx, intent.ID, draft.ExpectedMIME, draft.ExpectedBytes, draft.ExpectedSHA256,
+	)
+	if err != nil || replayed || queued.Status != mediadomain.UploadStatusQueued {
+		t.Fatalf("queue upload intent = %+v replay=%t err=%v", queued, replayed, err)
+	}
+	if _, replayed, err := adminRepository.QueueUploadIntent(
+		ctx, intent.ID, draft.ExpectedMIME, draft.ExpectedBytes, draft.ExpectedSHA256,
+	); err != nil || !replayed {
+		t.Fatalf("replay upload intent = %t/%v", replayed, err)
+	}
+	var ingestJobs int64
+	if err := adminDatabase.Raw(`SELECT count(*) FROM tauco_app.background_jobs WHERE idempotency_key = ?`, "media.ingest:"+intent.ID).Scan(&ingestJobs).Error; err != nil || ingestJobs != 1 {
+		t.Fatalf("upload ingest jobs = %d, err=%v", ingestJobs, err)
+	}
+	if err := runtimeRepository.CompleteUploadIntent(ctx, intent.ID, assetID); err != nil {
+		t.Fatalf("complete upload intent: %v", err)
+	}
+	if err := runtimeRepository.CompleteUploadIntent(ctx, intent.ID, assetID); err != nil {
+		t.Fatalf("replay complete upload intent: %v", err)
+	}
+	completed, err := adminRepository.GetUploadIntent(ctx, intent.ID)
+	if err != nil || completed.Status != mediadomain.UploadStatusCompleted || completed.MediaAssetID == nil || *completed.MediaAssetID != assetID {
+		t.Fatalf("completed upload intent = %+v, err=%v", completed, err)
+	}
+
+	failed, err := adminRepository.CreateUploadIntent(ctx, draft)
+	if err != nil {
+		t.Fatalf("create failed-path upload intent: %v", err)
+	}
+	if _, _, err := adminRepository.QueueUploadIntent(ctx, failed.ID, draft.ExpectedMIME, draft.ExpectedBytes, draft.ExpectedSHA256); err != nil {
+		t.Fatalf("queue failed-path upload intent: %v", err)
+	}
+	if err := runtimeRepository.FailUploadIntent(ctx, failed.ID, "INGEST_VALIDATION_FAILED"); err != nil {
+		t.Fatalf("fail upload intent: %v", err)
+	}
+	if err := runtimeRepository.FailUploadIntent(ctx, failed.ID, "INGEST_VALIDATION_FAILED"); err != nil {
+		t.Fatalf("replay fail upload intent: %v", err)
+	}
+	if err := runtimeRepository.CompleteUploadIntent(ctx, failed.ID, recoveryAssetID); err != nil {
+		t.Fatalf("recover failed upload intent: %v", err)
+	}
+
+	expired, err := adminRepository.CreateUploadIntent(ctx, draft)
+	if err != nil {
+		t.Fatalf("create cleanup upload intent: %v", err)
+	}
+	if err := adminDatabase.Exec(`
+		UPDATE tauco_app.media_upload_intents
+		SET created_at = statement_timestamp() - interval '30 minutes',
+			expires_at = statement_timestamp() - interval '20 minutes'
+		WHERE id = ?`, expired.ID).Error; err != nil {
+		t.Fatalf("age cleanup upload intent: %v", err)
+	}
+	claimed, err := runtimeRepository.ClaimUploadIntentCleanup(ctx, 10)
+	if err != nil || len(claimed) != 1 || claimed[0].ID != expired.ID || claimed[0].Status != mediadomain.UploadStatusExpired {
+		t.Fatalf("claim upload cleanup = %+v, err=%v", claimed, err)
+	}
+	if err := runtimeRepository.CompleteUploadIntentCleanup(ctx, expired.ID); err != nil {
+		t.Fatalf("complete upload cleanup: %v", err)
+	}
+	if err := runtimeRepository.CompleteUploadIntentCleanup(ctx, expired.ID); err != nil {
+		t.Fatalf("replay upload cleanup: %v", err)
+	}
+	var retained int64
+	if err := adminDatabase.Raw(`SELECT count(*) FROM tauco_app.media_upload_intents`).Scan(&retained).Error; err != nil || retained != 3 {
+		t.Fatalf("retained upload intents = %d, err=%v", retained, err)
+	}
+	assertDirectUploadPipeline(t, ctx, runtimeRepository, adminRepository, adminDatabase, actorID)
+}
+
+func assertDirectUploadPipeline(
+	t *testing.T,
+	ctx context.Context,
+	runtimeRepository, adminRepository *mediarepo.Postgres,
+	adminDatabase *gorm.DB,
+	actorID string,
+) {
+	t.Helper()
+	store := newIntegrationQuarantineStore()
+	uploads, _ := mediaapp.NewUploadService(adminRepository, store)
+	processor := mediaprocessor.Image{}
+	ingestor, _ := mediaapp.NewIngestor(runtimeRepository, store, processor)
+	uploadHandler, _ := mediaapp.NewUploadHandler(runtimeRepository, store, ingestor)
+
+	fixture := image.NewNRGBA(image.Rect(0, 0, 720, 480))
+	for y := range 480 {
+		for x := range 720 {
+			fixture.SetNRGBA(x, y, color.NRGBA{R: 40, G: uint8(x % 251), B: uint8(y % 251), A: 255})
+		}
+	}
+	var encoded bytes.Buffer
+	if err := png.Encode(&encoded, fixture); err != nil {
+		t.Fatalf("encode direct-upload fixture: %v", err)
+	}
+	source := encoded.Bytes()
+	digest := sha256.Sum256(source)
+	created, err := uploads.Create(ctx, mediaapp.CreateUploadIntentInput{
+		MIMEType: "image/png", Bytes: int64(len(source)), SHA256: fmt.Sprintf("%x", digest),
+		AltText: "Ilustrasi direct upload", CreatedBy: actorID,
+	})
+	if err != nil || created.Intent.Status != mediadomain.UploadStatusPending || created.Upload.URL == "" {
+		t.Fatalf("create direct upload = %+v, err=%v", created, err)
+	}
+	if err := store.PutIfAbsent(ctx, created.Intent.QuarantineKey, "image/png", source); err != nil {
+		t.Fatalf("put direct-upload object: %v", err)
+	}
+	queued, replayed, err := uploads.Finalize(ctx, created.Intent.ID)
+	if err != nil || replayed || queued.Status != mediadomain.UploadStatusQueued {
+		t.Fatalf("finalize direct upload = %+v replay=%t err=%v", queued, replayed, err)
+	}
+	payload, _ := json.Marshal(map[string]string{"uploadIntentId": created.Intent.ID})
+	if err := uploadHandler.Handle(ctx, payload); err != nil {
+		t.Fatalf("handle direct upload: %v", err)
+	}
+	completed, err := uploads.Get(ctx, created.Intent.ID)
+	if err != nil || completed.Status != mediadomain.UploadStatusCompleted || completed.MediaAssetID == nil {
+		t.Fatalf("completed direct upload = %+v, err=%v", completed, err)
+	}
+	if err := uploadHandler.Handle(ctx, payload); err != nil {
+		t.Fatalf("replay direct upload handler: %v", err)
+	}
+	variantHandler, _ := mediaapp.NewVariantHandler(runtimeRepository, store, processor)
+	variantPayload, _ := json.Marshal(map[string]string{"mediaAssetId": *completed.MediaAssetID})
+	if err := variantHandler.Handle(ctx, variantPayload); err != nil {
+		t.Fatalf("direct-upload variant handler: %v", err)
+	}
+	asset, err := adminRepository.GetAdmin(ctx, *completed.MediaAssetID)
+	if err != nil || asset.Status != mediadomain.StatusReady || len(asset.Variants) == 0 {
+		t.Fatalf("direct-upload media asset = %+v, err=%v", asset, err)
+	}
+	if _, err := store.Get(ctx, created.Intent.QuarantineKey); !errors.Is(err, mediaapp.ErrObjectNotFound) {
+		t.Fatalf("quarantine object remains after ingest: %v", err)
+	}
+
+	invalid := []byte("not-a-valid-image")
+	invalidDigest := sha256.Sum256(invalid)
+	invalidCreated, err := uploads.Create(ctx, mediaapp.CreateUploadIntentInput{
+		MIMEType: "image/png", Bytes: int64(len(invalid)), SHA256: fmt.Sprintf("%x", invalidDigest),
+		AltText: "Ilustrasi invalid upload", CreatedBy: actorID,
+	})
+	if err != nil {
+		t.Fatalf("create invalid direct upload: %v", err)
+	}
+	_ = store.PutIfAbsent(ctx, invalidCreated.Intent.QuarantineKey, "image/png", invalid)
+	if _, _, err := uploads.Finalize(ctx, invalidCreated.Intent.ID); err != nil {
+		t.Fatalf("finalize invalid direct upload metadata: %v", err)
+	}
+	invalidPayload, _ := json.Marshal(map[string]string{"uploadIntentId": invalidCreated.Intent.ID})
+	if err := uploadHandler.Handle(ctx, invalidPayload); err != nil {
+		t.Fatalf("invalid upload should be a permanent handled failure: %v", err)
+	}
+	failed, _ := uploads.Get(ctx, invalidCreated.Intent.ID)
+	if failed.Status != mediadomain.UploadStatusFailed || failed.LastErrorCode == nil {
+		t.Fatalf("invalid direct upload status = %+v", failed)
+	}
+
+	cleanupCreated, err := uploads.Create(ctx, mediaapp.CreateUploadIntentInput{
+		MIMEType: "image/png", Bytes: int64(len(source)), SHA256: fmt.Sprintf("%x", digest),
+		AltText: "Ilustrasi cleanup upload", CreatedBy: actorID,
+	})
+	if err != nil {
+		t.Fatalf("create cleanup direct upload: %v", err)
+	}
+	_ = store.PutIfAbsent(ctx, cleanupCreated.Intent.QuarantineKey, "image/png", source)
+	if err := adminDatabase.Exec(`
+		UPDATE tauco_app.media_upload_intents
+		SET created_at = statement_timestamp() - interval '30 minutes',
+			expires_at = statement_timestamp() - interval '20 minutes'
+		WHERE id = ?`, cleanupCreated.Intent.ID).Error; err != nil {
+		t.Fatalf("age direct-upload cleanup intent: %v", err)
+	}
+	cleanup, _ := mediaapp.NewUploadCleanup(runtimeRepository, store)
+	if count, err := cleanup.RunOnce(ctx, 10); err != nil || count != 1 {
+		t.Fatalf("direct-upload cleanup count=%d err=%v", count, err)
+	}
+	if _, err := store.Get(ctx, cleanupCreated.Intent.QuarantineKey); !errors.Is(err, mediaapp.ErrObjectNotFound) {
+		t.Fatalf("cleanup quarantine object remains: %v", err)
+	}
+
+	deadCreated, err := uploads.Create(ctx, mediaapp.CreateUploadIntentInput{
+		MIMEType: "image/png", Bytes: int64(len(source)), SHA256: fmt.Sprintf("%x", digest),
+		AltText: "Ilustrasi dead-job cleanup", CreatedBy: actorID,
+	})
+	if err != nil {
+		t.Fatalf("create dead-job upload: %v", err)
+	}
+	_ = store.PutIfAbsent(ctx, deadCreated.Intent.QuarantineKey, "image/png", source)
+	if _, _, err := uploads.Finalize(ctx, deadCreated.Intent.ID); err != nil {
+		t.Fatalf("finalize dead-job upload: %v", err)
+	}
+	if err := adminDatabase.Exec(`
+		UPDATE tauco_app.media_upload_intents
+		SET created_at = statement_timestamp() - interval '30 minutes',
+			expires_at = statement_timestamp() - interval '20 minutes'
+		WHERE id = ?`, deadCreated.Intent.ID).Error; err != nil {
+		t.Fatalf("age dead-job upload intent: %v", err)
+	}
+	if err := adminDatabase.Exec(`
+		UPDATE tauco_app.background_jobs
+		SET status = 'dead', attempts = max_attempts,
+			dead_at = statement_timestamp(), run_at = statement_timestamp()
+		WHERE idempotency_key = ?`, "media.ingest:"+deadCreated.Intent.ID).Error; err != nil {
+		t.Fatalf("mark upload ingest job dead: %v", err)
+	}
+	if count, err := cleanup.RunOnce(ctx, 10); err != nil || count != 1 {
+		t.Fatalf("dead-job upload cleanup count=%d err=%v", count, err)
+	}
+	deadIntent, _ := uploads.Get(ctx, deadCreated.Intent.ID)
+	if deadIntent.Status != mediadomain.UploadStatusFailed || deadIntent.LastErrorCode == nil || *deadIntent.LastErrorCode != "INGEST_JOB_DEAD" {
+		t.Fatalf("dead-job upload intent = %+v", deadIntent)
+	}
+}
+
+type integrationQuarantineStore struct {
+	objects  map[string][]byte
+	metadata map[string]mediaapp.ObjectInfo
+}
+
+func newIntegrationQuarantineStore() *integrationQuarantineStore {
+	return &integrationQuarantineStore{objects: make(map[string][]byte), metadata: make(map[string]mediaapp.ObjectInfo)}
+}
+
+func (store *integrationQuarantineStore) PutIfAbsent(_ context.Context, key, mime string, data []byte) error {
+	if current, found := store.objects[key]; found {
+		if !bytes.Equal(current, data) {
+			return errors.New("integration object conflict")
+		}
+		return nil
+	}
+	store.objects[key] = append([]byte(nil), data...)
+	if _, found := store.metadata[key]; !found {
+		digest := sha256.Sum256(data)
+		store.metadata[key] = mediaapp.ObjectInfo{Bytes: int64(len(data)), MIMEType: mime, SHA256: fmt.Sprintf("%x", digest)}
+	}
+	return nil
+}
+
+func (store *integrationQuarantineStore) Get(_ context.Context, key string) ([]byte, error) {
+	return store.GetBounded(context.Background(), key, mediaapp.MaxStoredObjectBytes)
+}
+
+func (store *integrationQuarantineStore) GetBounded(_ context.Context, key string, maximum int64) ([]byte, error) {
+	data, found := store.objects[key]
+	if !found {
+		return nil, mediaapp.ErrObjectNotFound
+	}
+	if int64(len(data)) > maximum {
+		return nil, mediaapp.ErrObjectTooLarge
+	}
+	return append([]byte(nil), data...), nil
+}
+
+func (store *integrationQuarantineStore) PresignPut(
+	_ context.Context,
+	key, mime, sha256Value string,
+	bytesValue int64,
+	lifetime time.Duration,
+) (mediaapp.PresignedUpload, error) {
+	store.metadata[key] = mediaapp.ObjectInfo{Bytes: bytesValue, MIMEType: mime, SHA256: sha256Value}
+	return mediaapp.PresignedUpload{
+		URL: "https://storage.example/" + key,
+		Headers: map[string]string{
+			"Content-Type": mime, "X-Amz-Meta-Sha256": sha256Value,
+		},
+		ExpiresAt: time.Now().UTC().Add(lifetime),
+	}, nil
+}
+
+func (store *integrationQuarantineStore) Head(_ context.Context, key string) (mediaapp.ObjectInfo, error) {
+	data, found := store.objects[key]
+	if !found {
+		return mediaapp.ObjectInfo{}, mediaapp.ErrObjectNotFound
+	}
+	metadata := store.metadata[key]
+	metadata.Bytes = int64(len(data))
+	return metadata, nil
+}
+
+func (store *integrationQuarantineStore) Delete(_ context.Context, key string) error {
+	delete(store.objects, key)
+	return nil
+}
+
+func (*integrationQuarantineStore) Health(context.Context) error { return nil }
+
+var _ mediaapp.QuarantineStore = (*integrationQuarantineStore)(nil)
 
 func intPointer(value int) *int { return &value }
 

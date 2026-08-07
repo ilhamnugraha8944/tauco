@@ -21,8 +21,10 @@ import (
 )
 
 const (
-	MaxPixels      = 40_000_000
-	MaxSide        = 12_000
+	// Keep each CPU-bound image step below 10 seconds on the acceptance host,
+	// leaving 15 seconds of the one-shot worker budget for S3 and PostgreSQL.
+	MaxPixels      = 12_500_000
+	MaxSide        = 6_000
 	WebPQuality    = 82
 	variantWorkers = 2
 )
@@ -52,7 +54,7 @@ func (Image) Normalize(source []byte) (mediaapp.NormalizedImage, error) {
 		decoded = applyOrientation(decoded, jpegOrientation(source))
 	}
 	var output bytes.Buffer
-	if err := png.Encode(&output, decoded); err != nil {
+	if err := (&png.Encoder{CompressionLevel: png.BestSpeed}).Encode(&output, decoded); err != nil {
 		return mediaapp.NormalizedImage{}, fmt.Errorf("normalize media: %w", err)
 	}
 	digest := sha256.Sum256(output.Bytes())
@@ -180,7 +182,7 @@ func decode(format string, source []byte) (image.Image, error) {
 
 func validateDimensions(width, height int) error {
 	if width < 1 || height < 1 || width > MaxSide || height > MaxSide || int64(width)*int64(height) > MaxPixels {
-		return errors.New("media dimensions exceed the 12000 side or 40 megapixel limit")
+		return errors.New("media dimensions exceed the 6000 side or 12.5 megapixel limit")
 	}
 	return nil
 }

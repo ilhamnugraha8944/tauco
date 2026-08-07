@@ -230,7 +230,7 @@ func TestMigrationRoundTripAndRuntimePrivileges(t *testing.T) {
 	if err := migrator.Up(); err != nil {
 		t.Fatalf("migration Up() error = %v", err)
 	}
-	assertMigrationVersion(t, migrator, 7)
+	assertMigrationVersion(t, migrator, 8)
 	if err := BootstrapRoles(ctx, cfg); err != nil {
 		t.Fatalf("post-migration idempotent BootstrapRoles() error = %v", err)
 	}
@@ -272,15 +272,15 @@ func TestMigrationRoundTripAndRuntimePrivileges(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewMigrator(rotated login) error = %v", err)
 	}
-	assertMigrationVersion(t, rotatedMigrator, 7)
+	assertMigrationVersion(t, rotatedMigrator, 8)
 	if err := rotatedMigrator.DownOne(); err != nil {
 		t.Fatalf("rotated migration DownOne() error = %v", err)
 	}
-	assertMigrationVersion(t, rotatedMigrator, 6)
+	assertMigrationVersion(t, rotatedMigrator, 7)
 	if err := rotatedMigrator.Up(); err != nil {
 		t.Fatalf("rotated migration Up() error = %v", err)
 	}
-	assertMigrationVersion(t, rotatedMigrator, 7)
+	assertMigrationVersion(t, rotatedMigrator, 8)
 	if err := rotatedMigrator.Close(); err != nil {
 		t.Fatalf("close rotated migrator: %v", err)
 	}
@@ -364,7 +364,7 @@ func TestMigrationRoundTripAndRuntimePrivileges(t *testing.T) {
 	if err := migrator.Up(); err != nil {
 		t.Fatalf("second migration Up() error = %v", err)
 	}
-	assertMigrationVersion(t, migrator, 7)
+	assertMigrationVersion(t, migrator, 8)
 	if err := migrator.DownAll(); err != nil {
 		t.Fatalf("second migration DownAll() error = %v", err)
 	}
@@ -380,7 +380,7 @@ FROM information_schema.tables
 WHERE table_schema = 'public'
   AND table_name IN (
       'pages', 'page_revisions', 'products', 'product_revisions',
-      'media_assets', 'media_variants', 'contact_messages',
+      'media_assets', 'media_variants', 'media_upload_intents', 'contact_messages',
       'background_jobs', 'activity_logs'
   )`).Scan(&publicCount); err != nil {
 		t.Fatalf("count public app tables: %v", err)
@@ -396,13 +396,13 @@ FROM information_schema.tables
 WHERE table_schema = 'tauco_app'
   AND table_name IN (
       'pages', 'page_revisions', 'products', 'product_revisions',
-      'media_assets', 'media_variants', 'contact_messages',
+      'media_assets', 'media_variants', 'media_upload_intents', 'contact_messages',
       'background_jobs', 'activity_logs'
   )`).Scan(&appCount); err != nil {
 		t.Fatalf("count private app tables: %v", err)
 	}
-	if appCount != 9 {
-		t.Fatalf("Phase 1B private app table count = %d, want 9", appCount)
+	if appCount != 10 {
+		t.Fatalf("private app table count = %d, want 10", appCount)
 	}
 
 	var metadataCount int

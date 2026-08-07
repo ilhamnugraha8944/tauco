@@ -23,10 +23,12 @@ production. Kontrak dan evidence tersedia di
 [PHASE_1C_RUNBOOK.md](./PHASE_1C_RUNBOOK.md). Hasil quality final ada di
 [PHASE_1C_QUALITY_REPORT.md](./PHASE_1C_QUALITY_REPORT.md).
 
-**Phase 1D** sedang berjalan. Gate D0 telah membekukan remote pilot Netlify,
-Supabase PostgreSQL/Storage, Upstash Redis, staged content/admin cutover,
-verified Netlify Forms Inbox sync, rollback, dan backup/restore boundary.
-Production belum diubah oleh D0. Kontrak delivery serta evidence ledger ada di
+**Phase 1D** sedang berjalan. Gate D0-D2 selesai lokal: scope/provider sudah
+dibekukan, production configuration kini fail-closed, JWT production memakai
+Ed25519, Admin API dilindungi shared secret BFF, dan direct media upload beserta
+bounded one-shot worker sudah lulus lokal. Profil koneksi serta command
+provisioning Supabase juga tersedia. Production belum diubah. Kontrak delivery
+serta evidence ledger ada di
 [PHASE_1D_PLAN.md](./PHASE_1D_PLAN.md) dan
 [PHASE_1D_WALKTHROUGH.md](./PHASE_1D_WALKTHROUGH.md).
 
@@ -47,10 +49,10 @@ layanan backend. Bukti ada di
 | Privacy notice | Phase 1A |
 | Metadata, canonical, sitemap, robots, JSON-LD | Phase 1A |
 | Go REST API | Phase 1B local complete; public/contact/health/protected metrics aktif lokal |
-| PostgreSQL | Phase 1B/1C local complete; Phase 1D migration v7 memperbaiki bounded worker retention |
+| PostgreSQL | Phase 1B/1C local complete; Phase 1D migration v8 menambah upload intent dan bounded cleanup |
 | Redis | Phase 1B local complete; cache-aside, atomic limiter, fail-open, dan metrics lulus |
 | Admin CMS | Phase 1C C0-C10 complete lokal; belum dideploy atau di-cutover |
-| Remote pilot/cutover | Phase 1D D0 complete; D1-D10 belum diimplementasikan |
+| Remote pilot/cutover | Phase 1D D0-D2 complete lokal; D3-D10 belum selesai |
 | Inventory dan order management | Out of scope Phase 1 |
 
 ## Tech stack
@@ -207,6 +209,8 @@ Jalankan script menggunakan `npm.cmd run <nama>`.
 | `backend:dev` | Menjalankan API lokal pada `127.0.0.1:8080` |
 | `backend:worker` | Menjalankan durable background worker |
 | `backend:worker:ready` | Memeriksa readiness dependency worker |
+| `backend:worker:once` | Memproses maksimal satu durable job untuk scheduled invocation |
+| `backend:worker:cleanup-media` | Menghapus bounded quarantine intent yang kedaluwarsa; jalankan secara sengaja |
 | `backend:media:import` | Ingest media internal tanpa HTTP upload |
 | `backend:ops` | Dead-job replay atau targeted cache purge |
 | `backend:load` | Mengukur cold-start dan warm-read baseline lokal |

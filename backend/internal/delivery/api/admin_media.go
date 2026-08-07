@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	catalogapp "github.com/ilhamnugraha8944/tauco/backend/internal/catalog/application"
 	mediaapp "github.com/ilhamnugraha8944/tauco/backend/internal/media/application"
+	mediadomain "github.com/ilhamnugraha8944/tauco/backend/internal/media/domain"
 )
 
 const mediaMultipartLimit = mediaapp.MaxUploadBytes + 64*1024
@@ -24,13 +25,21 @@ type AdminMediaServer struct {
 	admin    *mediaapp.AdminService
 	ingestor *mediaapp.Ingestor
 	store    mediaapp.ObjectStore
+	uploads  *mediaapp.UploadService
 }
 
-func NewAdminMediaServer(admin *mediaapp.AdminService, ingestor *mediaapp.Ingestor, store mediaapp.ObjectStore) (*AdminMediaServer, error) {
+func NewAdminMediaServer(admin *mediaapp.AdminService, ingestor *mediaapp.Ingestor, store mediaapp.ObjectStore, uploads ...*mediaapp.UploadService) (*AdminMediaServer, error) {
 	if admin == nil || ingestor == nil || store == nil {
 		return nil, errors.New("admin media server requires service, ingestor, and storage")
 	}
-	return &AdminMediaServer{admin: admin, ingestor: ingestor, store: store}, nil
+	if len(uploads) > 1 {
+		return nil, errors.New("admin media server accepts at most one upload service")
+	}
+	server := &AdminMediaServer{admin: admin, ingestor: ingestor, store: store}
+	if len(uploads) == 1 {
+		server.uploads = uploads[0]
+	}
+	return server, nil
 }
 
 func RegisterSafeMediaHandlers(router gin.IRouter, server *AdminMediaServer, auth *AdminAuthHandler, publicLimit gin.HandlerFunc) {
@@ -38,11 +47,14 @@ func RegisterSafeMediaHandlers(router gin.IRouter, server *AdminMediaServer, aut
 	options := NewSafeGinServerOptions("")
 	wrapper := ServerInterfaceWrapper{Handler: handler, ErrorHandler: options.ErrorHandler}
 
-	read := []gin.HandlerFunc{auth.require(true, "media.read"), rejectUnknownQuery("cursor", "limit")}
-	write := []gin.HandlerFunc{auth.browserMutation(), auth.require(true, "media.write"), auth.csrf()}
+	read := []gin.HandlerFunc{auth.bff(), auth.require(true, "media.read"), rejectUnknownQuery("cursor", "limit")}
+	write := []gin.HandlerFunc{auth.bff(), auth.browserMutation(), auth.require(true, "media.write"), auth.csrf()}
 	router.GET("/api/v1/admin/media", appendRouteMiddleware(read, wrapper.AdminListMedia)...)
 	router.POST("/api/v1/admin/media", appendRouteMiddleware(write, limitRequestBody(mediaMultipartLimit), wrapper.AdminUploadMedia)...)
-	router.GET("/api/v1/admin/media/:id", appendRouteMiddleware([]gin.HandlerFunc{auth.require(true, "media.read"), rejectUnknownQuery()}, wrapper.AdminGetMedia)...)
+	router.POST("/api/v1/admin/media/upload-intents", appendRouteMiddleware(write, rejectUnknownQuery(), limitRequestBody(64<<10), wrapper.AdminCreateMediaUploadIntent)...)
+	router.GET("/api/v1/admin/media/upload-intents/:intentId", appendRouteMiddleware([]gin.HandlerFunc{auth.bff(), auth.require(true, "media.read"), rejectUnknownQuery()}, wrapper.AdminGetMediaUploadIntent)...)
+	router.POST("/api/v1/admin/media/upload-intents/:intentId/finalize", appendRouteMiddleware(write, rejectUnknownQuery(), wrapper.AdminFinalizeMediaUploadIntent)...)
+	router.GET("/api/v1/admin/media/:id", appendRouteMiddleware([]gin.HandlerFunc{auth.bff(), auth.require(true, "media.read"), rejectUnknownQuery()}, wrapper.AdminGetMedia)...)
 	router.POST("/api/v1/admin/media/:id/retry", appendRouteMiddleware(write, wrapper.AdminRetryMedia)...)
 	router.GET("/api/v1/media/:id/display.webp", publicLimit, rejectUnknownQuery(), wrapper.GetMediaDisplay)
 	router.GET("/api/v1/media/:id/variants/:width.webp", publicLimit, rejectUnknownQuery(), wrapper.GetMediaVariant)
@@ -81,6 +93,9 @@ func (server *AdminMediaServer) AdminListMedia(ctx context.Context, request Admi
 
 func (server *AdminMediaServer) AdminUploadMedia(ctx context.Context, request AdminUploadMediaRequestObject) (AdminUploadMediaResponseObject, error) {
 	requestID := publicRequestID(request.Params.XRequestID)
+	if server.uploads != nil {
+		return AdminUploadMedia404ApplicationProblemPlusJSONResponse{adminUploadUnavailable(requestID, "/api/v1/admin/media")}, nil
+	}
 	source, alt, decorative, err := readMediaMultipart(request.Body)
 	if err != nil {
 		if errors.Is(err, errMediaTooLarge) {
@@ -102,6 +117,96 @@ func (server *AdminMediaServer) AdminUploadMedia(ctx context.Context, request Ad
 	return AdminUploadMedia202JSONResponse{AdminMediaAcceptedJSONResponse{
 		Body:    AdminMediaResponse{Data: mediaDTO(asset), Meta: mustResponseMeta(requestID)},
 		Headers: AdminMediaAcceptedResponseHeaders{CacheControl: "no-store", XRequestID: requestID},
+	}}, nil
+}
+
+func (server *AdminMediaServer) AdminCreateMediaUploadIntent(ctx context.Context, request AdminCreateMediaUploadIntentRequestObject) (AdminCreateMediaUploadIntentResponseObject, error) {
+	requestID := publicRequestID(request.Params.XRequestID)
+	instance := "/api/v1/admin/media/upload-intents"
+	if server.uploads == nil {
+		return AdminCreateMediaUploadIntent404ApplicationProblemPlusJSONResponse{adminUploadUnavailable(requestID, instance)}, nil
+	}
+	if request.Body == nil {
+		return AdminCreateMediaUploadIntent400ApplicationProblemPlusJSONResponse{adminBadRequest(requestID, instance)}, nil
+	}
+	body := *request.Body
+	if body.Bytes < 1 || body.Bytes > mediaapp.MaxUploadBytes {
+		return AdminCreateMediaUploadIntent413ApplicationProblemPlusJSONResponse{adminPayloadTooLarge(requestID, instance)}, nil
+	}
+	if body.MimeType != AdminMediaUploadIntentRequestMimeTypeImagejpeg &&
+		body.MimeType != AdminMediaUploadIntentRequestMimeTypeImagepng &&
+		body.MimeType != AdminMediaUploadIntentRequestMimeTypeImagewebp {
+		return AdminCreateMediaUploadIntent415ApplicationProblemPlusJSONResponse{adminUnsupported(requestID, instance)}, nil
+	}
+	created, err := server.uploads.Create(ctx, mediaapp.CreateUploadIntentInput{
+		MIMEType: string(body.MimeType), Bytes: body.Bytes, SHA256: body.Sha256,
+		AltText: body.AltText, Decorative: body.Decorative,
+		CreatedBy: currentPrincipalFromContext(ctx),
+	})
+	if errors.Is(err, mediaapp.ErrInvalidUploadIntent) {
+		return AdminCreateMediaUploadIntent422ApplicationProblemPlusJSONResponse{adminValidation(requestID, instance, "Metadata upload tidak valid.")}, nil
+	}
+	if err != nil {
+		return AdminCreateMediaUploadIntent500ApplicationProblemPlusJSONResponse{adminInternal(requestID, instance)}, nil
+	}
+	return AdminCreateMediaUploadIntent201JSONResponse{AdminMediaUploadIntentCreatedJSONResponse{
+		Body: AdminMediaUploadIntentCreatedResponse{
+			Data: AdminMediaUploadIntentCreatedData{
+				Intent: uploadIntentDTO(created.Intent),
+				Upload: AdminMediaUploadInstructions{
+					Url: created.Upload.URL, Method: PUT,
+					Headers: created.Upload.Headers, ExpiresAt: created.Upload.ExpiresAt,
+				},
+			},
+			Meta: mustResponseMeta(requestID),
+		},
+		Headers: AdminMediaUploadIntentCreatedResponseHeaders{CacheControl: "no-store", XRequestID: requestID},
+	}}, nil
+}
+
+func (server *AdminMediaServer) AdminGetMediaUploadIntent(ctx context.Context, request AdminGetMediaUploadIntentRequestObject) (AdminGetMediaUploadIntentResponseObject, error) {
+	requestID := publicRequestID(request.Params.XRequestID)
+	id := request.IntentId.String()
+	instance := "/api/v1/admin/media/upload-intents/" + id
+	if server.uploads == nil {
+		return AdminGetMediaUploadIntent404ApplicationProblemPlusJSONResponse{adminUploadUnavailable(requestID, instance)}, nil
+	}
+	intent, err := server.uploads.Get(ctx, id)
+	if errors.Is(err, mediaapp.ErrUploadIntentNotFound) {
+		return AdminGetMediaUploadIntent404ApplicationProblemPlusJSONResponse{adminUploadIntentNotFound(requestID, instance)}, nil
+	}
+	if err != nil {
+		return AdminGetMediaUploadIntent500ApplicationProblemPlusJSONResponse{adminInternal(requestID, instance)}, nil
+	}
+	return AdminGetMediaUploadIntent200JSONResponse{AdminMediaUploadIntentOKJSONResponse{
+		Body:    AdminMediaUploadIntentResponse{Data: uploadIntentDTO(intent), Meta: mustResponseMeta(requestID)},
+		Headers: AdminMediaUploadIntentOKResponseHeaders{CacheControl: "no-store", XRequestID: requestID},
+	}}, nil
+}
+
+func (server *AdminMediaServer) AdminFinalizeMediaUploadIntent(ctx context.Context, request AdminFinalizeMediaUploadIntentRequestObject) (AdminFinalizeMediaUploadIntentResponseObject, error) {
+	requestID := publicRequestID(request.Params.XRequestID)
+	id := request.IntentId.String()
+	instance := "/api/v1/admin/media/upload-intents/" + id + "/finalize"
+	if server.uploads == nil {
+		return AdminFinalizeMediaUploadIntent404ApplicationProblemPlusJSONResponse{adminUploadUnavailable(requestID, instance)}, nil
+	}
+	intent, _, err := server.uploads.Finalize(ctx, id)
+	if errors.Is(err, mediaapp.ErrUploadIntentNotFound) {
+		return AdminFinalizeMediaUploadIntent404ApplicationProblemPlusJSONResponse{adminUploadIntentNotFound(requestID, instance)}, nil
+	}
+	if errors.Is(err, mediaapp.ErrUploadIntentConflict) {
+		return AdminFinalizeMediaUploadIntent409ApplicationProblemPlusJSONResponse{adminUploadIntentConflict(requestID, instance)}, nil
+	}
+	if errors.Is(err, mediaapp.ErrUploadIntentMetadata) {
+		return AdminFinalizeMediaUploadIntent422ApplicationProblemPlusJSONResponse{adminValidation(requestID, instance, "Ukuran, tipe, atau checksum objek tidak sesuai intent.")}, nil
+	}
+	if err != nil {
+		return AdminFinalizeMediaUploadIntent500ApplicationProblemPlusJSONResponse{adminInternal(requestID, instance)}, nil
+	}
+	return AdminFinalizeMediaUploadIntent202JSONResponse{AdminMediaUploadIntentAcceptedJSONResponse{
+		Body:    AdminMediaUploadIntentResponse{Data: uploadIntentDTO(intent), Meta: mustResponseMeta(requestID)},
+		Headers: AdminMediaUploadIntentAcceptedResponseHeaders{CacheControl: "no-store", XRequestID: requestID},
 	}}, nil
 }
 
@@ -253,6 +358,22 @@ func mediaDTO(asset mediaapp.AdminAsset) AdminMedia {
 		CreatedAt: asset.CreatedAt, UpdatedAt: asset.UpdatedAt}
 }
 
+func uploadIntentDTO(intent mediadomain.UploadIntent) AdminMediaUploadIntent {
+	var assetID *uuid.UUID
+	if intent.MediaAssetID != nil {
+		value := mustUUID(*intent.MediaAssetID)
+		assetID = &value
+	}
+	return AdminMediaUploadIntent{
+		Id: mustUUID(intent.ID), Status: AdminMediaUploadIntentStatus(intent.Status),
+		MimeType: AdminMediaUploadIntentMimeType(intent.ExpectedMIME),
+		Bytes:    intent.ExpectedBytes, Sha256: intent.ExpectedSHA256,
+		AltText: intent.AltText, Decorative: intent.Decorative,
+		MediaAssetId: assetID, LastErrorCode: intent.LastErrorCode,
+		ExpiresAt: intent.ExpiresAt, CreatedAt: intent.CreatedAt, UpdatedAt: intent.UpdatedAt,
+	}
+}
+
 func currentPrincipalFromContext(ctx context.Context) string {
 	if ginContext, ok := ctx.(*gin.Context); ok {
 		return currentPrincipal(ginContext).ID.String()
@@ -295,4 +416,16 @@ func adminUnsupported(requestID, instance string) UnsupportedMediaTypeApplicatio
 }
 func adminValidation(requestID, instance, detail string) ValidationFailedApplicationProblemPlusJSONResponse {
 	return ValidationFailedApplicationProblemPlusJSONResponse{Body: adminProblemResponse(422, requestID, instance, "VALIDATION_FAILED", detail), Headers: ValidationFailedResponseHeaders{CacheControl: "no-store", XRequestID: requestID}}
+}
+
+func adminUploadUnavailable(requestID, instance string) NotFoundApplicationProblemPlusJSONResponse {
+	return NotFoundApplicationProblemPlusJSONResponse{Body: adminProblemResponse(404, requestID, instance, "MEDIA_DIRECT_UPLOAD_DISABLED", "Upload langsung tidak tersedia pada runtime ini."), Headers: NotFoundResponseHeaders{CacheControl: "no-store", XRequestID: requestID}}
+}
+
+func adminUploadIntentNotFound(requestID, instance string) NotFoundApplicationProblemPlusJSONResponse {
+	return NotFoundApplicationProblemPlusJSONResponse{Body: adminProblemResponse(404, requestID, instance, "MEDIA_UPLOAD_INTENT_NOT_FOUND", "Intent upload tidak ditemukan."), Headers: NotFoundResponseHeaders{CacheControl: "no-store", XRequestID: requestID}}
+}
+
+func adminUploadIntentConflict(requestID, instance string) ConflictApplicationProblemPlusJSONResponse {
+	return ConflictApplicationProblemPlusJSONResponse{Body: adminProblemResponse(409, requestID, instance, "MEDIA_UPLOAD_INTENT_CONFLICT", "Intent upload sudah kedaluwarsa atau tidak dapat difinalisasi."), Headers: ConflictResponseHeaders{CacheControl: "no-store", XRequestID: requestID}}
 }

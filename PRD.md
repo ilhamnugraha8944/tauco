@@ -4,8 +4,8 @@
 
 | Atribut | Nilai |
 | --- | --- |
-| Versi dokumen | 1.5 |
-| Tanggal | 6 Agustus 2026 |
+| Versi dokumen | 1.7 |
+| Tanggal | 7 Agustus 2026 |
 | Status produk | Phase 1A complete production; Phase 1B dan 1C complete lokal; Phase 1D implementing |
 | Bahasa produk | Indonesia |
 | Target pasar awal | Indonesia |
@@ -37,7 +37,7 @@ Delivery dibagi agar website publik dapat diluncurkan lebih cepat:
   same-origin BFF, shell CMS, media CMS, editor dan publishing Home/About,
   Product CMS, inbox/activity, worker publishing, recovery, metrics, dan quality
   closeout tersedia dalam shadow-mode lokal.
-- **Phase 1D — implementing:** D0 complete. Remote pilot memakai Netlify,
+- **Phase 1D — implementing:** D0-D2 complete lokal. Remote pilot memakai Netlify,
   Supabase PostgreSQL/Storage, dan Upstash Redis dengan staged content/admin
   cutover, verified Netlify Forms Inbox sync, rollback, backup, serta
   operational readiness. Netlify Forms tetap menjadi contact transport dan
@@ -55,8 +55,9 @@ Label status dalam dokumen ini:
 - `IMPLEMENTED-1C-LOCAL`: gate C0-C10 selesai dan tercatat pada
   `PHASE_1C_PLAN.md`, `PHASE_1C_WALKTHROUGH.md`, serta
   `PHASE_1C_QUALITY_REPORT.md`; belum dideploy.
-- `IMPLEMENTING-1D`: scope dan provider sudah dibekukan pada D0; implementasi
-  remote runtime serta staged production cutover berjalan melalui
+- `IMPLEMENTING-1D`: scope/provider D0, production hardening D1, serta direct
+  media upload dan worker foundation D2 selesai lokal; remote provider/runtime
+  serta staged production cutover berjalan melalui
   `PHASE_1D_PLAN.md` dan `PHASE_1D_WALKTHROUGH.md`.
 - `PLANNED`: desain target yang belum diimplementasikan pada Phase 1A.
 - `OUT-OF-SCOPE`: bukan bagian delivery Phase 1.
@@ -172,9 +173,9 @@ inbox, dan audit trail.
 | Technical SEO | `IMPLEMENTED-1A` | Metadata, canonical, sitemap, robots, JSON-LD |
 | Responsive dan accessibility baseline | `IMPLEMENTED-1A` | Semantic HTML dan keyboard flow |
 | REST API Go | `IMPLEMENTED-1B-LOCAL` | Public/contact/health/metrics dan quality gate complete lokal |
-| PostgreSQL/Supabase | `IMPLEMENTED-1C-LOCAL` | Migration v6, auth/RBAC/session/MFA, role admin, dan integration lulus lokal |
+| PostgreSQL/Supabase | `IMPLEMENTING-1D` | Migration v8 menambah upload intent; provider Supabase belum diprovision |
 | Redis/Upstash | `IMPLEMENTED-1B-LOCAL` | Cache, rate limit, fail-open, dan integration lokal |
-| Object storage dan image worker | `IMPLEMENTED-1B-LOCAL` | Local/S3 port, safe image pipeline, dan worker lokal |
+| Object storage dan image worker | `IMPLEMENTING-1D` | D2 direct PUT, finalize, S3 adapter, one-shot worker, dan cleanup lulus lokal |
 | Admin authentication | `IMPLEMENTED-1C-LOCAL` | Password, TOTP, session, auth API, BFF, account, dan security gate lulus |
 | CMS homepage/about | `IMPLEMENTED-1C-LOCAL` | Draft/history/preview/publish lokal; production tetap konten Phase 1A |
 | Product/media CMS | `IMPLEMENTED-1C-LOCAL` | CRUD, revision, archive, upload/variant/retry, dan publishing lokal lulus |
@@ -589,7 +590,8 @@ shell CMS, media, content/product publishing, recovery, dan security gate lulus.
 - Role aktif Phase 1: `super_admin`; schema tetap siap untuk RBAC.
 - Tidak ada public registration.
 - Password menggunakan Argon2id.
-- Access JWT RS256 berumur pendek dan disimpan pada secure HttpOnly cookie.
+- Access JWT production memakai Ed25519/EdDSA berumur pendek; RSA file tetap
+  tersedia hanya untuk local/test. Token disimpan pada secure HttpOnly cookie.
 - Opaque refresh token dirotasi, disimpan dalam bentuk hash, dan dapat dicabut
   per session.
 - TOTP wajib disiapkan sebelum akun dapat menggunakan CMS dan wajib
@@ -598,6 +600,8 @@ shell CMS, media, content/product publishing, recovery, dan security gate lulus.
   allowlist.
 - Admin browser mengakses API melalui same-origin BFF/proxy agar cookie tidak
   menjadi third-party cookie lintas platform.
+- Seluruh route Admin Go mewajibkan shared secret server-only dari BFF; header
+  browser dengan nama yang sama tidak diteruskan.
 
 ### 11.6 Content publishing
 
@@ -675,8 +679,9 @@ berakhir.
   admin/job ID, dan stable error code.
 - Token, password, TOTP, raw message body, dan sensitive PII harus direduksi.
 - Global error handler memetakan domain error tanpa mengekspos internals.
-- Upload maksimal 10 MB dan hanya JPEG/PNG/WebP yang lolos magic-byte serta
-  decode validation; SVG tidak diterima.
+- Upload maksimal 10 MB, 12,5 megapiksel, dan sisi 6000 px. Hanya
+  JPEG/PNG/WebP yang lolos magic-byte serta decode validation; SVG tidak
+  diterima.
 
 ### 11.11 Observability dan operations
 

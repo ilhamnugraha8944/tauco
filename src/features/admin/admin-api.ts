@@ -110,6 +110,48 @@ export const adminAPI = {
     body.set("decorative", String(input.decorative));
     return send<{ data: AdminMedia }>("media", { method: "POST", body });
   },
+  createMediaUploadIntent(input: {
+    mimeType: string;
+    bytes: number;
+    sha256: string;
+    altText: string;
+    decorative: boolean;
+  }) {
+    return send<{ data: { intent: AdminMediaUploadIntent; upload: AdminMediaUploadTarget } }>(
+      "media/upload-intents",
+      { method: "POST", body: JSON.stringify(input) },
+    );
+  },
+  getMediaUploadIntent(id: string) {
+    return send<{ data: AdminMediaUploadIntent }>(`media/upload-intents/${id}`, { method: "GET" });
+  },
+  finalizeMediaUploadIntent(id: string) {
+    return send<{ data: AdminMediaUploadIntent }>(`media/upload-intents/${id}/finalize`, { method: "POST" });
+  },
+  async putMediaUpload(upload: AdminMediaUploadTarget, file: File) {
+    const target = new URL(upload.url, window.location.origin);
+
+    if (!["http:", "https:"].includes(target.protocol) || upload.method !== "PUT") {
+      throw new AdminAPIError("Target upload media tidak valid.", 500, "MEDIA_UPLOAD_TARGET_INVALID");
+    }
+
+    const response = await fetch(target, {
+      method: "PUT",
+      headers: upload.headers,
+      body: file,
+      cache: "no-store",
+      credentials: "omit",
+      referrerPolicy: "no-referrer",
+    });
+
+    if (!response.ok) {
+      throw new AdminAPIError(
+        "Object storage menolak upload media.",
+        response.status,
+        "MEDIA_DIRECT_UPLOAD_FAILED",
+      );
+    }
+  },
   retryMedia(id: string) {
     return send<{ data: AdminMedia }>(`media/${id}/retry`, { method: "POST" });
   },
@@ -198,6 +240,28 @@ export type AdminMedia = {
   variants: Array<{ width: number; height: number; bytes: number; url: string }>;
   createdAt: string;
   updatedAt: string;
+};
+
+export type AdminMediaUploadIntent = {
+  id: string;
+  status: "pending" | "queued" | "completed" | "failed" | "expired";
+  mimeType: string;
+  bytes: number;
+  sha256: string;
+  altText: string;
+  decorative: boolean;
+  mediaAssetId?: string | null;
+  lastErrorCode?: string | null;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminMediaUploadTarget = {
+  url: string;
+  method: "PUT";
+  headers: Record<string, string>;
+  expiresAt: string;
 };
 
 export type AdminPageKey = "home" | "about";

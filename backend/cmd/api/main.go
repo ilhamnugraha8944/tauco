@@ -12,6 +12,7 @@ import (
 
 	"github.com/ilhamnugraha8944/tauco/backend/internal/auth"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/composition"
+	mediastorage "github.com/ilhamnugraha8944/tauco/backend/internal/media/storage"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/platform/config"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/platform/database"
 )
@@ -32,8 +33,13 @@ func run() int {
 		_, _ = fmt.Fprintf(os.Stderr, "database configuration error: %v\n", err)
 		return 1
 	}
+	deployment, err := config.LoadDeployment(os.LookupEnv, cfg.Environment)
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "deployment configuration error: %v\n", err)
+		return 1
+	}
 	var adminAuth *composition.AdminAuthOptions
-	if strings.TrimSpace(os.Getenv("ADMIN_DATABASE_URL")) != "" {
+	if deployment.AdminRemoteEnabled {
 		adminDatabase, loadErr := database.LoadAdminRuntimeConfig(os.LookupEnv)
 		if loadErr != nil {
 			_, _ = fmt.Fprintln(os.Stderr, "admin database configuration error")
@@ -46,8 +52,9 @@ func run() int {
 		}
 		adminAuth = &composition.AdminAuthOptions{
 			Database: adminDatabase, Runtime: authRuntime,
-			AllowedOrigins: splitCSV(os.Getenv("ADMIN_ALLOWED_ORIGINS")),
-			SecureCookies:  strings.EqualFold(os.Getenv("ADMIN_COOKIE_SECURE"), "true"),
+			AllowedOrigins: deployment.AdminOrigins,
+			SecureCookies:  deployment.AdminCookieSecure,
+			BFFSecret:      deployment.AdminBFFSecret,
 		}
 	}
 
@@ -67,10 +74,17 @@ func run() int {
 			MetricsBearer: []byte(os.Getenv("METRICS_BEARER_TOKEN")),
 		},
 		composition.PublicAPIInfrastructure{
-			RedisURL:          os.Getenv("REDIS_URL"),
-			CORSOrigins:       splitCSV(os.Getenv("CORS_ALLOWED_ORIGINS")),
-			TrustedProxyCIDRs: splitCSV(os.Getenv("TRUSTED_PROXY_CIDRS")),
-			MediaRoot:         os.Getenv("MEDIA_LOCAL_ROOT"),
+			RedisURL:           os.Getenv("REDIS_URL"),
+			CORSOrigins:        deployment.CORSOrigins,
+			TrustedProxyCIDRs:  splitCSV(os.Getenv("TRUSTED_PROXY_CIDRS")),
+			MediaRoot:          os.Getenv("MEDIA_LOCAL_ROOT"),
+			MediaStorageDriver: deployment.MediaStorageDriver,
+			MediaS3: mediastorage.S3Config{
+				Endpoint: deployment.MediaS3Endpoint, Region: deployment.MediaS3Region,
+				Bucket: deployment.MediaS3Bucket, Prefix: deployment.MediaS3Prefix,
+				AccessKeyID: deployment.MediaS3AccessKeyID, SecretAccessKey: deployment.MediaS3SecretKey,
+			},
+			ContactAPIEnabled: deployment.ContactAPIEnabled,
 			AdminAuth:         adminAuth,
 		},
 	)

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Tauco Cap Badak API
-  version: 1.1.0
+  version: 1.2.0
   description: |
     Contract-first REST API for the Phase 1B public backend and the Phase 1C
     local shadow CMS. Administration operations are contractual only in C1 and
@@ -919,10 +919,99 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
         '415':
           $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/media/upload-intents:
+    post:
+      tags: [Admin media]
+      summary: Create a short-lived direct media upload intent
+      operationId: adminCreateMediaUploadIntent
+      security:
+        - AdminCookie: []
+          AdminCSRF: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+      requestBody:
+        required: true
+        x-max-body-bytes: 65536
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminMediaUploadIntentRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/AdminMediaUploadIntentCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/media/upload-intents/{intentId}:
+    get:
+      tags: [Admin media]
+      summary: Get a direct media upload intent
+      operationId: adminGetMediaUploadIntent
+      security:
+        - AdminCookie: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/UploadIntentID'
+      responses:
+        '200':
+          $ref: '#/components/responses/AdminMediaUploadIntentOK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/media/upload-intents/{intentId}/finalize:
+    post:
+      tags: [Admin media]
+      summary: Verify and queue a directly uploaded media object
+      operationId: adminFinalizeMediaUploadIntent
+      security:
+        - AdminCookie: []
+          AdminCSRF: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestID'
+        - $ref: '#/components/parameters/UploadIntentID'
+      responses:
+        '202':
+          $ref: '#/components/responses/AdminMediaUploadIntentAccepted'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/ValidationFailed'
         '500':
@@ -1317,6 +1406,13 @@ components:
       schema:
         type: string
         format: uuid
+    UploadIntentID:
+      name: intentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     RevisionID:
       name: revisionId
       in: path
@@ -1698,6 +1794,30 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/AdminMediaResponse' }
+    AdminMediaUploadIntentCreated:
+      description: Direct upload intent and presigned PUT instructions
+      headers:
+        X-Request-ID: { $ref: '#/components/headers/XRequestID' }
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AdminMediaUploadIntentCreatedResponse' }
+    AdminMediaUploadIntentOK:
+      description: Current direct upload intent state
+      headers:
+        X-Request-ID: { $ref: '#/components/headers/XRequestID' }
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AdminMediaUploadIntentResponse' }
+    AdminMediaUploadIntentAccepted:
+      description: Direct upload verified and queued, or an idempotent replay
+      headers:
+        X-Request-ID: { $ref: '#/components/headers/XRequestID' }
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/AdminMediaUploadIntentResponse' }
     AdminContactListOK:
       description: Cursor page of inbox messages
       headers:
@@ -3051,6 +3171,109 @@ components:
           maxLength: 300
         decorative:
           type: boolean
+    AdminMediaUploadIntentRequest:
+      type: object
+      additionalProperties: false
+      required: [mimeType, bytes, sha256, altText, decorative]
+      properties:
+        mimeType:
+          type: string
+          enum: [image/jpeg, image/png, image/webp]
+        bytes:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 10485760
+        sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+        altText:
+          type: string
+          maxLength: 300
+        decorative:
+          type: boolean
+    AdminMediaUploadIntent:
+      type: object
+      additionalProperties: false
+      required: [id, status, mimeType, bytes, sha256, altText, decorative, expiresAt, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, queued, completed, failed, expired]
+        mimeType:
+          type: string
+          enum: [image/jpeg, image/png, image/webp]
+        bytes:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 10485760
+        sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+        altText:
+          type: string
+          maxLength: 300
+        decorative:
+          type: boolean
+        mediaAssetId:
+          type: string
+          format: uuid
+          nullable: true
+        lastErrorCode:
+          type: string
+          nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    AdminMediaUploadInstructions:
+      type: object
+      additionalProperties: false
+      required: [url, method, headers, expiresAt]
+      properties:
+        url:
+          type: string
+          format: uri
+        method:
+          type: string
+          enum: [PUT]
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        expiresAt:
+          type: string
+          format: date-time
+    AdminMediaUploadIntentCreatedData:
+      type: object
+      additionalProperties: false
+      required: [intent, upload]
+      properties:
+        intent: { $ref: '#/components/schemas/AdminMediaUploadIntent' }
+        upload: { $ref: '#/components/schemas/AdminMediaUploadInstructions' }
+    AdminMediaUploadIntentCreatedResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/AdminMediaUploadIntentCreatedData' }
+        meta: { $ref: '#/components/schemas/ResponseMeta' }
+    AdminMediaUploadIntentResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/AdminMediaUploadIntent' }
+        meta: { $ref: '#/components/schemas/ResponseMeta' }
     AdminMediaVariant:
       type: object
       additionalProperties: false

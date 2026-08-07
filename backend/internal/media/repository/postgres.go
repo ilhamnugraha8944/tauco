@@ -18,6 +18,51 @@ type Postgres struct {
 	database *gorm.DB
 }
 
+type uploadIntentRow struct {
+	ID                  string     `gorm:"column:id"`
+	Status              string     `gorm:"column:status"`
+	QuarantineKey       string     `gorm:"column:quarantine_object_key"`
+	ExpectedMIME        string     `gorm:"column:expected_mime_type"`
+	ExpectedBytes       int64      `gorm:"column:expected_bytes"`
+	ExpectedSHA256      string     `gorm:"column:expected_sha256"`
+	AltText             string     `gorm:"column:alt_text"`
+	Decorative          bool       `gorm:"column:decorative"`
+	CreatedBy           string     `gorm:"column:created_by"`
+	MediaAssetID        *string    `gorm:"column:media_asset_id"`
+	LastErrorCode       *string    `gorm:"column:last_error_code"`
+	ExpiresAt           time.Time  `gorm:"column:expires_at"`
+	QueuedAt            *time.Time `gorm:"column:queued_at"`
+	CompletedAt         *time.Time `gorm:"column:completed_at"`
+	FailedAt            *time.Time `gorm:"column:failed_at"`
+	ExpiredAt           *time.Time `gorm:"column:expired_at"`
+	CleanupClaimedAt    *time.Time `gorm:"column:cleanup_claimed_at"`
+	QuarantineDeletedAt *time.Time `gorm:"column:quarantine_deleted_at"`
+	CreatedAt           time.Time  `gorm:"column:created_at"`
+	UpdatedAt           time.Time  `gorm:"column:updated_at"`
+}
+
+const uploadIntentColumns = `
+	id::text AS id, status, quarantine_object_key, expected_mime_type,
+	expected_bytes, expected_sha256, alt_text, decorative,
+	created_by::text AS created_by, media_asset_id::text AS media_asset_id,
+	last_error_code, expires_at, queued_at, completed_at, failed_at,
+	expired_at, cleanup_claimed_at, quarantine_deleted_at, created_at, updated_at`
+
+func (row uploadIntentRow) domain() domain.UploadIntent {
+	return domain.UploadIntent{
+		ID: row.ID, Status: row.Status, QuarantineKey: row.QuarantineKey,
+		ExpectedMIME: row.ExpectedMIME, ExpectedBytes: row.ExpectedBytes,
+		ExpectedSHA256: row.ExpectedSHA256, AltText: row.AltText,
+		Decorative: row.Decorative, CreatedBy: row.CreatedBy,
+		MediaAssetID: row.MediaAssetID, LastErrorCode: row.LastErrorCode,
+		ExpiresAt: row.ExpiresAt, QueuedAt: row.QueuedAt,
+		CompletedAt: row.CompletedAt, FailedAt: row.FailedAt,
+		ExpiredAt: row.ExpiredAt, CleanupClaimedAt: row.CleanupClaimedAt,
+		QuarantineDeletedAt: row.QuarantineDeletedAt,
+		CreatedAt:           row.CreatedAt, UpdatedAt: row.UpdatedAt,
+	}
+}
+
 func (repository *Postgres) ListAdmin(ctx context.Context, after *catalogapp.ProductPaginationPosition, limit int) ([]mediaapp.AdminAsset, bool, error) {
 	arguments := []any{}
 	where := ""
@@ -326,5 +371,309 @@ func (repository *Postgres) MarkFailed(ctx context.Context, assetID, errorCode s
 	return nil
 }
 
+func (repository *Postgres) CreateUploadIntent(ctx context.Context, draft domain.UploadIntentDraft) (domain.UploadIntent, error) {
+	if err := draft.Validate(); err != nil {
+		return domain.UploadIntent{}, err
+	}
+	actorID, err := uuid.Parse(draft.CreatedBy)
+	if err != nil {
+		return domain.UploadIntent{}, errors.New("media upload actor must be a UUID")
+	}
+	identifier, err := uuid.NewV7()
+	if err != nil {
+		return domain.UploadIntent{}, fmt.Errorf("generate media upload intent ID: %w", err)
+	}
+	key := "quarantine/" + identifier.String()
+	var row uploadIntentRow
+	err = repository.database.WithContext(ctx).Raw(`
+		INSERT INTO tauco_app.media_upload_intents (
+			id, quarantine_object_key, expected_mime_type, expected_bytes,
+			expected_sha256, alt_text, decorative, created_by, expires_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		RETURNING `+uploadIntentColumns,
+		identifier, key, draft.ExpectedMIME, draft.ExpectedBytes,
+		draft.ExpectedSHA256, draft.AltText, draft.Decorative,
+		actorID, draft.ExpiresAt.UTC(),
+	).Scan(&row).Error
+	if err != nil {
+		return domain.UploadIntent{}, fmt.Errorf("create media upload intent: %w", err)
+	}
+	return row.domain(), nil
+}
+
+func (repository *Postgres) GetUploadIntent(ctx context.Context, intentID string) (domain.UploadIntent, error) {
+	row, err := repository.loadUploadIntent(ctx, repository.database, intentID, false)
+	if err != nil {
+		return domain.UploadIntent{}, err
+	}
+	return row.domain(), nil
+}
+
+func (repository *Postgres) QueueUploadIntent(
+	ctx context.Context,
+	intentID, observedMIME string,
+	observedBytes int64,
+	observedSHA256 string,
+) (domain.UploadIntent, bool, error) {
+	var (
+		intent      domain.UploadIntent
+		replayed    bool
+		semanticErr error
+	)
+	err := repository.database.WithContext(ctx).Transaction(func(transaction *gorm.DB) error {
+		row, err := repository.loadUploadIntent(ctx, transaction, intentID, true)
+		if err != nil {
+			return err
+		}
+		intent = row.domain()
+		if row.ExpectedMIME != observedMIME || row.ExpectedBytes != observedBytes || row.ExpectedSHA256 != observedSHA256 {
+			semanticErr = mediaapp.ErrUploadIntentMetadata
+			return nil
+		}
+		switch row.Status {
+		case domain.UploadStatusQueued, domain.UploadStatusCompleted:
+			replayed = true
+			return nil
+		case domain.UploadStatusFailed, domain.UploadStatusExpired:
+			semanticErr = mediaapp.ErrUploadIntentConflict
+			return nil
+		case domain.UploadStatusPending:
+		default:
+			semanticErr = mediaapp.ErrUploadIntentConflict
+			return nil
+		}
+
+		queued := transaction.Exec(`
+			UPDATE tauco_app.media_upload_intents
+			SET status = 'queued', queued_at = statement_timestamp()
+			WHERE id = ? AND status = 'pending'
+			  AND expires_at > statement_timestamp()`, intentID)
+		if queued.Error != nil {
+			return fmt.Errorf("queue media upload intent: %w", queued.Error)
+		}
+		if queued.RowsAffected != 1 {
+			if err := transaction.Exec(`
+				UPDATE tauco_app.media_upload_intents
+				SET status = 'expired', expired_at = statement_timestamp()
+				WHERE id = ? AND status = 'pending'
+				  AND expires_at <= statement_timestamp()`, intentID).Error; err != nil {
+				return fmt.Errorf("expire media upload intent: %w", err)
+			}
+			row, err = repository.loadUploadIntent(ctx, transaction, intentID, false)
+			if err != nil {
+				return err
+			}
+			intent = row.domain()
+			semanticErr = mediaapp.ErrUploadIntentConflict
+			return nil
+		}
+
+		jobID, err := uuid.NewV7()
+		if err != nil {
+			return fmt.Errorf("generate media ingest job ID: %w", err)
+		}
+		payload, _ := json.Marshal(map[string]string{"uploadIntentId": intentID})
+		if err := transaction.Exec(`
+			INSERT INTO tauco_app.background_jobs (
+				id, kind, payload_json, idempotency_key
+			) VALUES (?, 'media.ingest_upload', ?::jsonb, ?)
+		`, jobID, string(payload), "media.ingest:"+intentID).Error; err != nil {
+			return fmt.Errorf("insert media ingest job: %w", err)
+		}
+		row, err = repository.loadUploadIntent(ctx, transaction, intentID, false)
+		if err != nil {
+			return err
+		}
+		intent = row.domain()
+		return nil
+	})
+	if err != nil {
+		return domain.UploadIntent{}, false, err
+	}
+	return intent, replayed, semanticErr
+}
+
+func (repository *Postgres) CompleteUploadIntent(ctx context.Context, intentID, assetID string) error {
+	if _, err := uuid.Parse(assetID); err != nil {
+		return mediaapp.ErrUploadIntentConflict
+	}
+	return repository.updateUploadIntent(ctx, intentID, func(transaction *gorm.DB, row uploadIntentRow) error {
+		if row.Status == domain.UploadStatusCompleted && row.MediaAssetID != nil && *row.MediaAssetID == assetID {
+			return nil
+		}
+		if row.Status != domain.UploadStatusQueued && row.Status != domain.UploadStatusFailed {
+			return mediaapp.ErrUploadIntentConflict
+		}
+		result := transaction.Exec(`
+			UPDATE tauco_app.media_upload_intents
+			SET status = 'completed', media_asset_id = ?::uuid,
+				completed_at = statement_timestamp(), failed_at = NULL,
+				last_error_code = NULL
+			WHERE id = ? AND status IN ('queued', 'failed')`, assetID, intentID)
+		if result.Error != nil {
+			return fmt.Errorf("complete media upload intent: %w", result.Error)
+		}
+		if result.RowsAffected != 1 {
+			return mediaapp.ErrUploadIntentConflict
+		}
+		return nil
+	})
+}
+
+func (repository *Postgres) FailUploadIntent(ctx context.Context, intentID, errorCode string) error {
+	if errorCode == "" {
+		return mediaapp.ErrUploadIntentConflict
+	}
+	return repository.updateUploadIntent(ctx, intentID, func(transaction *gorm.DB, row uploadIntentRow) error {
+		if row.Status == domain.UploadStatusFailed && row.LastErrorCode != nil && *row.LastErrorCode == errorCode {
+			return nil
+		}
+		if row.Status != domain.UploadStatusQueued {
+			return mediaapp.ErrUploadIntentConflict
+		}
+		result := transaction.Exec(`
+			UPDATE tauco_app.media_upload_intents
+			SET status = 'failed', failed_at = statement_timestamp(),
+				last_error_code = ?
+			WHERE id = ? AND status = 'queued'`, errorCode, intentID)
+		if result.Error != nil {
+			return fmt.Errorf("fail media upload intent: %w", result.Error)
+		}
+		if result.RowsAffected != 1 {
+			return mediaapp.ErrUploadIntentConflict
+		}
+		return nil
+	})
+}
+
+func (repository *Postgres) ClaimUploadIntentCleanup(ctx context.Context, limit int) ([]domain.UploadIntent, error) {
+	if limit < 1 || limit > 1000 {
+		return nil, errors.New("media upload cleanup limit must be between 1 and 1000")
+	}
+	var rows []uploadIntentRow
+	err := repository.database.WithContext(ctx).Raw(`
+		WITH candidates AS (
+			SELECT intent.id
+			FROM tauco_app.media_upload_intents AS intent
+			WHERE intent.expires_at <= statement_timestamp()
+			  AND intent.quarantine_deleted_at IS NULL
+			  AND (
+				intent.status IN ('pending', 'completed', 'failed', 'expired')
+				OR (
+					intent.status = 'queued'
+					AND EXISTS (
+						SELECT 1 FROM tauco_app.background_jobs AS job
+						WHERE job.idempotency_key = 'media.ingest:' || intent.id::text
+						  AND job.status = 'dead'
+					)
+				)
+			  )
+			  AND (
+				intent.cleanup_claimed_at IS NULL
+				OR intent.cleanup_claimed_at <= statement_timestamp() - interval '15 minutes'
+			  )
+			ORDER BY intent.expires_at, intent.id
+			FOR UPDATE SKIP LOCKED
+			LIMIT ?
+		), claimed AS (
+			UPDATE tauco_app.media_upload_intents AS intent
+			SET status = CASE
+					WHEN intent.status = 'pending' THEN 'expired'
+					WHEN intent.status = 'queued' THEN 'failed'
+					ELSE intent.status
+				END,
+				expired_at = CASE
+					WHEN intent.status = 'pending' THEN statement_timestamp()
+					ELSE intent.expired_at
+				END,
+				failed_at = CASE
+					WHEN intent.status = 'queued' THEN statement_timestamp()
+					ELSE intent.failed_at
+				END,
+				last_error_code = CASE
+					WHEN intent.status = 'queued' THEN 'INGEST_JOB_DEAD'
+					ELSE intent.last_error_code
+				END,
+				cleanup_claimed_at = statement_timestamp()
+			FROM candidates
+			WHERE intent.id = candidates.id
+			RETURNING intent.*
+		)
+		SELECT `+uploadIntentColumns+`
+		FROM claimed ORDER BY expires_at, id`, limit).Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("claim media upload cleanup: %w", err)
+	}
+	intents := make([]domain.UploadIntent, 0, len(rows))
+	for _, row := range rows {
+		intents = append(intents, row.domain())
+	}
+	return intents, nil
+}
+
+func (repository *Postgres) CompleteUploadIntentCleanup(ctx context.Context, intentID string) error {
+	return repository.updateUploadIntent(ctx, intentID, func(transaction *gorm.DB, row uploadIntentRow) error {
+		if row.QuarantineDeletedAt != nil {
+			return nil
+		}
+		if row.CleanupClaimedAt == nil {
+			return mediaapp.ErrUploadIntentCleanupConflict
+		}
+		result := transaction.Exec(`
+			UPDATE tauco_app.media_upload_intents
+			SET quarantine_deleted_at = statement_timestamp()
+			WHERE id = ? AND cleanup_claimed_at IS NOT NULL
+			  AND quarantine_deleted_at IS NULL`, intentID)
+		if result.Error != nil {
+			return fmt.Errorf("complete media upload cleanup: %w", result.Error)
+		}
+		if result.RowsAffected != 1 {
+			return mediaapp.ErrUploadIntentCleanupConflict
+		}
+		return nil
+	})
+}
+
+func (repository *Postgres) loadUploadIntent(
+	ctx context.Context,
+	database *gorm.DB,
+	intentID string,
+	forUpdate bool,
+) (uploadIntentRow, error) {
+	if _, err := uuid.Parse(intentID); err != nil {
+		return uploadIntentRow{}, mediaapp.ErrUploadIntentNotFound
+	}
+	lock := ""
+	if forUpdate {
+		lock = " FOR UPDATE"
+	}
+	var row uploadIntentRow
+	if err := database.WithContext(ctx).Raw(`
+		SELECT `+uploadIntentColumns+`
+		FROM tauco_app.media_upload_intents
+		WHERE id = ?`+lock, intentID).Scan(&row).Error; err != nil {
+		return uploadIntentRow{}, fmt.Errorf("get media upload intent: %w", err)
+	}
+	if row.ID == "" {
+		return uploadIntentRow{}, mediaapp.ErrUploadIntentNotFound
+	}
+	return row, nil
+}
+
+func (repository *Postgres) updateUploadIntent(
+	ctx context.Context,
+	intentID string,
+	update func(*gorm.DB, uploadIntentRow) error,
+) error {
+	return repository.database.WithContext(ctx).Transaction(func(transaction *gorm.DB) error {
+		row, err := repository.loadUploadIntent(ctx, transaction, intentID, true)
+		if err != nil {
+			return err
+		}
+		return update(transaction, row)
+	})
+}
+
 var _ mediaapp.Repository = (*Postgres)(nil)
 var _ mediaapp.AdminRepository = (*Postgres)(nil)
+var _ mediaapp.UploadIntentRepository = (*Postgres)(nil)

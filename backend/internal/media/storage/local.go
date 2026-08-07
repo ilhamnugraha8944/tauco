@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	mediaapp "github.com/ilhamnugraha8944/tauco/backend/internal/media/application"
 )
 
 var ErrObjectConflict = errors.New("object key already contains different data")
@@ -68,8 +70,15 @@ func (store *Local) PutIfAbsent(ctx context.Context, key, _ string, data []byte)
 }
 
 func (store *Local) Get(ctx context.Context, key string) ([]byte, error) {
+	return store.GetBounded(ctx, key, mediaapp.MaxStoredObjectBytes)
+}
+
+func (store *Local) GetBounded(ctx context.Context, key string, maximum int64) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
+	}
+	if maximum < 1 {
+		return nil, errors.New("maximum object size must be positive")
 	}
 	path, err := store.path(key)
 	if err != nil {
@@ -79,7 +88,42 @@ func (store *Local) Get(ctx context.Context, key string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read object: %w", err)
 	}
+	if int64(len(data)) > maximum {
+		return nil, mediaapp.ErrObjectTooLarge
+	}
 	return data, nil
+}
+
+func (store *Local) Delete(ctx context.Context, key string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	path, err := store.path(key)
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("delete object: %w", err)
+	}
+	return nil
+}
+
+func (store *Local) Health(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	info, err := os.Stat(store.root)
+	if err != nil || !info.IsDir() {
+		return errors.New("local media root is unavailable")
+	}
+	probe, err := os.CreateTemp(store.root, ".readiness-*")
+	if err != nil {
+		return fmt.Errorf("probe local media root: %w", err)
+	}
+	path := probe.Name()
+	closeErr := probe.Close()
+	removeErr := os.Remove(path)
+	return errors.Join(closeErr, removeErr)
 }
 
 func (store *Local) path(key string) (string, error) {
@@ -97,3 +141,5 @@ func (store *Local) path(key string) (string, error) {
 	}
 	return path, nil
 }
+
+var _ mediaapp.HealthStore = (*Local)(nil)

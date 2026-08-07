@@ -63,11 +63,14 @@ type PublicAPISecrets struct {
 }
 
 type PublicAPIInfrastructure struct {
-	RedisURL          string
-	CORSOrigins       []string
-	TrustedProxyCIDRs []string
-	MediaRoot         string
-	AdminAuth         *AdminAuthOptions
+	RedisURL           string
+	CORSOrigins        []string
+	TrustedProxyCIDRs  []string
+	MediaRoot          string
+	MediaStorageDriver string
+	MediaS3            mediastorage.S3Config
+	ContactAPIEnabled  bool
+	AdminAuth          *AdminAuthOptions
 }
 
 type AdminAuthOptions struct {
@@ -75,6 +78,7 @@ type AdminAuthOptions struct {
 	Runtime        auth.Runtime
 	AllowedOrigins []string
 	SecureCookies  bool
+	BFFSecret      []byte
 }
 
 func NewPublicAPI(
@@ -109,6 +113,32 @@ func NewPublicAPI(
 		_ = redisStore.Close()
 		closeDatabase()
 	}
+	storageDriver := infrastructure.MediaStorageDriver
+	if storageDriver == "" {
+		storageDriver = "local"
+	}
+	var mediaStore mediaapp.ObjectStore
+	var mediaHealth mediaapp.HealthStore
+	var mediaQuarantine mediaapp.QuarantineStore
+	switch storageDriver {
+	case "local":
+		localStore, storageErr := mediastorage.NewLocal(infrastructure.MediaRoot)
+		if storageErr != nil {
+			closeAll()
+			return nil, storageErr
+		}
+		mediaStore, mediaHealth = localStore, localStore
+	case "s3":
+		s3Store, storageErr := mediastorage.NewS3FromConfig(infrastructure.MediaS3)
+		if storageErr != nil {
+			closeAll()
+			return nil, storageErr
+		}
+		mediaStore, mediaHealth, mediaQuarantine = s3Store, s3Store, s3Store
+	default:
+		closeAll()
+		return nil, errors.New("unsupported media storage driver")
+	}
 
 	metrics := observability.NewRegistry()
 	observedCache := platformcache.Observe(redisStore, metrics)
@@ -142,24 +172,26 @@ func NewPublicAPI(
 		closeAll()
 		return nil, err
 	}
-	contactStore, err := contactrepo.NewPostgresStore(gormDatabase)
-	if err != nil {
-		closeAll()
-		return nil, err
-	}
-	contactIntake, err := contactapp.NewIntake(contactStore, secrets.ContactHMAC)
-	if err != nil {
-		closeAll()
-		return nil, err
-	}
 	publicReadServer, err := api.NewPublicReadServer(pageReader, productReader)
 	if err != nil {
 		closeAll()
 		return nil, err
 	}
-	if err := publicReadServer.WithContactIntake(contactIntake); err != nil {
-		closeAll()
-		return nil, err
+	if infrastructure.ContactAPIEnabled {
+		contactStore, contactErr := contactrepo.NewPostgresStore(gormDatabase)
+		if contactErr != nil {
+			closeAll()
+			return nil, contactErr
+		}
+		contactIntake, contactErr := contactapp.NewIntake(contactStore, secrets.ContactHMAC)
+		if contactErr != nil {
+			closeAll()
+			return nil, contactErr
+		}
+		if contactErr = publicReadServer.WithContactIntake(contactIntake); contactErr != nil {
+			closeAll()
+			return nil, contactErr
+		}
 	}
 	localLimiter, _ := ratelimit.NewLocal(10_000)
 	limiter, _ := ratelimit.New(redisStore, localLimiter, metrics.ObserveRateLimit)
@@ -190,19 +222,15 @@ func NewPublicAPI(
 			return nil, serviceErr
 		}
 		adminAuthHandler, err = api.NewAdminAuthHandler(service, limiter, api.AdminAuthConfig{
-			AllowedOrigins: options.AllowedOrigins, RateSecret: secrets.RateHMAC, SecureCookies: options.SecureCookies,
-			RequestID: func(c *gin.Context) string { id, _ := httpserver.RequestIDFromGinContext(c); return id },
+			AllowedOrigins: options.AllowedOrigins, RateSecret: secrets.RateHMAC, BFFSecret: options.BFFSecret,
+			SecureCookies: options.SecureCookies,
+			RequestID:     func(c *gin.Context) string { id, _ := httpserver.RequestIDFromGinContext(c); return id },
 		})
 		if err != nil {
 			closeAll()
 			return nil, err
 		}
 		mediaRepository, mediaErr := mediarepo.NewPostgres(adminGORM)
-		if mediaErr != nil {
-			closeAll()
-			return nil, mediaErr
-		}
-		mediaStore, mediaErr := mediastorage.NewLocal(infrastructure.MediaRoot)
 		if mediaErr != nil {
 			closeAll()
 			return nil, mediaErr
@@ -217,7 +245,15 @@ func NewPublicAPI(
 			closeAll()
 			return nil, mediaErr
 		}
-		adminMediaServer, mediaErr = api.NewAdminMediaServer(mediaAdmin, mediaIngestor, mediaStore)
+		var mediaUploads *mediaapp.UploadService
+		if mediaQuarantine != nil {
+			mediaUploads, mediaErr = mediaapp.NewUploadService(mediaRepository, mediaQuarantine)
+			if mediaErr != nil {
+				closeAll()
+				return nil, mediaErr
+			}
+		}
+		adminMediaServer, mediaErr = api.NewAdminMediaServer(mediaAdmin, mediaIngestor, mediaStore, mediaUploads)
 		if mediaErr != nil {
 			closeAll()
 			return nil, mediaErr
@@ -285,12 +321,15 @@ func NewPublicAPI(
 		closeAll()
 		return nil, err
 	}
-	contactLimit, err := httpmiddleware.RateLimit(limiter, secrets.RateHMAC, httpmiddleware.RatePolicy{
-		Name: "contact", Limit: 5, Window: time.Hour,
-	})
-	if err != nil {
-		closeAll()
-		return nil, err
+	var contactLimit gin.HandlerFunc
+	if infrastructure.ContactAPIEnabled {
+		contactLimit, err = httpmiddleware.RateLimit(limiter, secrets.RateHMAC, httpmiddleware.RatePolicy{
+			Name: "contact", Limit: 5, Window: time.Hour,
+		})
+		if err != nil {
+			closeAll()
+			return nil, err
+		}
 	}
 	corsMiddleware, err := httpmiddleware.CORS(infrastructure.CORSOrigins)
 	if err != nil {
@@ -318,10 +357,12 @@ func NewPublicAPI(
 			publicLimit,
 			httpmiddleware.RejectBody(),
 		)
-		api.RegisterSafeContactHandler(router, publicReadServer, nil, "", contactLimit)
+		if infrastructure.ContactAPIEnabled {
+			api.RegisterSafeContactHandler(router, publicReadServer, nil, "", contactLimit)
+		}
 		registrationError = registerOperations(router, operationsDependencies{
 			Database: sqlDatabase, AdminDatabase: adminSQL, Cache: redisStore,
-			MediaRoot:    infrastructure.MediaRoot,
+			Storage:      mediaHealth,
 			MetricsToken: secrets.MetricsBearer, Metrics: metrics,
 		})
 	})
