@@ -27,9 +27,9 @@ func RegisterSafeAdminProductHandlers(router gin.IRouter, server *AdminProductSe
 	handler := NewSafeStrictHandler(server, nil)
 	options := NewSafeGinServerOptions("")
 	wrapper := ServerInterfaceWrapper{Handler: handler, ErrorHandler: options.ErrorHandler}
-	read := []gin.HandlerFunc{auth.require(true, "product.read")}
+	read := []gin.HandlerFunc{auth.bff(), auth.require(true, "product.read")}
 	write := func(permission string) []gin.HandlerFunc {
-		return []gin.HandlerFunc{auth.browserMutation(), auth.require(true, permission), auth.csrf()}
+		return []gin.HandlerFunc{auth.bff(), auth.browserMutation(), auth.require(true, permission), auth.csrf()}
 	}
 	router.GET("/api/v1/admin/products", appendRouteMiddleware(append(read, rejectUnknownQuery("cursor", "limit")), wrapper.AdminListProducts)...)
 	router.POST("/api/v1/admin/products", appendRouteMiddleware(write("product.write"), wrapper.AdminCreateProduct)...)

@@ -307,6 +307,10 @@ SELECT
                       AND acl.privilege_type IN ('INSERT', 'UPDATE')
                   )
                   OR (
+                      relation.relname = 'media_upload_intents'
+                      AND acl.privilege_type IN ('SELECT', 'UPDATE')
+                  )
+                  OR (
                       relation.relname = 'contact_messages'
                       AND acl.privilege_type IN ('SELECT', 'INSERT')
                   )

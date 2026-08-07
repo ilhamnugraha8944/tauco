@@ -42,6 +42,7 @@ func run() int {
 		}, composition.PublicAPIInfrastructure{
 			RedisURL: os.Getenv("REDIS_URL"), CORSOrigins: splitCSV(os.Getenv("CORS_ALLOWED_ORIGINS")),
 			TrustedProxyCIDRs: splitCSV(os.Getenv("TRUSTED_PROXY_CIDRS")), MediaRoot: os.Getenv("MEDIA_LOCAL_ROOT"),
+			MediaStorageDriver: "local", ContactAPIEnabled: true,
 		})
 	if err != nil {
 		return fail("API initialization failed")

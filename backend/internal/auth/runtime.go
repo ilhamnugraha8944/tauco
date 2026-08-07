@@ -2,6 +2,7 @@
 package auth
 
 import (
+	"crypto/ed25519"
 	"encoding/base64"
 	"errors"
 	"os"
@@ -28,26 +29,6 @@ func LoadRuntime(lookup func(string) (string, bool)) (Runtime, error) {
 		}
 		return strings.TrimSpace(value), nil
 	}
-	privatePath, err := required("JWT_PRIVATE_KEY_FILE")
-	if err != nil {
-		return Runtime{}, err
-	}
-	publicPath, err := required("JWT_PUBLIC_KEY_FILE")
-	if err != nil {
-		return Runtime{}, err
-	}
-	privatePEM, err := os.ReadFile(privatePath)
-	if err != nil {
-		return Runtime{}, errors.New("read JWT private key failed")
-	}
-	publicPEM, err := os.ReadFile(publicPath)
-	if err != nil {
-		return Runtime{}, errors.New("read JWT public key failed")
-	}
-	privateKey, publicKey, err := authdomain.ParseRSAKeyPair(privatePEM, publicPEM)
-	if err != nil {
-		return Runtime{}, err
-	}
 	issuer, err := required("JWT_ISSUER")
 	if err != nil {
 		return Runtime{}, err
@@ -60,7 +41,47 @@ func LoadRuntime(lookup func(string) (string, bool)) (Runtime, error) {
 	if err != nil {
 		return Runtime{}, err
 	}
-	tokens, err := authdomain.NewTokenManager(privateKey, publicKey, issuer, audience, keyID, 10*time.Minute)
+	environment := "local"
+	if value, ok := lookup("APP_ENV"); ok && strings.TrimSpace(value) != "" {
+		environment = strings.ToLower(strings.TrimSpace(value))
+	}
+	if environment != "local" && environment != "test" && environment != "staging" && environment != "production" {
+		return Runtime{}, errors.New("APP_ENV must be local, test, staging, or production")
+	}
+	var tokens *authdomain.TokenManager
+	if environment == "staging" || environment == "production" {
+		encodedPrivate, loadErr := required("JWT_ED25519_PRIVATE_KEY_BASE64")
+		if loadErr != nil {
+			return Runtime{}, loadErr
+		}
+		privateKey, decodeErr := base64.RawStdEncoding.DecodeString(encodedPrivate)
+		if decodeErr != nil || len(privateKey) != ed25519.PrivateKeySize {
+			return Runtime{}, errors.New("JWT_ED25519_PRIVATE_KEY_BASE64 must contain one raw-base64 Ed25519 private key")
+		}
+		tokens, err = authdomain.NewEd25519TokenManager(ed25519.PrivateKey(privateKey), issuer, audience, keyID, 10*time.Minute)
+	} else {
+		privatePath, loadErr := required("JWT_PRIVATE_KEY_FILE")
+		if loadErr != nil {
+			return Runtime{}, loadErr
+		}
+		publicPath, loadErr := required("JWT_PUBLIC_KEY_FILE")
+		if loadErr != nil {
+			return Runtime{}, loadErr
+		}
+		privatePEM, readErr := os.ReadFile(privatePath)
+		if readErr != nil {
+			return Runtime{}, errors.New("read JWT private key failed")
+		}
+		publicPEM, readErr := os.ReadFile(publicPath)
+		if readErr != nil {
+			return Runtime{}, errors.New("read JWT public key failed")
+		}
+		privateKey, publicKey, parseErr := authdomain.ParseRSAKeyPair(privatePEM, publicPEM)
+		if parseErr != nil {
+			return Runtime{}, parseErr
+		}
+		tokens, err = authdomain.NewTokenManager(privateKey, publicKey, issuer, audience, keyID, 10*time.Minute)
+	}
 	if err != nil {
 		return Runtime{}, err
 	}

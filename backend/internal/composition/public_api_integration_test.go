@@ -30,6 +30,7 @@ func TestPublicAPIWithPostgresAndRedis(t *testing.T) {
 		MetricsBearer: []byte("integration-metrics-token-1234567890"),
 	}, PublicAPIInfrastructure{
 		RedisURL: os.Getenv("REDIS_URL"), CORSOrigins: []string{"http://localhost:3000"}, MediaRoot: t.TempDir(),
+		MediaStorageDriver: "local", ContactAPIEnabled: true,
 	})
 	if err != nil {
 		t.Fatalf("NewPublicAPI() error = %v", err)
@@ -109,6 +110,24 @@ func TestPublicAPIWithPostgresAndRedis(t *testing.T) {
 		if response.Code != want {
 			t.Fatalf("contact attempt %d status=%d want=%d", attempt, response.Code, want)
 		}
+	}
+
+	contactDisabled, err := NewPublicAPI(ctx, testPublicAPIConfig(), databaseConfig, PublicAPISecrets{
+		CursorHMAC: []byte("integration-cursor-secret-1234567890"), RateHMAC: rateSecret,
+		MetricsBearer: []byte("integration-metrics-token-1234567890"),
+	}, PublicAPIInfrastructure{
+		RedisURL: os.Getenv("REDIS_URL"), CORSOrigins: []string{"http://localhost:3000"},
+		MediaRoot: t.TempDir(), MediaStorageDriver: "local", ContactAPIEnabled: false,
+	})
+	if err != nil {
+		t.Fatalf("contact-disabled NewPublicAPI() error = %v", err)
+	}
+	defer contactDisabled.Close()
+	request = httptest.NewRequest(http.MethodPost, "/api/v1/contact-messages", strings.NewReader("{}"))
+	response = httptest.NewRecorder()
+	contactDisabled.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("contact-disabled route status=%d, want 404", response.Code)
 	}
 }
 

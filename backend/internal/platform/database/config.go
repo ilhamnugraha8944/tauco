@@ -29,7 +29,15 @@ type MigrationConfig struct {
 	RuntimeURL     string
 	AdminURL       string
 	BootstrapRoles bool
+	Profile        DeploymentProfile
 }
+
+type DeploymentProfile string
+
+const (
+	ProfileOwned    DeploymentProfile = "owned"
+	ProfileSupabase DeploymentProfile = "supabase"
+)
 
 // ConfigError identifies an invalid field without echoing its secret value.
 type ConfigError struct {
@@ -67,6 +75,10 @@ func LoadMigrationConfig(lookup LookupEnv) (MigrationConfig, error) {
 	if err != nil {
 		return MigrationConfig{}, err
 	}
+	profile, err := loadDeploymentProfile(lookup)
+	if err != nil {
+		return MigrationConfig{}, err
+	}
 	if bootstrap && (!runtimeFound || strings.TrimSpace(runtimeURL) == "") {
 		return MigrationConfig{}, &ConfigError{
 			Field:  "DATABASE_URL",
@@ -85,6 +97,7 @@ func LoadMigrationConfig(lookup LookupEnv) (MigrationConfig, error) {
 		RuntimeURL:     strings.TrimSpace(runtimeURL),
 		AdminURL:       strings.TrimSpace(adminURL),
 		BootstrapRoles: bootstrap,
+		Profile:        profile,
 	}
 	if err := cfg.Validate(); err != nil {
 		return MigrationConfig{}, err
@@ -94,9 +107,31 @@ func LoadMigrationConfig(lookup LookupEnv) (MigrationConfig, error) {
 
 // Validate checks endpoint shape and enforces credential separation.
 func (c MigrationConfig) Validate() error {
+	if c.Profile == "" {
+		c.Profile = ProfileOwned
+	}
+	if c.Profile != ProfileOwned && c.Profile != ProfileSupabase {
+		return &ConfigError{Field: "DATABASE_DEPLOYMENT_PROFILE", Reason: "must be owned or supabase"}
+	}
 	migration, err := parseDatabaseURL("MIGRATION_DATABASE_URL", c.MigrationURL, true)
 	if err != nil {
 		return err
+	}
+	var projectRef string
+	if c.Profile == ProfileSupabase {
+		if c.BootstrapRoles {
+			return &ConfigError{Field: "MIGRATION_BOOTSTRAP_ROLES", Reason: "must be false for the supabase profile"}
+		}
+		if migration.port != "5432" || !secureSSLMode(migration.sslMode) {
+			return &ConfigError{Field: "MIGRATION_DATABASE_URL", Reason: "must use TLS and the session/direct port 5432 for the supabase profile"}
+		}
+		if c.RuntimeURL == "" || c.AdminURL == "" {
+			return &ConfigError{Field: "DATABASE_URL", Reason: "runtime and admin URLs are required for the supabase profile"}
+		}
+		projectRef, err = supabaseProjectRef("MIGRATION_DATABASE_URL", migration.username, ManagedMigrationLogin)
+		if err != nil {
+			return err
+		}
 	}
 
 	if c.RuntimeURL == "" {
@@ -112,6 +147,18 @@ func (c MigrationConfig) Validate() error {
 	runtime, err := parseDatabaseURL("DATABASE_URL", c.RuntimeURL, c.BootstrapRoles)
 	if err != nil {
 		return err
+	}
+	if c.Profile == ProfileSupabase && (runtime.port != "6543" || !secureSSLMode(runtime.sslMode)) {
+		return &ConfigError{Field: "DATABASE_URL", Reason: "must use TLS and transaction pooler port 6543 for the supabase profile"}
+	}
+	if c.Profile == ProfileSupabase {
+		runtimeProjectRef, projectErr := supabaseProjectRef("DATABASE_URL", runtime.username, ManagedRuntimeLogin)
+		if projectErr != nil {
+			return projectErr
+		}
+		if runtimeProjectRef != projectRef {
+			return &ConfigError{Field: "DATABASE_URL", Reason: "must target the same Supabase project as MIGRATION_DATABASE_URL"}
+		}
 	}
 	if migration.database != runtime.database {
 		return &ConfigError{
@@ -158,6 +205,18 @@ func (c MigrationConfig) Validate() error {
 	if err != nil {
 		return err
 	}
+	if c.Profile == ProfileSupabase && (admin.port != "6543" || !secureSSLMode(admin.sslMode)) {
+		return &ConfigError{Field: "ADMIN_DATABASE_URL", Reason: "must use TLS and transaction pooler port 6543 for the supabase profile"}
+	}
+	if c.Profile == ProfileSupabase {
+		adminProjectRef, projectErr := supabaseProjectRef("ADMIN_DATABASE_URL", admin.username, ManagedAdminLogin)
+		if projectErr != nil {
+			return projectErr
+		}
+		if adminProjectRef != projectRef {
+			return &ConfigError{Field: "ADMIN_DATABASE_URL", Reason: "must target the same Supabase project as MIGRATION_DATABASE_URL"}
+		}
+	}
 	if migration.database != admin.database {
 		return &ConfigError{Field: "ADMIN_DATABASE_URL", Reason: "must target the same database as MIGRATION_DATABASE_URL"}
 	}
@@ -183,6 +242,7 @@ type databaseEndpoint struct {
 	database string
 	host     string
 	port     string
+	sslMode  string
 }
 
 func parseDatabaseURL(field, raw string, requirePassword bool) (databaseEndpoint, error) {
@@ -248,7 +308,41 @@ func parseDatabaseURL(field, raw string, requirePassword bool) (databaseEndpoint
 		database: unescapedDatabase,
 		host:     strings.ToLower(parsed.Hostname()),
 		port:     normalizedPostgresPort(parsed.Port()),
+		sslMode:  strings.ToLower(parsed.Query().Get("sslmode")),
 	}, nil
+}
+
+func secureSSLMode(mode string) bool {
+	return mode == "require" || mode == "verify-ca" || mode == "verify-full"
+}
+
+func supabaseProjectRef(field, username, login string) (string, error) {
+	prefix := login + "."
+	if !strings.HasPrefix(username, prefix) {
+		return "", &ConfigError{Field: field, Reason: "must use the dedicated " + login + ".<project-ref> login"}
+	}
+	projectRef := strings.TrimPrefix(username, prefix)
+	if projectRef == "" || strings.Contains(projectRef, ".") {
+		return "", &ConfigError{Field: field, Reason: "must include exactly one Supabase project reference"}
+	}
+	for _, character := range projectRef {
+		if (character < 'a' || character > 'z') && (character < '0' || character > '9') {
+			return "", &ConfigError{Field: field, Reason: "contains an invalid Supabase project reference"}
+		}
+	}
+	return projectRef, nil
+}
+
+func loadDeploymentProfile(lookup LookupEnv) (DeploymentProfile, error) {
+	value, found := lookup("DATABASE_DEPLOYMENT_PROFILE")
+	if !found || strings.TrimSpace(value) == "" {
+		return ProfileOwned, nil
+	}
+	profile := DeploymentProfile(strings.ToLower(strings.TrimSpace(value)))
+	if profile != ProfileOwned && profile != ProfileSupabase {
+		return "", &ConfigError{Field: "DATABASE_DEPLOYMENT_PROFILE", Reason: "must be owned or supabase"}
+	}
+	return profile, nil
 }
 
 func normalizedPostgresPort(port string) string {

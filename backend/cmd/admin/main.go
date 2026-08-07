@@ -4,6 +4,9 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -29,13 +32,24 @@ func main() {
 
 func run(args []string, input io.Reader) error {
 	if len(args) == 0 {
-		return errors.New("usage: admin <keygen|bootstrap|reset-password|reset-totp|revoke-sessions>")
+		return errors.New("usage: admin <keygen|keygen-ed25519|bootstrap|reset-password|reset-totp|revoke-sessions>")
 	}
 	if args[0] == "keygen" {
 		if len(args) != 3 {
 			return errors.New("usage: admin keygen <private-path> <public-path>")
 		}
 		return keygen(args[1], args[2])
+	}
+	if args[0] == "keygen-ed25519" {
+		if len(args) != 1 {
+			return errors.New("usage: admin keygen-ed25519")
+		}
+		_, private, err := ed25519.GenerateKey(rand.Reader)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(os.Stdout, "JWT_ED25519_PRIVATE_KEY_BASE64=%s\n", base64.RawStdEncoding.EncodeToString(private))
+		return err
 	}
 	if len(args) != 2 {
 		return errors.New("usage: admin <bootstrap|reset-password|reset-totp|revoke-sessions> <email>")

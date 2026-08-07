@@ -51,7 +51,19 @@ func NewSafeStrictHandler(
 		server,
 		safeMiddlewares,
 		StrictGinServerOptions{
-			RequestErrorHandlerFunc: func(ctx *gin.Context, _ error) {
+			RequestErrorHandlerFunc: func(ctx *gin.Context, err error) {
+				var tooLarge *http.MaxBytesError
+				if errors.As(err, &tooLarge) {
+					writeContractProblem(
+						ctx,
+						http.StatusRequestEntityTooLarge,
+						"urn:tauco-cap-badak:problem:payload-too-large",
+						"Payload terlalu besar",
+						"Ukuran payload melewati batas endpoint.",
+						"PAYLOAD_TOO_LARGE",
+					)
+					return
+				}
 				writeContractProblem(
 					ctx,
 					http.StatusBadRequest,

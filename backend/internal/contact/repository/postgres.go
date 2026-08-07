@@ -16,6 +16,8 @@ type PostgresStore struct {
 	database *gorm.DB
 }
 
+const retentionClockSkew = 5 * time.Second
+
 func NewPostgresStore(database *gorm.DB) (*PostgresStore, error) {
 	if database == nil {
 		return nil, errors.New("contact PostgreSQL store requires a database")
@@ -118,7 +120,7 @@ func (store *PostgresStore) PurgeExpired(
 	var deleted int64
 	result := store.database.WithContext(ctx).Raw(`
 		SELECT tauco_app.tauco_purge_expired_contact_messages(?, ?)
-	`, before.UTC(), limit).Scan(&deleted)
+	`, before.UTC().Add(-retentionClockSkew), limit).Scan(&deleted)
 	if result.Error != nil {
 		return 0, fmt.Errorf("purge expired contact messages: %w", result.Error)
 	}

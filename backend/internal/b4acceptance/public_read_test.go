@@ -20,6 +20,7 @@ import (
 	"github.com/ilhamnugraha8944/tauco/backend/internal/content/importer"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/contract/requestmeta"
 	"github.com/ilhamnugraha8944/tauco/backend/internal/delivery/api"
+	platformconfig "github.com/ilhamnugraha8944/tauco/backend/internal/platform/config"
 )
 
 const publicReadTestSecret = "0123456789abcdef0123456789abcdef"
@@ -325,4 +326,72 @@ func readJSONFixture(t *testing.T, filename string) map[string]any {
 		t.Fatalf("decode fixture %s: %v", filename, err)
 	}
 	return value
+}
+
+func TestD1DeploymentConfigurationFailsClosed(t *testing.T) {
+	localValues := map[string]string{
+		"ADMIN_REMOTE_ENABLED": "true", "CONTACT_API_ENABLED": "true", "FORM_SYNC_ENABLED": "false",
+		"ADMIN_COOKIE_SECURE": "false", "ADMIN_DATABASE_URL": "postgres://admin:secret@127.0.0.1:5432/tauco",
+		"ADMIN_BFF_SHARED_SECRET": "tauco-local-admin-bff-secret-change-me",
+		"ADMIN_ALLOWED_ORIGINS":   "http://localhost:3000", "CORS_ALLOWED_ORIGINS": "http://localhost:3000",
+		"MEDIA_STORAGE_DRIVER": "local",
+	}
+	localLookup := func(key string) (string, bool) { value, ok := localValues[key]; return value, ok }
+	if _, err := platformconfig.LoadDeployment(localLookup, platformconfig.EnvironmentLocal); err != nil {
+		t.Fatalf("local HTTP/insecure-cookie configuration rejected: %v", err)
+	}
+
+	values := map[string]string{
+		"ADMIN_REMOTE_ENABLED":       "true",
+		"CONTACT_API_ENABLED":        "false",
+		"FORM_SYNC_ENABLED":          "false",
+		"ADMIN_COOKIE_SECURE":        "true",
+		"ADMIN_DATABASE_URL":         "postgres://admin:secret@db.example:6543/tauco?sslmode=require",
+		"ADMIN_BFF_SHARED_SECRET":    "production-bff-secret-with-32-random-bytes",
+		"ADMIN_ALLOWED_ORIGINS":      "https://tauco.example",
+		"CORS_ALLOWED_ORIGINS":       "https://tauco.example",
+		"MEDIA_STORAGE_DRIVER":       "s3",
+		"MEDIA_S3_ENDPOINT":          "https://project.storage.example/storage/v1/s3",
+		"MEDIA_S3_REGION":            "ap-southeast-1",
+		"MEDIA_S3_BUCKET":            "tauco-media",
+		"MEDIA_S3_PREFIX":            "production",
+		"MEDIA_S3_ACCESS_KEY_ID":     "media-access-key",
+		"MEDIA_S3_SECRET_ACCESS_KEY": "media-secret-key",
+		"CURSOR_HMAC_SECRET":         "0123456789abcdef0123456789abcdef",
+		"RATE_LIMIT_HMAC_SECRET":     "123456789abcdef0123456789abcdef0",
+		"METRICS_BEARER_TOKEN":       "23456789abcdef0123456789abcdef01",
+		"REDIS_URL":                  "rediss://default:secret@redis.example:6379",
+	}
+	lookup := func(key string) (string, bool) { value, ok := values[key]; return value, ok }
+	loaded, err := platformconfig.LoadDeployment(lookup, platformconfig.EnvironmentProduction)
+	if err != nil || !loaded.AdminRemoteEnabled || loaded.ContactAPIEnabled {
+		t.Fatalf("valid production deployment config = %+v, %v", loaded, err)
+	}
+
+	cases := []struct {
+		field, value string
+	}{
+		{"ADMIN_REMOTE_ENABLED", "yes"},
+		{"ADMIN_COOKIE_SECURE", "false"},
+		{"ADMIN_ALLOWED_ORIGINS", "http://tauco.example"},
+		{"ADMIN_ALLOWED_ORIGINS", "https://user@tauco.example"},
+		{"ADMIN_ALLOWED_ORIGINS", "https://tauco.example/path"},
+		{"CONTACT_API_ENABLED", "true"},
+		{"MEDIA_STORAGE_DRIVER", "local"},
+	}
+	for _, testCase := range cases {
+		original := values[testCase.field]
+		values[testCase.field] = testCase.value
+		if _, err := platformconfig.LoadDeployment(lookup, platformconfig.EnvironmentProduction); err == nil {
+			t.Fatalf("production config accepted %s=%s", testCase.field, testCase.value)
+		}
+		values[testCase.field] = original
+	}
+
+	secret := strings.Repeat("sensitive-value-", 240)
+	values["JWT_ED25519_PRIVATE_KEY_BASE64"] = secret
+	_, err = platformconfig.LoadDeployment(lookup, platformconfig.EnvironmentProduction)
+	if err == nil || strings.Contains(err.Error(), secret) {
+		t.Fatalf("environment budget error must be redacted: %v", err)
+	}
 }

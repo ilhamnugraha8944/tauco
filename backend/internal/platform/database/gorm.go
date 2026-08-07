@@ -31,6 +31,7 @@ type RuntimeConfig struct {
 	ConnMaxLifetime   time.Duration
 	ConnMaxIdleTime   time.Duration
 	PreferSimpleQuery bool
+	Profile           DeploymentProfile
 }
 
 // LoadRuntimeConfig loads the runtime connection policy without ever
@@ -59,14 +60,26 @@ func loadRuntimeConfig(lookup LookupEnv, urlField string) (RuntimeConfig, error)
 			Reason: "is required",
 		}
 	}
-	if _, err := parseDatabaseURL(urlField, rawURL, true); err != nil {
+	endpoint, err := parseDatabaseURL(urlField, rawURL, true)
+	if err != nil {
 		return RuntimeConfig{}, err
+	}
+	profile, err := loadDeploymentProfile(lookup)
+	if err != nil {
+		return RuntimeConfig{}, err
+	}
+	defaultOpen, defaultIdle := defaultMaxOpenConnections, defaultMaxIdleConnections
+	if profile == ProfileSupabase {
+		defaultOpen, defaultIdle = 1, 0
+		if endpoint.port != "6543" || !secureSSLMode(endpoint.sslMode) {
+			return RuntimeConfig{}, &ConfigError{Field: urlField, Reason: "must use TLS and transaction pooler port 6543 for the supabase profile"}
+		}
 	}
 
 	maxOpen, err := loadPositiveInt(
 		lookup,
 		"DATABASE_MAX_OPEN_CONNS",
-		defaultMaxOpenConnections,
+		defaultOpen,
 	)
 	if err != nil {
 		return RuntimeConfig{}, err
@@ -74,7 +87,7 @@ func loadRuntimeConfig(lookup LookupEnv, urlField string) (RuntimeConfig, error)
 	maxIdle, err := loadNonNegativeInt(
 		lookup,
 		"DATABASE_MAX_IDLE_CONNS",
-		defaultMaxIdleConnections,
+		defaultIdle,
 	)
 	if err != nil {
 		return RuntimeConfig{}, err
@@ -84,6 +97,9 @@ func loadRuntimeConfig(lookup LookupEnv, urlField string) (RuntimeConfig, error)
 			Field:  "DATABASE_MAX_IDLE_CONNS",
 			Reason: "must not exceed DATABASE_MAX_OPEN_CONNS",
 		}
+	}
+	if profile == ProfileSupabase && (maxOpen > 2 || maxIdle != 0) {
+		return RuntimeConfig{}, &ConfigError{Field: "DATABASE_MAX_OPEN_CONNS", Reason: "supabase profile requires at most 2 open and exactly 0 idle connections"}
 	}
 	lifetime, err := loadPositiveDuration(
 		lookup,
@@ -109,19 +125,24 @@ func loadRuntimeConfig(lookup LookupEnv, urlField string) (RuntimeConfig, error)
 		ConnMaxLifetime:   lifetime,
 		ConnMaxIdleTime:   idleTime,
 		PreferSimpleQuery: true,
+		Profile:           profile,
 	}, nil
 }
 
 // OpenGORM opens and verifies a runtime database connection. Prepared
 // statements are disabled for Supavisor transaction-pool compatibility.
 func OpenGORM(ctx context.Context, config RuntimeConfig) (*gorm.DB, error) {
-	return openGORM(ctx, config, "DATABASE_URL", assertRuntimeIdentity)
+	return openGORM(ctx, config, "DATABASE_URL", func(ctx context.Context, db *sql.DB) error {
+		return assertRuntimeIdentity(ctx, db, config.Profile)
+	})
 }
 
 // OpenAdminGORM opens the CMS connection and fails closed unless it inherits
 // exactly the fixed least-privilege admin authorization role.
 func OpenAdminGORM(ctx context.Context, config RuntimeConfig) (*gorm.DB, error) {
-	return openGORM(ctx, config, "ADMIN_DATABASE_URL", assertAdminIdentity)
+	return openGORM(ctx, config, "ADMIN_DATABASE_URL", func(ctx context.Context, db *sql.DB) error {
+		return assertAdminIdentity(ctx, db, config.Profile)
+	})
 }
 
 func openGORM(
@@ -217,8 +238,19 @@ func OpenMigrationGORM(
 }
 
 func validateRuntimeConfig(config RuntimeConfig, urlField string) error {
-	if _, err := parseDatabaseURL(urlField, config.URL, true); err != nil {
+	endpoint, err := parseDatabaseURL(urlField, config.URL, true)
+	if err != nil {
 		return err
+	}
+	profile := config.Profile
+	if profile == "" {
+		profile = ProfileOwned
+	}
+	if profile != ProfileOwned && profile != ProfileSupabase {
+		return &ConfigError{Field: "DATABASE_DEPLOYMENT_PROFILE", Reason: "must be owned or supabase"}
+	}
+	if profile == ProfileSupabase && (endpoint.port != "6543" || !secureSSLMode(endpoint.sslMode) || config.MaxOpenConns > 2 || config.MaxIdleConns != 0) {
+		return &ConfigError{Field: urlField, Reason: "supabase runtime requires TLS, transaction port 6543, at most 2 open, and 0 idle connections"}
 	}
 	if config.MaxOpenConns < 1 {
 		return &ConfigError{
@@ -253,7 +285,7 @@ func validateRuntimeConfig(config RuntimeConfig, urlField string) error {
 	return nil
 }
 
-func assertAdminIdentity(ctx context.Context, database *sql.DB) error {
+func assertAdminIdentity(ctx context.Context, database *sql.DB, profile DeploymentProfile) error {
 	var (
 		isSuperuser, canCreateDB, canCreateRole, canReplicate, canBypassRLS bool
 		isAdminMember, isRuntimeMember, isMigratorMember                    bool
@@ -293,15 +325,127 @@ WHERE role.rolname = current_user`).Scan(
 	}
 	if isSuperuser || canCreateDB || canCreateRole || canReplicate || canBypassRLS ||
 		!isAdminMember || isRuntimeMember || isMigratorMember || canCreateSchema ||
-		canCreateDatabase || canCreateTemp || canCreatePublic || currentSchema != ApplicationSchema ||
+		canCreateDatabase || (canCreateTemp && profile != ProfileSupabase) || canCreatePublic || currentSchema != ApplicationSchema ||
 		!canReadUsers || !canWriteUsers || !canInsertRevision || !canUpdatePages ||
 		canDeleteInbox || canWritePermissions {
 		return errors.New("verify PostgreSQL admin identity: connection is not least-privilege tauco admin runtime")
 	}
+	if err := assertAdminAuthorizationIsolation(ctx, database); err != nil {
+		return err
+	}
+	if err := assertAdminPrivilegeMatrix(ctx, database); err != nil {
+		return err
+	}
 	return nil
 }
 
-func assertRuntimeIdentity(ctx context.Context, database *sql.DB) error {
+func assertAdminAuthorizationIsolation(ctx context.Context, database *sql.DB) error {
+	var unexpectedMemberships int
+	var hasAdminOption bool
+	if err := database.QueryRowContext(ctx, `
+SELECT
+    count(*) FILTER (WHERE granted.rolname <> 'tauco_admin_runtime'),
+    coalesce(bool_or(membership.admin_option), false)
+FROM pg_catalog.pg_auth_members AS membership
+JOIN pg_catalog.pg_roles AS member ON member.oid = membership.member
+JOIN pg_catalog.pg_roles AS granted ON granted.oid = membership.roleid
+WHERE member.rolname = current_user`).Scan(&unexpectedMemberships, &hasAdminOption); err != nil {
+		return fmt.Errorf("verify PostgreSQL admin memberships: %w", err)
+	}
+	if unexpectedMemberships != 0 || hasAdminOption {
+		return errors.New("verify PostgreSQL admin identity: unexpected role membership")
+	}
+
+	var inheritedRoles int
+	if err := database.QueryRowContext(ctx, `
+SELECT count(*)
+FROM pg_catalog.pg_auth_members AS membership
+JOIN pg_catalog.pg_roles AS member ON member.oid = membership.member
+WHERE member.rolname = 'tauco_admin_runtime'`).Scan(&inheritedRoles); err != nil {
+		return fmt.Errorf("verify PostgreSQL admin authorization role: %w", err)
+	}
+	if inheritedRoles != 0 {
+		return errors.New("verify PostgreSQL admin identity: tauco_admin_runtime inherits an unexpected role")
+	}
+	return nil
+}
+
+func assertAdminPrivilegeMatrix(ctx context.Context, database *sql.DB) error {
+	var mismatched, owned int
+	if err := database.QueryRowContext(ctx, `
+WITH expected(table_name, selects, inserts, updates) AS (
+    VALUES
+        ('admin_users', true, true, true),
+        ('admin_sessions', true, true, true),
+        ('admin_refresh_tokens', true, true, true),
+        ('mfa_credentials', true, true, true),
+        ('mfa_recovery_codes', true, true, true),
+        ('roles', true, false, false),
+        ('permissions', true, false, false),
+        ('user_roles', true, true, false),
+        ('role_permissions', true, true, false),
+        ('pages', true, true, true),
+        ('products', true, true, true),
+        ('media_assets', true, true, true),
+        ('media_variants', true, true, true),
+        ('media_upload_intents', true, true, true),
+        ('contact_messages', true, true, true),
+        ('background_jobs', true, true, true),
+        ('page_revisions', true, true, false),
+        ('product_revisions', true, true, false),
+        ('page_revision_media', true, true, false),
+        ('product_revision_media', true, true, false),
+        ('activity_logs', true, true, false)
+), relations AS (
+    SELECT relation.relname AS table_name
+    FROM pg_catalog.pg_class AS relation
+    JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'tauco_app'
+      AND relation.relkind IN ('r', 'p', 'v', 'm', 'S', 'f')
+), matrix AS (
+    SELECT relations.table_name, privilege_name,
+        coalesce(CASE privilege_name WHEN 'SELECT' THEN selects WHEN 'INSERT' THEN inserts WHEN 'UPDATE' THEN updates ELSE false END, false) AS expected
+    FROM relations
+    CROSS JOIN (VALUES ('SELECT'), ('INSERT'), ('UPDATE'), ('DELETE'), ('TRUNCATE'), ('REFERENCES'), ('TRIGGER')) AS privileges(privilege_name)
+    LEFT JOIN expected USING (table_name)
+)
+SELECT
+    count(*) FILTER (WHERE has_table_privilege(current_user, format('tauco_app.%I', table_name), privilege_name) IS DISTINCT FROM expected),
+    (SELECT count(*) FROM pg_catalog.pg_class AS relation
+     JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+     JOIN pg_catalog.pg_roles AS owner ON owner.oid = relation.relowner
+     WHERE namespace.nspname = 'tauco_app' AND owner.rolname = current_user
+       AND relation.relkind IN ('r', 'p', 'v', 'm', 'S', 'f'))
+FROM matrix`).Scan(&mismatched, &owned); err != nil {
+		return fmt.Errorf("verify PostgreSQL admin table privileges: %w", err)
+	}
+	if mismatched != 0 || owned != 0 {
+		return errors.New("verify PostgreSQL admin identity: table privilege matrix is not least-privilege")
+	}
+
+	var unexpectedFunctions int
+	if err := database.QueryRowContext(ctx, `
+SELECT count(*)
+FROM pg_catalog.pg_proc AS procedure
+JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = procedure.pronamespace
+WHERE namespace.nspname = 'tauco_app'
+  AND has_function_privilege(current_user, procedure.oid, 'EXECUTE') IS DISTINCT FROM
+      (procedure.proname IN (
+          'tauco_set_updated_at',
+          'tauco_reject_revision_mutation',
+          'tauco_assert_page_published_revision',
+          'tauco_assert_product_published_revision',
+          'tauco_reject_activity_log_mutation'
+      ))`).Scan(&unexpectedFunctions); err != nil {
+		return fmt.Errorf("verify PostgreSQL admin function privileges: %w", err)
+	}
+	if unexpectedFunctions != 0 {
+		return errors.New("verify PostgreSQL admin identity: function privilege matrix is not least-privilege")
+	}
+	return nil
+}
+
+func assertRuntimeIdentity(ctx context.Context, database *sql.DB, profile DeploymentProfile) error {
 	var (
 		isSuperuser       bool
 		canCreateDB       bool
@@ -394,7 +538,7 @@ WHERE role.rolname = current_user`).Scan(
 		canWriteProducts ||
 		canWriteProdRevs ||
 		canCreateDatabase ||
-		canCreateTemp ||
+		(canCreateTemp && profile != ProfileSupabase) ||
 		canCreatePublic {
 		return errors.New(
 			"verify PostgreSQL runtime identity: connection is not the " +
@@ -483,6 +627,7 @@ WITH expected_tables(table_name) AS (
         ('product_revisions'),
         ('media_assets'),
         ('media_variants'),
+        ('media_upload_intents'),
         ('contact_messages'),
         ('background_jobs'),
         ('activity_logs')
@@ -509,6 +654,8 @@ matrix AS (
               AND privilege_name IN ('INSERT', 'UPDATE') THEN true
             WHEN table_name IN ('media_assets', 'media_variants')
               AND privilege_name IN ('INSERT', 'UPDATE') THEN true
+            WHEN table_name = 'media_upload_intents'
+              AND privilege_name = 'UPDATE' THEN true
             WHEN table_name = 'activity_logs'
               AND privilege_name = 'INSERT' THEN true
             ELSE false

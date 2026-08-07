@@ -24,11 +24,13 @@ const (
 	refreshCookie = "tauco_admin_refresh"
 	csrfCookie    = "tauco_admin_csrf"
 	principalKey  = "tauco.admin.principal"
+	bffHeader     = "X-Tauco-Admin-BFF-Secret"
 )
 
 type AdminAuthConfig struct {
 	AllowedOrigins []string
 	RateSecret     []byte
+	BFFSecret      []byte
 	SecureCookies  bool
 	RequestID      func(*gin.Context) string
 }
@@ -38,6 +40,7 @@ type AdminAuthHandler struct {
 	limiter   rateLimiter
 	origins   map[string]struct{}
 	rateKey   []byte
+	bffKey    []byte
 	secure    bool
 	requestID func(*gin.Context) string
 }
@@ -47,7 +50,7 @@ type rateLimiter interface {
 }
 
 func NewAdminAuthHandler(service *authapp.Service, limiter rateLimiter, config AdminAuthConfig) (*AdminAuthHandler, error) {
-	if service == nil || limiter == nil || len(config.RateSecret) < 32 || len(config.AllowedOrigins) == 0 {
+	if service == nil || limiter == nil || len(config.RateSecret) < 32 || len(config.BFFSecret) < 32 || len(config.AllowedOrigins) == 0 {
 		return nil, errors.New("invalid admin auth handler configuration")
 	}
 	origins := make(map[string]struct{}, len(config.AllowedOrigins))
@@ -62,11 +65,16 @@ func NewAdminAuthHandler(service *authapp.Service, limiter rateLimiter, config A
 	if requestID == nil {
 		requestID = func(c *gin.Context) string { return c.GetHeader("X-Request-ID") }
 	}
-	return &AdminAuthHandler{service: service, limiter: limiter, origins: origins, rateKey: append([]byte(nil), config.RateSecret...), secure: config.SecureCookies, requestID: requestID}, nil
+	return &AdminAuthHandler{
+		service: service, limiter: limiter, origins: origins,
+		rateKey: append([]byte(nil), config.RateSecret...), bffKey: append([]byte(nil), config.BFFSecret...),
+		secure: config.SecureCookies, requestID: requestID,
+	}, nil
 }
 
 func (handler *AdminAuthHandler) Register(router gin.IRouter) {
 	group := router.Group("/api/v1/admin/auth")
+	group.Use(handler.bff())
 	group.Use(func(c *gin.Context) { c.Header("Cache-Control", "no-store"); c.Next() })
 	group.POST("/login", handler.browserMutation(), handler.login)
 	group.POST("/totp/setup", handler.browserMutation(), handler.require(false, ""), handler.csrf(), handler.setupTOTP)
@@ -75,6 +83,18 @@ func (handler *AdminAuthHandler) Register(router gin.IRouter) {
 	group.POST("/logout", handler.browserMutation(), handler.require(false, ""), handler.csrf(), handler.logout)
 	group.GET("/me", handler.require(false, ""), handler.me)
 	group.POST("/recovery-codes/regenerate", handler.browserMutation(), handler.require(true, "account.manage"), handler.csrf(), handler.regenerate)
+}
+
+func (handler *AdminAuthHandler) bff() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		provided := []byte(c.GetHeader(bffHeader))
+		if len(provided) != len(handler.bffKey) || subtle.ConstantTimeCompare(provided, handler.bffKey) != 1 {
+			handler.problem(c, http.StatusNotFound, "ROUTE_NOT_FOUND", "Route tidak ditemukan.")
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
 }
 
 func (handler *AdminAuthHandler) login(c *gin.Context) {

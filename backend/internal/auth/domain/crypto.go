@@ -4,6 +4,7 @@ package domain
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/ed25519"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/rsa"
@@ -92,8 +93,9 @@ type AccessClaims struct {
 }
 
 type TokenManager struct {
-	private  *rsa.PrivateKey
-	public   *rsa.PublicKey
+	private  any
+	public   any
+	method   jwt.SigningMethod
 	issuer   string
 	audience string
 	keyID    string
@@ -111,7 +113,39 @@ func NewTokenManager(
 		strings.TrimSpace(keyID) == "" || ttl <= 0 || ttl > 15*time.Minute || private.N.Cmp(public.N) != 0 || private.E != public.E {
 		return nil, errors.New("invalid JWT manager configuration")
 	}
-	return &TokenManager{private: private, public: public, issuer: issuer, audience: audience, keyID: keyID, ttl: ttl, now: time.Now}, nil
+	return newTokenManager(private, public, jwt.SigningMethodRS256, issuer, audience, keyID, ttl)
+}
+
+func NewEd25519TokenManager(
+	private ed25519.PrivateKey,
+	issuer, audience, keyID string,
+	ttl time.Duration,
+) (*TokenManager, error) {
+	if len(private) != ed25519.PrivateKeySize {
+		return nil, errors.New("invalid JWT manager configuration")
+	}
+	privateCopy := append(ed25519.PrivateKey(nil), private...)
+	public, ok := privateCopy.Public().(ed25519.PublicKey)
+	if !ok || len(public) != ed25519.PublicKeySize {
+		return nil, errors.New("invalid JWT manager configuration")
+	}
+	return newTokenManager(privateCopy, public, jwt.SigningMethodEdDSA, issuer, audience, keyID, ttl)
+}
+
+func newTokenManager(
+	private, public any,
+	method jwt.SigningMethod,
+	issuer, audience, keyID string,
+	ttl time.Duration,
+) (*TokenManager, error) {
+	if private == nil || public == nil || method == nil || strings.TrimSpace(issuer) == "" ||
+		strings.TrimSpace(audience) == "" || strings.TrimSpace(keyID) == "" || ttl <= 0 || ttl > 15*time.Minute {
+		return nil, errors.New("invalid JWT manager configuration")
+	}
+	return &TokenManager{
+		private: private, public: public, method: method,
+		issuer: issuer, audience: audience, keyID: keyID, ttl: ttl, now: time.Now,
+	}, nil
 }
 
 func (manager *TokenManager) Sign(userID, sessionID uuid.UUID, mfa bool) (string, time.Time, error) {
@@ -137,7 +171,7 @@ func (manager *TokenManager) Sign(userID, sessionID uuid.UUID, mfa bool) (string
 			ID:        jti.String(),
 		},
 	}
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token := jwt.NewWithClaims(manager.method, claims)
 	token.Header["typ"] = "JWT"
 	token.Header["kid"] = manager.keyID
 	signed, err := token.SignedString(manager.private)
@@ -156,12 +190,12 @@ func (manager *TokenManager) Verify(raw string) (AccessClaims, error) {
 		raw,
 		&claims,
 		func(token *jwt.Token) (any, error) {
-			if token.Method != jwt.SigningMethodRS256 || token.Header["typ"] != "JWT" || token.Header["kid"] != manager.keyID {
+			if token.Method != manager.method || token.Header["typ"] != "JWT" || token.Header["kid"] != manager.keyID {
 				return nil, ErrInvalidToken
 			}
 			return manager.public, nil
 		},
-		jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Alg()}),
+		jwt.WithValidMethods([]string{manager.method.Alg()}),
 		jwt.WithIssuer(manager.issuer),
 		jwt.WithAudience(manager.audience),
 		jwt.WithExpirationRequired(),

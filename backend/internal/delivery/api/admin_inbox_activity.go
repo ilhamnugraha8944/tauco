@@ -29,11 +29,11 @@ func RegisterSafeAdminInboxActivityHandlers(router gin.IRouter, server *AdminInb
 	handler := NewSafeStrictHandler(server, nil)
 	options := NewSafeGinServerOptions("")
 	wrapper := ServerInterfaceWrapper{Handler: handler, ErrorHandler: options.ErrorHandler}
-	readInbox := []gin.HandlerFunc{auth.require(true, "inbox.read")}
+	readInbox := []gin.HandlerFunc{auth.bff(), auth.require(true, "inbox.read")}
 	router.GET("/api/v1/admin/contact-messages", appendRouteMiddleware(append(readInbox, rejectUnknownQuery("cursor", "limit", "status")), wrapper.AdminListContactMessages)...)
 	router.GET("/api/v1/admin/contact-messages/:id", appendRouteMiddleware(append(readInbox, rejectUnknownQuery()), wrapper.AdminGetContactMessage)...)
-	router.PATCH("/api/v1/admin/contact-messages/:id/status", appendRouteMiddleware([]gin.HandlerFunc{auth.browserMutation(), auth.require(true, "inbox.write"), auth.csrf()}, wrapper.AdminUpdateContactMessageStatus)...)
-	router.GET("/api/v1/admin/activity-logs", appendRouteMiddleware([]gin.HandlerFunc{auth.require(true, "activity.read"), rejectUnknownQuery("cursor", "limit", "eventType", "entityType")}, wrapper.AdminListActivityLogs)...)
+	router.PATCH("/api/v1/admin/contact-messages/:id/status", appendRouteMiddleware([]gin.HandlerFunc{auth.bff(), auth.browserMutation(), auth.require(true, "inbox.write"), auth.csrf()}, wrapper.AdminUpdateContactMessageStatus)...)
+	router.GET("/api/v1/admin/activity-logs", appendRouteMiddleware([]gin.HandlerFunc{auth.bff(), auth.require(true, "activity.read"), rejectUnknownQuery("cursor", "limit", "eventType", "entityType")}, wrapper.AdminListActivityLogs)...)
 }
 
 func (server *AdminInboxActivityServer) AdminListContactMessages(ctx context.Context, request AdminListContactMessagesRequestObject) (AdminListContactMessagesResponseObject, error) {

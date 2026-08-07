@@ -27,9 +27,9 @@ func RegisterSafeAdminContentHandlers(router gin.IRouter, server *AdminContentSe
 	handler := NewSafeStrictHandler(server, nil)
 	options := NewSafeGinServerOptions("")
 	wrapper := ServerInterfaceWrapper{Handler: handler, ErrorHandler: options.ErrorHandler}
-	read := []gin.HandlerFunc{auth.require(true, "content.read"), rejectUnknownQuery()}
+	read := []gin.HandlerFunc{auth.bff(), auth.require(true, "content.read"), rejectUnknownQuery()}
 	write := func(permission string) []gin.HandlerFunc {
-		return []gin.HandlerFunc{auth.browserMutation(), auth.require(true, permission), auth.csrf()}
+		return []gin.HandlerFunc{auth.bff(), auth.browserMutation(), auth.require(true, permission), auth.csrf()}
 	}
 	router.GET("/api/v1/admin/pages/:key", appendRouteMiddleware(read, wrapper.AdminGetPage)...)
 	router.POST("/api/v1/admin/pages/:key/drafts", appendRouteMiddleware(write("content.write"), wrapper.AdminCreatePageDraft)...)
